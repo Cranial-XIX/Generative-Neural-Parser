@@ -205,7 +205,9 @@ class Processor(object):
                     row = file.next().strip().split('\t')
 
                     for i, rowEntry in enumerate(row):
-                        parent, leftSib, rightChild = rowEntry.split()
+                        row_splitted = rowEntry.split()
+                        parent, leftSib = row_splitted[0], row_splitted[1]
+                        rightChild =  ' '.join(row_splitted[2:])
 
                         if rightChild == "-1":
                             break
