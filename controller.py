@@ -192,7 +192,7 @@ def parse_LCNP(processor, pretrained_file_name, input_parse, input_model):
         'dnt': processor.dim_non_term,
         # model
         'coef_lstm': input_model['coef_lstm'],
-        'bsz': 2,
+        'bsz': 1,
         'dhid': processor.dim_model,
         'coef_l2': input_model['coef_l2'],
         'nlayers': 1,
@@ -202,17 +202,20 @@ def parse_LCNP(processor, pretrained_file_name, input_parse, input_model):
         'brules': processor.torch_binary
     }
     lcnp = LCNPModel(inputs)    
-    nll, chart, hashmap, end, idx = lcnp.parse(get_batch_input(0, inp))
+
+    inp0 = get_batch_input(0, inp)
+
+    nll, chart, hashmap, end, idx = lcnp.parse(inp0)
 
     if nll > 0: # exist parse
         print "The best parse negative log likelihood is ", nll
-        print_parse(processor, chart, hashmap, 0, end, idx)
+        print print_parse(processor, chart, hashmap, 0, end, idx)
 
 
 def print_parse(processor, cky_chart, hash_map, start, end, idx):
     tpl_map = (start, end, idx)
-    parent, left_sib, child, curr_log_prob, mid = cky_chart[start][end][hash_map[tpl_map][1]]
-    #print "ooooooooooooooooooooo ", child
+    parent, curr_log_prob, left_sib, child, mid = cky_chart[start][end][hash_map[tpl_map][0]]
+
     if left_sib == -2:
         # is terminal rule
         return "(" + processor.idx2Nonterm[parent] + " " + processor.idx2Word[child] + ")"
