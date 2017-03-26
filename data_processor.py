@@ -184,7 +184,7 @@ class Processor(object):
                     # I think it might be easier to create matrices in that fashion?
                     try:
                         width, height = [int(num) for num in file.next().split()[:2]]
-                    except EOFError:
+                    except:
                         break
 
                     # skip those special cases
