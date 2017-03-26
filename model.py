@@ -9,8 +9,6 @@ class LCNPModel(nn.Module):
     def __init__(self, inputs):
         super(LCNPModel, self).__init__()
 
-        self.parse = False
-
         # read in necessary inputs
         initrange = inputs['initrange']
 
@@ -88,7 +86,7 @@ class LCNPModel(nn.Module):
     def parse(self, seq_term):
         emb_inp = self.encoder_t(seq_term)
         output, hidden = self.coef_lstm * self.LSTM(emb_inp, self.h0)       
-
+        
         nll = Variable(torch.FloatTensor([0]))
 
         sen = seq_term[0]
@@ -104,7 +102,6 @@ class LCNPModel(nn.Module):
 
         ## Inside Algorithm
         root_idx = 2
-        print "Starting the inside algorithm ... "
 
         # Initialization
 
@@ -221,13 +218,13 @@ class LCNPModel(nn.Module):
                                 tpl = (parent, curr_log_prob, -1, child, start)
                                 inside[start][end].append(tpl)
                                 tpl_map = (start, end, parent)
-                                hash_map[tpl_map] = len(inside[start][end])-1
+                                hash_map[tpl_map] = (len(inside[start][end])-1, curr_log_prob)
                             elif curr_log_prob > hash_map[tpl_map][1]:
                                 idx = hash_map[tpl_map][0]
-                                tpl = (parent, curr_log_prob, -1, child, i)
-                                inside[i][i+1][idx] = tpl
+                                tpl = (parent, curr_log_prob, -1, child, end)
+                                inside[start][end][idx] = tpl
                                 hash_map[tpl_map] = (idx, curr_log_prob)
-        print "Finish inside algorithm ... "
+
         '''
         # DEBUG
         for x in hash_map:
@@ -240,8 +237,9 @@ class LCNPModel(nn.Module):
             print "No parse at all ! "
             return -1, None, None, -1, -1
         else:
-            nll -= inside[0][length][hash_map[tpl_map][0]][1]
+            nll = -inside[0][length][ hash_map[tpl_map][0] ][1]
             return nll, inside, hash_map, length, root_idx
+
 
     def unsupervised(self, seq_term):
         emb_inp = self.encoder_t(seq_term)
