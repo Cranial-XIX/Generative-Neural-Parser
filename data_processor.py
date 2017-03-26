@@ -175,97 +175,104 @@ class Processor(object):
 
         for filename in os.listdir(treeToMatrixDir):
             with open(treeToMatrixDir +  '/' + filename, 'r') as file:
+
                 print "the tree filename is %s" % filename
-                # TODO (@Vin) for some reason, we actually need the transpose of the original matrix,
-                # so maybe we want to change it later, for now, I just use the matrix you give me since
-                # I think it might be easier to create matrices in that fashion?
-                width, height = [int(num) for num in file.next().split()[:2]]
 
-                # skip those special cases
-                if width > constants.MAX_SEN_LENGTH or height > constants.MAX_SEN_HEIGHT:
-                    continue
-                self.num_sen += 1
+                while True:
+                    # TODO (@Vin) for some reason, we actually need the transpose of the original matrix,
+                    # so maybe we want to change it later, for now, I just use the matrix you give me since
+                    # I think it might be easier to create matrices in that fashion?
+                    try:
+                        width, height = [int(num) for num in file.next().split()[:2]]
+                    except EOFError:
+                        break
 
-                input_sentence = []
+                    # skip those special cases
+                    if width > constants.MAX_SEN_LENGTH or height > constants.MAX_SEN_HEIGHT:
+                        continue
+                    self.num_sen += 1
 
-                # the initialization
-                preterms = []
-                
-                p2l_matrix = [[[0. for k in xrange(self.dim_non_term)] for j in xrange(width)] for i in xrange(height)]
-                p2l_target = [[-1 for j in xrange(width)] for i in xrange(height)]
+                    input_sentence = []
 
-                pl2r_matrix = [[[0. for k in xrange(self.dim_non_term * 2)] for j in xrange(width)] for i in xrange(height)]
-                pl2r_target = [[-1 for j in xrange(width)] for i in xrange(height)]
+                    # the initialization
+                    preterms = []
+                    
+                    p2l_matrix = [[[0. for k in xrange(self.dim_non_term)] for j in xrange(width)] for i in xrange(height)]
+                    p2l_target = [[-1 for j in xrange(width)] for i in xrange(height)]
 
-                u_ntm_matrix = [[[0. for k in xrange(self.dim_non_term)] for j in xrange(width)] for i in xrange(height)]
-                u_ntm_target = [[-1 for j in xrange(width)] for i in xrange(height)]
+                    pl2r_matrix = [[[0. for k in xrange(self.dim_non_term * 2)] for j in xrange(width)] for i in xrange(height)]
+                    pl2r_target = [[-1 for j in xrange(width)] for i in xrange(height)]
 
-                # copy matrix from file to local var
-                for j in xrange(width):
-                    row = file.next().strip().split('\t')
+                    u_ntm_matrix = [[[0. for k in xrange(self.dim_non_term)] for j in xrange(width)] for i in xrange(height)]
+                    u_ntm_target = [[-1 for j in xrange(width)] for i in xrange(height)]
 
-                    for i, rowEntry in enumerate(row):
-                        row_splitted = rowEntry.split()
-                        parent, leftSib = row_splitted[0], row_splitted[1]
-                        rightChild =  ' '.join(row_splitted[2:])
+                    # copy matrix from file to local var
+                    for j in xrange(width):
+                        row = file.next().strip().split('\t')
 
-                        if rightChild == "-1":
-                            break
+                        for i, rowEntry in enumerate(row):
+                            row_splitted = rowEntry.split()
+                            parent, leftSib = row_splitted[0], row_splitted[1]
+                            rightChild =  ' '.join(row_splitted[2:])
 
-                        is_terminal = not self.is_digit(rightChild)
+                            if rightChild == "-1":
+                                break
 
-                        ## Append input and preterminal sequence ------------------------
+                            is_terminal = not self.is_digit(rightChild)
 
-                        if is_terminal:
-                            preterms.append(self.emb_non_term_dict[int(parent) + self.new_nt_num])
-                            input_sentence.append(self.word2Idx[rightChild.lower()])
+                            ## Append input and preterminal sequence ------------------------
 
-                        ## Fill the feats matrix and target matrix ----------------------
-
-                        # parent to vector
-                        parentVec = self.emb_non_term_dict[int(parent) + self.new_nt_num]
-
-                        if leftSib == "null":
-                            # unary rule
-                            p2l_matrix[i][j] = parentVec[:]
                             if is_terminal:
-                                p2l_target[i][j] = 0
+                                preterms.append(self.emb_non_term_dict[int(parent) + self.new_nt_num])
+                                input_sentence.append(self.word2Idx[rightChild.lower()])
+
+                            ## Fill the feats matrix and target matrix ----------------------
+
+                            # parent to vector
+                            parentVec = self.emb_non_term_dict[int(parent) + self.new_nt_num]
+
+                            if leftSib == "null":
+                                # unary rule
+                                p2l_matrix[i][j] = parentVec[:]
+                                if is_terminal:
+                                    p2l_target[i][j] = 0
+                                else:
+                                    p2l_target[i][j] = 1
+                                    u_ntm_matrix[i][j] = parentVec[:]
+                                    u_ntm_target[i][j] = int(rightChild) + self.new_nt_num
+                            elif leftSib == "left":
+                                # left part of binary rule
+                                p2l_matrix[i][j] = parentVec[:]
+                                p2l_target[i][j] = int(rightChild) + self.new_nt_num
                             else:
-                                p2l_target[i][j] = 1
-                                u_ntm_matrix[i][j] = parentVec[:]
-                                u_ntm_target[i][j] = int(rightChild) + self.new_nt_num
-                        elif leftSib == "left":
-                            # left part of binary rule
-                            p2l_matrix[i][j] = parentVec[:]
-                            p2l_target[i][j] = int(rightChild) + self.new_nt_num
-                        else:
-                            pl2r_matrix[i][j] = parentVec[:]
-                            pl2r_matrix[i][j].extend(
-                                self.emb_non_term_dict[int(leftSib) + self.new_nt_num])
-                            pl2r_target[i][j] = int(rightChild) + self.new_nt_num
+                                pl2r_matrix[i][j] = parentVec[:]
+                                pl2r_matrix[i][j].extend(
+                                    self.emb_non_term_dict[int(leftSib) + self.new_nt_num])
+                                pl2r_target[i][j] = int(rightChild) + self.new_nt_num
 
-                        ## Store rules --------------------------------------------------
+                            ## Store rules --------------------------------------------------
 
-                        if is_terminal:
-                            # unary terminal rule
-                            self.lexicon[int(self.word2Idx[rightChild.lower()])][int(parent) + self.new_nt_num] = True
-                        elif leftSib == "null":
-                            # unary nonterminal rule
-                            self.unary_dict[int(rightChild) + self.new_nt_num][int(parent) + self.new_nt_num] = True
-                        elif not leftSib == "left":
-                            # binary rule
-                            self.binary_dict[int(leftSib) + self.new_nt_num][int(rightChild) + self.new_nt_num][int(parent) + self.new_nt_num] = True
+                            if is_terminal:
+                                # unary terminal rule
+                                self.lexicon[int(self.word2Idx[rightChild.lower()])][int(parent) + self.new_nt_num] = True
+                            elif leftSib == "null":
+                                # unary nonterminal rule
+                                self.unary_dict[int(rightChild) + self.new_nt_num][int(parent) + self.new_nt_num] = True
+                            elif not leftSib == "left":
+                                # binary rule
+                                self.binary_dict[int(leftSib) + self.new_nt_num][int(rightChild) + self.new_nt_num][int(parent) + self.new_nt_num] = True
 
-                self.seq_input_lists.append(input_sentence)
-                self.seq_preterms_lists.append(preterms)
+                    file.next()
+                    self.seq_input_lists.append(input_sentence)
+                    self.seq_preterms_lists.append(preterms)
 
-                self.seq_p2l_lists.append(p2l_matrix)
-                self.seq_pl2r_lists.append(pl2r_matrix)
-                self.seq_u_ntm_lists.append(u_ntm_matrix)
+                    self.seq_p2l_lists.append(p2l_matrix)
+                    self.seq_pl2r_lists.append(pl2r_matrix)
+                    self.seq_u_ntm_lists.append(u_ntm_matrix)
 
-                self.seq_p2l_target_list.append(p2l_target)
-                self.seq_pl2r_target_list.append(pl2r_target)
-                self.seq_u_ntm_target_list.append(u_ntm_target)
+                    self.seq_p2l_target_list.append(p2l_target)
+                    self.seq_pl2r_target_list.append(pl2r_target)
+                    self.seq_u_ntm_target_list.append(u_ntm_target)
         return
 
     def data(self):

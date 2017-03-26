@@ -103,15 +103,17 @@ def spv_train_LCNP(processor, input_model):
         for i in range(nbatch):
             train_start = time.time()
             inp0, pre0, p2l0, p2lt, pl2r0, pl2rt, unt0, untt = get_batch(i, inp, pre, p2l, p2l_t, pl2r, pl2r_t, unt, unt_t)
+            t0 = time.time()
             lcnp.zero_grad()
             loss = lcnp(inp0, pre0, p2l0, p2lt, pl2r0, pl2rt, unt0, untt)
             print "The loss is ", loss
             loss.backward()
+            t1 = time.time()
             clipped_lr = lr * clip_gradient(lcnp, 0.5)
             for p in lcnp.parameters():
                 p.data.add_(-clipped_lr, p.grad.data)
             train_end = time.time()
-            print "Training one instance needs %.4f secs" % round(train_end - train_start, 0)
+            print "Training one instance needs %.4f, %.4f, %.4f secs" % (round(t0 - train_start, 0),round(t1 - t0, 0),round(train_end - t1, 0) )
 
     print "Finish training"
 

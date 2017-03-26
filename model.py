@@ -1,4 +1,5 @@
 import math
+import time
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -439,6 +440,10 @@ class LCNPModel(nn.Module):
         p2l, p2l_target, 
         pl2r, pl2r_target, 
         unt, unt_target):
+
+
+        #t0 = time.time()
+
         emb_inp = self.encoder_t(seq_term)
         output, hidden = self.coef_lstm * self.LSTM(emb_inp, self.h0) 
 
@@ -447,6 +452,8 @@ class LCNPModel(nn.Module):
 
         output = output.contiguous().view(nbatch, 1, length, -1)
         output = output.repeat(1, height, 1, 1)
+
+        #t1 = time.time()
 
         p2l = torch.cat((p2l, output), 3)
         pl2r = torch.cat((pl2r, output), 3)
@@ -465,6 +472,8 @@ class LCNPModel(nn.Module):
                 torch.gather(logsoftmax(preterm), 1, preterm_target)
             ) / self.nt
 
+        #t2 = time.time()
+
         a, b, c, d = p2l.size()
         p2l = self.p2l(p2l.view(-1, d))
         p2l_target = p2l_target.view(-1, 1).repeat(1, self.nnt)
@@ -474,6 +483,8 @@ class LCNPModel(nn.Module):
         nll_p2l = -torch.sum(
                 torch.gather(logsoftmax(p2l), 1, p2l_target)
             ) / self.nnt
+
+        #t3 = time.time()
 
         a, b, c, d = pl2r.size()
         pl2r = self.pl2r(pl2r.view(-1, d))
@@ -485,6 +496,8 @@ class LCNPModel(nn.Module):
                 torch.gather(logsoftmax(pl2r), 1, pl2r_target)
             ) / self.nnt
 
+        #t4 = time.time()
+
         a, b, c, d = unt.size()
         unt = self.unt(unt.view(-1, d))
         unt_target = unt_target.view(-1, 1).repeat(1, self.nnt)
@@ -495,6 +508,7 @@ class LCNPModel(nn.Module):
                 torch.gather(logsoftmax(unt), 1, unt_target)
             ) / self.nnt
 
+        #print "needs %.4f, %.4f, %.4f, %.4f secs" % (round(t1- t0, 0), round(t2- t1, 0), round(t3- t2, 0), round(t4- t3, 0))
         nll = nll_pret + nll_p2l + nll_pl2r + nll_unt
 
         return nll + self.l2()
