@@ -19,7 +19,7 @@ class LCNPModel(nn.Module):
         self.dt = inputs['dt']              # dimension of terminals
 
         # nonterminals
-        self.encoder_nt = inputs['nt_emb']
+        self.nonterm_emb = inputs['nt_emb']
         self.nnt = inputs['nnt']            # number of nonterminals
         self.dnt = inputs['dnt']            # dimension of nonterminals
 
@@ -28,14 +28,19 @@ class LCNPModel(nn.Module):
         self.bsz = inputs['bsz']
         self.dhid = inputs['dhid']          # dimension of hidden layer
         self.nlayers = inputs['nlayers']    # number of layers in neural net
-        self.coef_l2 = inputs['coef_l2']    # coefficient for L2
         initrange = inputs['initrange']
         self.urules = inputs['urules']      # dictionary of unary rules
         self.brules = inputs['brules']      # dictionary of binary rules
         self.lexicon = inputs['lexicon']
 
 
-        self.encoder_t = nn.Embedding(self.nt, self.dt)
+        self.encoder_nt = nn.Embedding(self.nnt, self.dnt)
+        self.word2vec_plus = nn.Embedding(self.nt, self.dt)
+        self.word2vec = nn.Embedding(self.nt, self.dt)
+
+        self.word2vec.requires_grad = False
+        self.encoder_nt.requires_grad = False
+
 
         self.LSTM = nn.LSTM(self.dt, self.dhid, self.nlayers, batch_first=True, bias=True)
         # the initial states for h0 and c0 of LSTM
@@ -59,7 +64,9 @@ class LCNPModel(nn.Module):
         self.init_weights(initrange)
 
     def init_weights(self, initrange=1.0):
-        self.encoder_t.weight.data = self.term_emb.clone()
+        self.word2vec.weight.data = self.term_emb.clone()
+        self.word2vec_plus.weight.data.fill_(0)
+        self.encoder_nt.weight.data = self.nonterm_emb.clone()
 
         self.p2l.bias.data.fill_(0)
         self.p2l.weight.data.uniform_(-initrange, initrange)
@@ -83,6 +90,9 @@ class LCNPModel(nn.Module):
                 p2l, p2l_target, pl2r, pl2r_target, unt, unt_target)
         else:
             return self.unsupervised(seq_term)
+
+    def encoder_t(self, seq):
+        return self.word2vec_plus(seq) + self.word2vec(seq)
 
     def parse(self, seq_term):
         emb_inp = self.encoder_t(seq_term)
@@ -399,24 +409,33 @@ class LCNPModel(nn.Module):
             else:
                 nll -= inside[0][length][hash_map[tpl_map]][1]
 
-        return nll + self.l2()
+        return nll
 
     def log_prob_ut(self, parent, child, history):
         logsoftmax = nn.LogSoftmax()
-        condition = torch.cat((Variable(self.encoder_nt[parent].view(1, -1)), history.view(1, -1)), 1)
-        res = self.encoder_t.weight.mm(self.ut(condition).t()).view(1, -1)
+        condition = torch.cat((
+                self.encoder_nt(Variable(torch.LongTensor([parent]))), 
+                history.view(1, -1)
+            ), 1)
+        res = (self.word2vec.weight + self.word2vec_plus.weight).mm(self.ut(condition).t()).view(1, -1)
         res = logsoftmax(res).view(-1)
         return res[child]
 
     def log_prob_unt(self, parent, child, history):
         logsoftmax = nn.LogSoftmax()
-        condition = torch.cat((Variable(self.encoder_nt[parent].view(1, -1)), history.view(1, -1)), 1)
+        condition = torch.cat((
+                self.encoder_nt(Variable(torch.LongTensor([parent]))), 
+                history.view(1, -1)
+            ), 1)
         res = logsoftmax(self.unt(condition)).view(-1)
         return res[child]
 
     def log_prob_left(self, parent, child, history):
         logsoftmax = nn.LogSoftmax()
-        condition = torch.cat((Variable(self.encoder_nt[parent].view(1, -1)), history.view(1, -1)), 1)
+        condition = torch.cat((
+                self.encoder_nt(Variable(torch.LongTensor([parent]))), 
+                history.view(1, -1)
+            ), 1)
         res = logsoftmax(self.p2l(condition)).view(-1)
         return res[child]
 
@@ -424,8 +443,8 @@ class LCNPModel(nn.Module):
         logsoftmax = nn.LogSoftmax()
         condition = torch.cat(
                 (
-                    Variable(self.encoder_nt[parent].view(1,-1)),
-                    Variable(self.encoder_nt[left_sib].view(1,-1)),
+                    self.encoder_nt(Variable(torch.LongTensor([parent]))), 
+                    self.encoder_nt(Variable(torch.LongTensor([left_sib]))), 
                     history.view(1, -1)
                 ), 
             1)
@@ -440,7 +459,6 @@ class LCNPModel(nn.Module):
         p2l, p2l_target, 
         pl2r, pl2r_target, 
         unt, unt_target):
-
 
         t0 = time.time()
 
@@ -464,7 +482,7 @@ class LCNPModel(nn.Module):
         a, b, c = preterm.size()
 
         preterm = self.ut(preterm.view(-1, c))
-        preterm = logsoftmax(preterm.mm(self.encoder_t.weight.t()))
+        preterm = logsoftmax(preterm.mm((self.word2vec.weight + self.word2vec_plus.weight).t()))
 
         nll_pret = -torch.sum(preterm.gather(1, seq_term.view(-1).unsqueeze(1)))
         '''
@@ -514,17 +532,5 @@ class LCNPModel(nn.Module):
         print "needs %.4f, %.4f, %.4f, %.4f, %.4f secs" % (round(t1- t0, 5), round(t2- t1, 5), round(t3- t2, 5), round(t4- t3, 5), round(t5-t4, 5))
         nll = nll_pret + nll_p2l + nll_pl2r + nll_unt
 
-        return nll + self.l2()
-
-    def l2(self):
-        l2_t0 = time.time()
-        l2 = Variable(torch.FloatTensor([0]))
-        for param in self.parameters():
-            if param.size(0) == 400000:
-                l2 += torch.sum(torch.pow(param - Variable(self.term_emb), 2))
-            else:
-                l2 += torch.sum(torch.pow(param, 2))
-        l2_t1 = time.time()
-        print "in l2, it needs %.4f, secs" % round(l2_t1- l2_t0, 5)
-        return self.coef_l2 * l2
+        return nll
 

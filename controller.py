@@ -5,6 +5,7 @@ import numpy as np
 import os
 import torch
 import torch.nn as nn
+import torch.optim as optim
 
 from collections import defaultdict
 from torch.autograd import Variable
@@ -57,7 +58,6 @@ def spv_train_LCNP(processor, input_model):
     '''
 
     batch_size = input_model['batch_size']
-    lr = input_model['learning_rate']
     processor.data()
     
 
@@ -85,7 +85,6 @@ def spv_train_LCNP(processor, input_model):
         'coef_lstm': input_model['coef_lstm'],
         'bsz': 2,
         'dhid': processor.dim_model,
-        'coef_l2': input_model['coef_l2'],
         'nlayers': 1,
         'initrange': 1,
         'lexicon': processor.torch_lexicon,
@@ -94,7 +93,7 @@ def spv_train_LCNP(processor, input_model):
     }
     
     lcnp = LCNPModel(inputs)
-    
+    optimizer = optim.Adam(lcnp.parameters(), lr = input_model['learning_rate'], weight_decay=input_model['coef_l2'])
     print "There are %d sentences to train" % processor.num_sen
     for epi in range(input_model['max_epoch']):
 
@@ -103,15 +102,13 @@ def spv_train_LCNP(processor, input_model):
         for i in range(nbatch):
             train_start = time.time()
             inp0, pre0, p2l0, p2lt, pl2r0, pl2rt, unt0, untt = get_batch(i, inp, pre, p2l, p2l_t, pl2r, pl2r_t, unt, unt_t)
-            lcnp.zero_grad()
+            optimizer.zero_grad()
             loss = lcnp(inp0, pre0, p2l0, p2lt, pl2r0, pl2rt, unt0, untt)
             t0 = time.time()
             print "The loss is ", loss
             loss.backward()
             t1 = time.time()
-            clipped_lr = lr * clip_gradient(lcnp, 0.5)
-            for p in lcnp.parameters():
-                p.data.add_(-clipped_lr, p.grad.data)
+            optimizer.step()
             train_end = time.time()
             print "Training one instance needs %.4f, %.4f, %.4f secs" % (round(t0 - train_start, 5),round(t1 - t0, 5),round(train_end - t1, 5) )
 

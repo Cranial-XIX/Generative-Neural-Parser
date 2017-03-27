@@ -62,7 +62,7 @@ def main():
     # Below are variables associated with training
     # =========================================================================
     parser.add_argument(
-        '-me', '--MaxEpoch', required=False, default=2,
+        '-me', '--MaxEpoch', required=False, default=10,
         help='Max epoch number of training'
     )
 
@@ -72,7 +72,7 @@ def main():
     )
 
     parser.add_argument(
-        '-lr', '--LearningRate', required=False, default=0.1,
+        '-lr', '--LearningRate', required=False, default=0.02,
         help="Initial learning rate"
     )
 
