@@ -1,5 +1,6 @@
 import pickle
 import time
+import itertools
 import math
 import numpy as np
 import os
@@ -93,7 +94,8 @@ def spv_train_LCNP(processor, input_model):
     }
     
     lcnp = LCNPModel(inputs)
-    optimizer = optim.Adam(lcnp.parameters(), lr = input_model['learning_rate'], weight_decay=input_model['coef_l2'])
+    parameters = itertools.ifilter(lambda p: p.requires_grad == True, lcnp.parameters())
+    optimizer = optim.Adam(parameters, lr = input_model['learning_rate'], weight_decay=input_model['coef_l2'])
     print "There are %d sentences to train" % processor.num_sen
     for epi in range(input_model['max_epoch']):
 
@@ -118,7 +120,6 @@ def spv_train_LCNP(processor, input_model):
 def uspv_train_LCNP(processor, input_model):
 
     batch_size = input_model['batch_size']
-    lr = input_model['learning_rate']
     processor.data()
 
     inp = batchify(processor.torch_inp, batch_size)
@@ -138,7 +139,6 @@ def uspv_train_LCNP(processor, input_model):
         'coef_lstm': input_model['coef_lstm'],
         'bsz': 2,
         'dhid': processor.dim_model,
-        'coef_l2': input_model['coef_l2'],
         'nlayers': 1,
         'initrange': 1,
         'lexicon': processor.torch_lexicon,
@@ -147,7 +147,7 @@ def uspv_train_LCNP(processor, input_model):
     }
     
     lcnp = LCNPModel(inputs)
-
+    optimizer = optim.Adam(lcnp.l2, lr = input_model['learning_rate'], weight_decay=input_model['coef_l2'])
     print "There are %d sentences to train" % processor.num_sen
     for epi in range(input_model['max_epoch']):
 
@@ -155,7 +155,17 @@ def uspv_train_LCNP(processor, input_model):
 
         for i in range(nbatch):
             train_start = time.time()
+            optimizer.zero_grad()
+            loss = lcnp(inp0, pre0, p2l0, p2lt, pl2r0, pl2rt, unt0, untt)
+            t0 = time.time()
+            print "The loss is ", loss
+            loss.backward()
+            t1 = time.time()
+            optimizer.step()
+            train_end = time.time()
+            print "Training one instance needs %.4f, %.4f, %.4f secs" % (round(t0 - train_start, 5),round(t1 - t0, 5),round(train_end - t1, 5) )
 
+            '''
             inp0 = get_batch_input(i, inp)
             lcnp.zero_grad()
             loss = lcnp(inp0)
@@ -165,8 +175,9 @@ def uspv_train_LCNP(processor, input_model):
             for p in lcnp.parameters():
                 p.data.add_(-clipped_lr, p.grad.data)
             train_end = time.time()
-            print "Training one instance needs %.2f secs" % round(train_end - train_start, 5)
 
+            print "Training one instance needs %.2f secs" % round(train_end - train_start, 5)
+            '''
     print "Finish training"
 
 def parse_LCNP(processor, pretrained_file_name, input_parse, input_model):

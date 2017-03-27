@@ -1,3 +1,4 @@
+import itertools
 import math
 import time
 import torch
@@ -36,11 +37,7 @@ class LCNPModel(nn.Module):
 
         self.encoder_nt = nn.Embedding(self.nnt, self.dnt)
         self.word2vec_plus = nn.Embedding(self.nt, self.dt)
-        self.word2vec = nn.Embedding(self.nt, self.dt)
-
-        self.word2vec.requires_grad = False
-        self.encoder_nt.requires_grad = False
-
+        self.word2vec = nn.Embedding(self.nt, self.dt) 
 
         self.LSTM = nn.LSTM(self.dt, self.dhid, self.nlayers, batch_first=True, bias=True)
         # the initial states for h0 and c0 of LSTM
@@ -63,10 +60,15 @@ class LCNPModel(nn.Module):
 
         self.init_weights(initrange)
 
+        self.l2 = itertools.ifilter(lambda p: p.requires_grad == True, self.parameters())
+
     def init_weights(self, initrange=1.0):
-        self.word2vec.weight.data = self.term_emb.clone()
         self.word2vec_plus.weight.data.fill_(0)
-        self.encoder_nt.weight.data = self.nonterm_emb.clone()
+        self.word2vec.weight.data = self.term_emb
+        self.encoder_nt.weight.data = self.nonterm_emb      
+
+        self.word2vec.weight.requires_grad = False
+        self.encoder_nt.weight.requires_grad = False 
 
         self.p2l.bias.data.fill_(0)
         self.p2l.weight.data.uniform_(-initrange, initrange)
@@ -81,13 +83,18 @@ class LCNPModel(nn.Module):
         self.ut.weight.data.uniform_(-initrange, initrange)
 
     def forward(
-        self, seq_term, seq_preterm=None, 
-        p2l=None, p2l_target=None, 
+        self, seq_term, seq_preterm=None,
+        p2l=None, p2l_target=None,
         pl2r=None, pl2r_target=None,
         unt=None, unt_target=None):
         if type(seq_preterm) == Variable:
-            return self.supervised(seq_term, seq_preterm, 
-                p2l, p2l_target, pl2r, pl2r_target, unt, unt_target)
+            return 
+                self.supervised(
+                    seq_term, seq_preterm, 
+                    p2l, p2l_target, 
+                    pl2r, pl2r_target, 
+                    unt, unt_target
+                )
         else:
             return self.unsupervised(seq_term)
 
@@ -97,7 +104,7 @@ class LCNPModel(nn.Module):
     def parse(self, seq_term):
         emb_inp = self.encoder_t(seq_term)
         output, hidden = self.coef_lstm * self.LSTM(emb_inp, self.h0)       
-        
+
         nll = Variable(torch.FloatTensor([0]))
 
         sen = seq_term[0]
@@ -271,7 +278,7 @@ class LCNPModel(nn.Module):
 
             ## Inside Algorithm
             root_idx = 2
-            print "Starting the inside algorithm ... "
+            #print "Starting the inside algorithm ... "
 
             # Initialization
 
@@ -395,7 +402,7 @@ class LCNPModel(nn.Module):
                                     tpl = (parent, self.log_sum_exp(curr_log_prob, old_log_prob))
                                     inside[start][end][idx] = tpl
 
-            print "Finish inside algorithm ... "
+            #print "Finish inside algorithm ... "
             '''
             # DEBUG
             for x in hash_map:
@@ -417,6 +424,7 @@ class LCNPModel(nn.Module):
                 self.encoder_nt(Variable(torch.LongTensor([parent]))), 
                 history.view(1, -1)
             ), 1)
+        #res = (self.word2vec_plus.weight).mm(self.ut(condition).t()).view(1, -1)
         res = (self.word2vec.weight + self.word2vec_plus.weight).mm(self.ut(condition).t()).view(1, -1)
         res = logsoftmax(res).view(-1)
         return res[child]
@@ -460,7 +468,7 @@ class LCNPModel(nn.Module):
         pl2r, pl2r_target, 
         unt, unt_target):
 
-        t0 = time.time()
+        #t0 = time.time()
 
         emb_inp = self.encoder_t(seq_term)
         output, hidden = self.coef_lstm * self.LSTM(emb_inp, self.h0) 
@@ -471,7 +479,7 @@ class LCNPModel(nn.Module):
         output = output.contiguous().view(nbatch, 1, length, -1)
         output = output.repeat(1, height, 1, 1)
 
-        t1 = time.time()
+        #t1 = time.time()
 
         p2l = torch.cat((p2l, output), 3)
         pl2r = torch.cat((pl2r, output), 3)
@@ -482,6 +490,7 @@ class LCNPModel(nn.Module):
         a, b, c = preterm.size()
 
         preterm = self.ut(preterm.view(-1, c))
+        #preterm = logsoftmax(preterm.mm((self.word2vec_plus.weight).t()))
         preterm = logsoftmax(preterm.mm((self.word2vec.weight + self.word2vec_plus.weight).t()))
 
         nll_pret = -torch.sum(preterm.gather(1, seq_term.view(-1).unsqueeze(1)))
@@ -491,7 +500,7 @@ class LCNPModel(nn.Module):
                 torch.gather(logsoftmax(preterm), 1, preterm_target)
             ) / self.nt
         '''
-        t2 = time.time()
+        #t2 = time.time()
 
         a, b, c, d = p2l.size()
         p2l = self.p2l(p2l.view(-1, d))
@@ -503,7 +512,7 @@ class LCNPModel(nn.Module):
                 torch.gather(logsoftmax(p2l), 1, p2l_target)
             ) / self.nnt
 
-        t3 = time.time()
+        #t3 = time.time()
 
         a, b, c, d = pl2r.size()
         pl2r = self.pl2r(pl2r.view(-1, d))
@@ -515,7 +524,7 @@ class LCNPModel(nn.Module):
                 torch.gather(logsoftmax(pl2r), 1, pl2r_target)
             ) / self.nnt
 
-        t4 = time.time()
+        #t4 = time.time()
 
         a, b, c, d = unt.size()
         unt = self.unt(unt.view(-1, d))
@@ -527,9 +536,9 @@ class LCNPModel(nn.Module):
                 torch.gather(logsoftmax(unt), 1, unt_target)
             ) / self.nnt
 
-        t5 = time.time()
+        #t5 = time.time()
 
-        print "needs %.4f, %.4f, %.4f, %.4f, %.4f secs" % (round(t1- t0, 5), round(t2- t1, 5), round(t3- t2, 5), round(t4- t3, 5), round(t5-t4, 5))
+        #print "needs %.4f, %.4f, %.4f, %.4f, %.4f secs" % (round(t1- t0, 5), round(t2- t1, 5), round(t3- t2, 5), round(t4- t3, 5), round(t5-t4, 5))
         nll = nll_pret + nll_p2l + nll_pl2r + nll_unt
 
         return nll
