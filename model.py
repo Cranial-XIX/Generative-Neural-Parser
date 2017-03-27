@@ -442,7 +442,7 @@ class LCNPModel(nn.Module):
         unt, unt_target):
 
 
-        #t0 = time.time()
+        t0 = time.time()
 
         emb_inp = self.encoder_t(seq_term)
         output, hidden = self.coef_lstm * self.LSTM(emb_inp, self.h0) 
@@ -453,7 +453,7 @@ class LCNPModel(nn.Module):
         output = output.contiguous().view(nbatch, 1, length, -1)
         output = output.repeat(1, height, 1, 1)
 
-        #t1 = time.time()
+        t1 = time.time()
 
         p2l = torch.cat((p2l, output), 3)
         pl2r = torch.cat((pl2r, output), 3)
@@ -464,15 +464,16 @@ class LCNPModel(nn.Module):
         a, b, c = preterm.size()
 
         preterm = self.ut(preterm.view(-1, c))
-        preterm = preterm.mm(self.encoder_t.weight.t())
-        term = seq_term.clone()
-        # x.gather(1, b.unsqueeze(1))
+        preterm = logsoftmax(preterm.mm(self.encoder_t.weight.t()))
+
+        nll_pret = -torch.sum(preterm.gather(1, seq_term.view(-1).unsqueeze(1)))
+        '''
         preterm_target = term.view(-1, 1).repeat(1, self.nt)
         nll_pret = -torch.sum(
                 torch.gather(logsoftmax(preterm), 1, preterm_target)
             ) / self.nt
-
-        #t2 = time.time()
+        '''
+        t2 = time.time()
 
         a, b, c, d = p2l.size()
         p2l = self.p2l(p2l.view(-1, d))
@@ -484,7 +485,7 @@ class LCNPModel(nn.Module):
                 torch.gather(logsoftmax(p2l), 1, p2l_target)
             ) / self.nnt
 
-        #t3 = time.time()
+        t3 = time.time()
 
         a, b, c, d = pl2r.size()
         pl2r = self.pl2r(pl2r.view(-1, d))
@@ -496,7 +497,7 @@ class LCNPModel(nn.Module):
                 torch.gather(logsoftmax(pl2r), 1, pl2r_target)
             ) / self.nnt
 
-        #t4 = time.time()
+        t4 = time.time()
 
         a, b, c, d = unt.size()
         unt = self.unt(unt.view(-1, d))
@@ -508,17 +509,22 @@ class LCNPModel(nn.Module):
                 torch.gather(logsoftmax(unt), 1, unt_target)
             ) / self.nnt
 
-        #print "needs %.4f, %.4f, %.4f, %.4f secs" % (round(t1- t0, 0), round(t2- t1, 0), round(t3- t2, 0), round(t4- t3, 0))
+        t5 = time.time()
+
+        print "needs %.4f, %.4f, %.4f, %.4f, %.4f secs" % (round(t1- t0, 5), round(t2- t1, 5), round(t3- t2, 5), round(t4- t3, 5), round(t5-t4, 5))
         nll = nll_pret + nll_p2l + nll_pl2r + nll_unt
 
         return nll + self.l2()
 
     def l2(self):
+        l2_t0 = time.time()
         l2 = Variable(torch.FloatTensor([0]))
         for param in self.parameters():
             if param.size(0) == 400000:
                 l2 += torch.sum(torch.pow(param - Variable(self.term_emb), 2))
             else:
                 l2 += torch.sum(torch.pow(param, 2))
+        l2_t1 = time.time()
+        print "in l2, it needs %.4f, secs" % round(l2_t1- l2_t0, 5)
         return self.coef_l2 * l2
 

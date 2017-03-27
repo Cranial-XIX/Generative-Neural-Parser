@@ -184,7 +184,7 @@ class Processor(object):
                     # I think it might be easier to create matrices in that fashion?
                     try:
                         width, height = [int(num) for num in file.next().split()[:2]]
-                    except:
+                    except StopIteration:
                         break
 
                     # skip those special cases
@@ -262,7 +262,7 @@ class Processor(object):
                                 # binary rule
                                 self.binary_dict[int(leftSib) + self.new_nt_num][int(rightChild) + self.new_nt_num][int(parent) + self.new_nt_num] = True
 
-                    file.next()
+                    #print file.next()
                     self.seq_input_lists.append(input_sentence)
                     self.seq_preterms_lists.append(preterms)
 
