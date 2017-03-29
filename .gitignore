@@ -1,3 +1,4 @@
 data/*
+! data/embeddings/nonterminalMapping.txt
 output/*
 *.pyc
