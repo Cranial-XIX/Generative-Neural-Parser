@@ -220,6 +220,11 @@ class Processor(object):
                             row_splitted = rowEntry.split()
                             parent, leftSib = row_splitted[0], row_splitted[1]
                             rightChild =  ' '.join(row_splitted[2:])
+                            if rightChild.lower() in self.word2Idx:
+                                ## TODO galileo is very ugly code; please fix
+                                galileo = self.word2Idx[rightChild.lower()]
+                            else:
+                                continue
 
                             if rightChild == "-1":
                                 print file.next() #TODODO no print
@@ -231,7 +236,7 @@ class Processor(object):
 
                             if is_terminal:
                                 preterms.append(self.emb_non_term_dict[int(parent) + self.new_nt_num])
-                                input_sentence.append(self.word2Idx[rightChild.lower()])
+                                input_sentence.append(galileo)
 
                             ## Fill the feats matrix and target matrix ----------------------
 
@@ -261,7 +266,7 @@ class Processor(object):
 
                             if is_terminal:
                                 # unary terminal rule
-                                self.lexicon[int(self.word2Idx[rightChild.lower()])][int(parent) + self.new_nt_num] = True
+                                self.lexicon[int(galileo)][int(parent) + self.new_nt_num] = True
                             elif leftSib == "null":
                                 # unary nonterminal rule
                                 self.unary_dict[int(rightChild) + self.new_nt_num][int(parent) + self.new_nt_num] = True
