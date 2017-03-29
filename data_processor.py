@@ -182,19 +182,18 @@ class Processor(object):
                     # TODO (@Vin) for some reason, we actually need the transpose of the original matrix,
                     # so maybe we want to change it later, for now, I just use the matrix you give me since
                     # I think it might be easier to create matrices in that fashion?
-                    try:
-                        galileo = file.next().split()[:2]
-                        print "width, height ", galileo[0], galileo[1] #TODODO rm
-                        width, height = [int(num) for num in galileo]
-                    except StopIteration:
-                        break
+                    galileo = file.next().split()[:2]
+                    print "width, height ", galileo[0], galileo[1] #TODODO rm
+                    width, height = [int(num) for num in galileo]
+
+                    matrix = []
+                    for j in xrange(width):
+                        matrix.append(file.next())
 
                     # skip those special cases
                     if width > constants.MAX_SEN_LENGTH or height > constants.MAX_SEN_HEIGHT:
-                        for j in xrange(width):
-                            file.next()
-                        print file.next() #TODODO no print
                         continue
+
                     self.num_sen += 1
 
                     input_sentence = []
@@ -213,7 +212,7 @@ class Processor(object):
 
                     # copy matrix from file to local var
                     for j in xrange(width):
-                        row = file.next().strip().split('\t')
+                        row = matrix[j].strip().split('\t')
                         print "Rouch ", row #TODODO rm
 
                         for i, rowEntry in enumerate(row):
@@ -227,7 +226,6 @@ class Processor(object):
                                 continue
 
                             if rightChild == "-1":
-                                print file.next() #TODODO no print
                                 break
 
                             is_terminal = not self.is_digit(rightChild)
@@ -273,8 +271,7 @@ class Processor(object):
                             elif not leftSib == "left":
                                 # binary rule
                                 self.binary_dict[int(leftSib) + self.new_nt_num][int(rightChild) + self.new_nt_num][int(parent) + self.new_nt_num] = True
-
-                    print file.next() #TODODO no print
+                    
                     self.seq_input_lists.append(input_sentence)
                     self.seq_preterms_lists.append(preterms)
 
@@ -285,6 +282,12 @@ class Processor(object):
                     self.seq_p2l_target_list.append(p2l_target)
                     self.seq_pl2r_target_list.append(pl2r_target)
                     self.seq_u_ntm_target_list.append(u_ntm_target)
+                    try:
+                        print file.next()
+                    except StopIteration:
+                        break    
+
+
         return
 
     def data(self):
