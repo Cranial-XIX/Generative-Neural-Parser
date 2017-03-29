@@ -1,4 +1,4 @@
 data/*
-! data/embeddings/nonterminalMapping.txt
+!data/embeddings/nonterminalMapping.txt
 output/*
 *.pyc
