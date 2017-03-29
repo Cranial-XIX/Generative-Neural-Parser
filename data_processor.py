@@ -183,12 +183,17 @@ class Processor(object):
                     # so maybe we want to change it later, for now, I just use the matrix you give me since
                     # I think it might be easier to create matrices in that fashion?
                     try:
-                        width, height = [int(num) for num in file.next().split()[:2]]
+                        galileo = file.next().split()[:2]
+                        print "width, height ", galileo[0], galileo[1] #TODODO rm
+                        width, height = [int(num) for num in galileo]
                     except StopIteration:
                         break
 
                     # skip those special cases
                     if width > constants.MAX_SEN_LENGTH or height > constants.MAX_SEN_HEIGHT:
+                        for j in xrange(width):
+                            file.next()
+                        print file.next() #TODODO no print
                         continue
                     self.num_sen += 1
 
@@ -209,6 +214,7 @@ class Processor(object):
                     # copy matrix from file to local var
                     for j in xrange(width):
                         row = file.next().strip().split('\t')
+                        print "Rouch ", row #TODODO rm
 
                         for i, rowEntry in enumerate(row):
                             row_splitted = rowEntry.split()
@@ -216,6 +222,7 @@ class Processor(object):
                             rightChild =  ' '.join(row_splitted[2:])
 
                             if rightChild == "-1":
+                                print file.next() #TODODO no print
                                 break
 
                             is_terminal = not self.is_digit(rightChild)
@@ -262,7 +269,7 @@ class Processor(object):
                                 # binary rule
                                 self.binary_dict[int(leftSib) + self.new_nt_num][int(rightChild) + self.new_nt_num][int(parent) + self.new_nt_num] = True
 
-                    #print file.next()
+                    print file.next() #TODODO no print
                     self.seq_input_lists.append(input_sentence)
                     self.seq_preterms_lists.append(preterms)
 

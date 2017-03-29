@@ -88,8 +88,7 @@ class LCNPModel(nn.Module):
         pl2r=None, pl2r_target=None,
         unt=None, unt_target=None):
         if type(seq_preterm) == Variable:
-            return 
-                self.supervised(
+            return self.supervised(
                     seq_term, seq_preterm, 
                     p2l, p2l_target, 
                     pl2r, pl2r_target, 
