@@ -82,31 +82,26 @@ class LCNPModel(nn.Module):
         self.ut.bias.data.fill_(0)
         self.ut.weight.data.uniform_(-initrange, initrange)
 
-    def forward(
-        self, seq_term, seq_preterm=None,
-        p2l=None, p2l_target=None,
-        pl2r=None, pl2r_target=None,
-        unt=None, unt_target=None):
-        if type(seq_preterm) == Variable:
-            return self.supervised(
-                    seq_term, seq_preterm, 
-                    p2l, p2l_target, 
-                    pl2r, pl2r_target, 
-                    unt, unt_target
+    def forward(self, sen, *args):
+        if len(args) > 1:
+            return self.supervised(sen,
+                    args[0], args[1], args[2], args[3],
+                    args[4], args[5], args[6], args[7],
+                    args[8], args[9], args[10], args[11]
                 )
         else:
-            return self.unsupervised(seq_term)
+            return self.unsupervised(sen)
 
     def encoder_t(self, seq):
         return self.word2vec_plus(seq) + self.word2vec(seq)
 
-    def parse(self, seq_term):
-        emb_inp = self.encoder_t(seq_term)
+    def parse(self, sen):
+        emb_inp = self.encoder_t(sen)
         output, hidden = self.coef_lstm * self.LSTM(emb_inp, self.h0)       
 
         nll = Variable(torch.FloatTensor([0]))
 
-        sen = seq_term[0]
+        sen = sen.view(-1)
         left_context = output[0]
 
         length = len(sen)
@@ -125,40 +120,33 @@ class LCNPModel(nn.Module):
         # TODO(@Bo) speed up!
         for i in xrange(length):
             child = sen.data[i]
-            for parent in xrange(self.nnt):
-                if self.lexicon[child][parent]:
-                    # new nonterminal found, append to list
-                    # calculate each part of the entry
-                    log_rule_prob = self.log_prob_left(
-                        parent,
-                        0,
-                        left_context[i]
+            if not child in self.lexicon:
+                child = 0
+            for parent in self.lexicon[child]:
+                # new nonterminal found, append to list
+                # calculate each part of the entry
+                log_rule_prob = self.log_prob_left(
+                        parent, 0, left_context[i]
                     ) + self.log_prob_ut(
-                        parent,
-                        child,
-                        left_context[i]
+                        parent, child, left_context[i]
                     )
-                    tpl = (parent, log_rule_prob, -2, child, i)
-                    inside[i][i+1].append(tpl)
-                    tpl_map = (i, i+1, parent)
-                    hash_map[tpl_map] = (len(inside[i][i+1])-1, log_rule_prob)
+                tpl = (parent, log_rule_prob, -2, child, i)
+                inside[i][i+1].append(tpl)
+                tpl_map = (i, i+1, parent)
+                hash_map[tpl_map] = (len(inside[i][i+1])-1, log_rule_prob)
 
         # Unary appending, deal with non_term -> non_term ... -> term chain
         for i in xrange(length):
             for child_tpl in inside[i][i+1]:
                 child = child_tpl[0]
                 previous_log_prob = child_tpl[1]
-                for parent in xrange(self.nnt):
-                    if self.urules[child][parent] == 1:
+                if child in self.urules:
+                    for parent in self.urules[child]:
                         log_rule_prob = self.log_prob_left(
-                            parent,
-                            1,
-                            left_context[i]
-                        ) + self.log_prob_unt(
-                            parent,
-                            child,
-                            left_context[i]
-                        )
+                                parent, 1, left_context[i]
+                            ) + self.log_prob_unt(
+                                parent, child, left_context[i]
+                            )
                         curr_log_prob = previous_log_prob + log_rule_prob
                         tpl_map = (i, i+1, parent)
                         if not tpl_map in hash_map:
@@ -186,19 +174,14 @@ class LCNPModel(nn.Module):
                             child = child_tpl[0]
                             child_log_prob = child_tpl[1]
                             previous_log_prob = left_sib_log_prob + child_log_prob
-                            for parent in xrange(self.nnt):
-                                if self.brules[left_sib][child][parent] == 1:
+                            children = (left_sib, child)
+                            if children in self.brules:
+                                for parent in self.brules[children]:
                                     log_rule_prob = self.log_prob_left(
-                                        parent,
-                                        child,
-                                        left_context[start]
-                                    ) + self.log_prob_right(
-                                        parent,
-                                        left_sib,
-                                        child,
-                                        left_context[mid]
-                                    )
-
+                                            parent, child, left_context[start]
+                                        ) + self.log_prob_right(
+                                            parent, left_sib, child, left_context[mid]
+                                        )
                                     curr_log_prob = previous_log_prob + log_rule_prob
                                     tpl_map = (start, end, parent)
                                     if not tpl_map in hash_map:
@@ -216,17 +199,13 @@ class LCNPModel(nn.Module):
                 for child_tpl in inside[start][end]:
                     child = child_tpl[0]
                     previous_log_prob = child_tpl[1]
-                    for parent in xrange(self.nnt):
-                        if self.urules[child][parent] == 1:
+                    if parent in self.urules:
+                        for parent in self.urules[child]:
                             log_rule_prob = self.log_prob_left(
-                                parent,
-                                1,
-                                left_context[start]
-                            ) + self.log_prob_unt(
-                                parent,
-                                child,
-                                left_context[start]
-                            )
+                                    parent, 1, left_context[start]
+                                ) + self.log_prob_unt(
+                                    parent, child, left_context[start]
+                                )
 
                             curr_log_prob = previous_log_prob + log_rule_prob
                             tpl_map = (start, end, parent)
@@ -251,171 +230,145 @@ class LCNPModel(nn.Module):
         tpl_map = (0, length, root_idx)
         posterior = 1
         if not tpl_map in hash_map:
-            print "No parse at all ! "
             return -1, None, None, -1, -1
         else:
             nll = -inside[0][length][ hash_map[tpl_map][0] ][1]
             return nll, inside, hash_map, length, root_idx
 
 
-    def unsupervised(self, seq_term):
-        emb_inp = self.encoder_t(seq_term)
+    def unsupervised(self, sen):
+        emb_inp = self.encoder_t(sen)
         output, hidden = self.coef_lstm * self.LSTM(emb_inp, self.h0)
 
-        nll = Variable(torch.FloatTensor([0]))
-        for mini_batch in range(len(seq_term)):
-            sen = seq_term[mini_batch]
-            left_context = output[mini_batch]
+        left_context = output.squeeze(0)
 
-            length = len(sen)
-            # every entry is a list of tuples, with each tuple indicate a potential nonterminal 
-            # at this position (nonterminal idx, sum of log probability over the constituent)
-            inside = [[[] for i in xrange(length + 1)] for j in xrange(length + 1)]
+        sen = sen.view(-1)
+        length = len(sen)
+        # every entry is a list of tuples, with each tuple indicate
+        # a potential nonterminal at this position 
+        # (nonterminal idx, sum of log probability over the constituent)
+        inside = [[[] for i in xrange(length+1)] for j in xrange(length+1)]
 
-            # a hashmap that stores the total prob of certain constituent
-            hash_map = {}
+        # a hashmap that stores the total prob of certain constituent
+        hash_map = {}
 
-            ## Inside Algorithm
-            root_idx = 2
-            #print "Starting the inside algorithm ... "
+        ## Inside Algorithm
 
-            # Initialization
+        root_idx = 2
 
-            # TODO(@Bo) speed up!
-            for i in xrange(length):
-                child = sen.data[i]
-                for parent in xrange(self.nnt):
-                    if self.lexicon[child][parent]:
-                        # new nonterminal found, append to list
-                        # calculate each part of the entry
+        # Initialization
+        for i in xrange(length):
+            child = sen.data[i]
+            if not child in self.lexicon:
+                child = 0
+            for parent in self.lexicon[child]:
+                # new nonterminal found, append to list
+                # calculate each part of the entry
+                log_rule_prob = self.log_prob_left(
+                        parent, 0, left_context[i]
+                    ) + self.log_prob_ut(
+                        parent, child, left_context[i]
+                    )
+                tpl = (parent, log_rule_prob)
+                inside[i][i+1].append(tpl)
+                tpl_map = (i, i+1, parent)
+                hash_map[tpl_map] = len(inside[i][i+1])-1
+
+        # Unary appending, deal with non_term -> non_term ... -> term chain
+        for i in xrange(length):
+            for child_tpl in inside[i][i+1]:
+                child = child_tpl[0]
+                previous_log_prob = child_tpl[1]
+                if child in self.urules:
+                    for parent in self.urules[child]:
                         log_rule_prob = self.log_prob_left(
-                            parent,
-                            0,
-                            left_context[i]
-                        ) + self.log_prob_ut(
-                            parent,
-                            child,
-                            left_context[i]
-                        )
-                        tpl = (parent, log_rule_prob)
-                        inside[i][i+1].append(tpl)
+                                parent, 1, left_context[i]
+                            ) + self.log_prob_unt(
+                                parent, child, left_context[i]
+                            )
+                        curr_log_prob = previous_log_prob + log_rule_prob
                         tpl_map = (i, i+1, parent)
-                        hash_map[tpl_map] = len(inside[i][i+1])-1
+                        if not tpl_map in hash_map:
+                            left_sib = -1
+                            tpl = (parent, curr_log_prob)
+                            inside[i][i+1].append(tpl)
+                            hash_map[tpl_map] = len(inside[i][i+1])-1
+                        else:
+                            left_sib = -1
+                            idx = hash_map[tpl_map]
+                            old_log_prob = inside[i][i+1][idx][1]
+                            tpl = (parent, self.log_sum_exp(curr_log_prob, old_log_prob))
+                            inside[i][i+1][idx] = tpl
 
-            # Unary appending, deal with non_term -> non_term ... -> term chain
-            for i in xrange(length):
-                for child_tpl in inside[i][i+1]:
+        # viterbi algorithm
+        for width in xrange(2, length+1):
+            for start in xrange(0, length-width+1):
+                end = start + width
+                # binary rule
+                for mid in xrange(start+1, end):
+                    for left_sib_tpl in inside[start][mid]:
+                        for child_tpl in inside[mid][end]:
+                            left_sib = left_sib_tpl[0]
+                            left_sib_log_prob = left_sib_tpl[1]
+                            child = child_tpl[0]
+                            child_log_prob = child_tpl[1]
+                            previous_log_prob = left_sib_log_prob + child_log_prob
+                            children = (left_sib, child)
+                            if children in self.brules:
+                                for parent in self.brules[children]:
+                                    log_rule_prob = self.log_prob_left(
+                                            parent, child, left_context[start]
+                                        ) + self.log_prob_right(
+                                            parent, left_sib, child, left_context[mid]
+                                        )
+                                    curr_log_prob = previous_log_prob + log_rule_prob
+                                    tpl_map = (start, end, parent)
+                                    if not tpl_map in hash_map:
+                                        tpl = (parent, curr_log_prob)
+                                        inside[start][end].append(tpl)
+                                        tpl_map = (start, end, parent)
+                                        hash_map[tpl_map] = len(inside[start][end])-1
+                                    else:
+                                        idx = hash_map[tpl_map]
+                                        old_log_prob = inside[start][end][idx][1]
+                                        tpl = (parent, self.log_sum_exp(curr_log_prob, old_log_prob))
+                                        inside[start][end][idx] = tpl
+
+                # unary rule
+                for child_tpl in inside[start][end]:
                     child = child_tpl[0]
                     previous_log_prob = child_tpl[1]
-                    for parent in xrange(self.nnt):
-                        if self.urules[child][parent] == 1:
+                    if parent in self.urules:
+                        for parent in self.urules[child]:
                             log_rule_prob = self.log_prob_left(
-                                parent,
-                                1,
-                                left_context[i]
-                            ) + self.log_prob_unt(
-                                parent,
-                                child,
-                                left_context[i]
-                            )
-                            curr_log_prob = previous_log_prob + log_rule_prob
-                            tpl_map = (i, i+1, parent)
-                            if not tpl_map in hash_map:
-                                left_sib = -1
-                                tpl = (parent, curr_log_prob)
-                                inside[i][i+1].append(tpl)
-                                hash_map[tpl_map] = len(inside[i][i+1])-1
-                            else:
-                                left_sib = -1
-                                idx = hash_map[tpl_map]
-                                old_log_prob = inside[i][i+1][idx][1]
-                                tpl = (parent, self.log_sum_exp(curr_log_prob, old_log_prob))
-                                inside[i][i+1][idx] = tpl
-
-            # viterbi algorithm
-            for width in xrange(2, length+1):
-                for start in xrange(0, length-width+1):
-                    end = start + width
-                    # binary rule
-                    for mid in xrange(start+1, end):
-                        for left_sib_tpl in inside[start][mid]:
-                            for child_tpl in inside[mid][end]:
-                                left_sib = left_sib_tpl[0]
-                                left_sib_log_prob = left_sib_tpl[1]
-                                child = child_tpl[0]
-                                child_log_prob = child_tpl[1]
-                                previous_log_prob = left_sib_log_prob + child_log_prob
-                                for parent in xrange(self.nnt):
-                                    if self.brules[left_sib][child][parent] == 1:
-                                        log_rule_prob = self.log_prob_left(
-                                            parent,
-                                            child,
-                                            left_context[start]
-                                        ) + self.log_prob_right(
-                                            parent,
-                                            left_sib,
-                                            child,
-                                            left_context[mid]
-                                        )
-
-                                        curr_log_prob = previous_log_prob + log_rule_prob
-                                        tpl_map = (start, end, parent)
-                                        if not tpl_map in hash_map:
-                                            tpl = (parent, curr_log_prob)
-                                            inside[start][end].append(tpl)
-                                            tpl_map = (start, end, parent)
-                                            hash_map[tpl_map] = len(inside[start][end])-1
-                                        else:
-                                            idx = hash_map[tpl_map]
-                                            old_log_prob = inside[start][end][idx][1]
-                                            tpl = (parent, self.log_sum_exp(curr_log_prob, old_log_prob))
-                                            inside[start][end][idx] = tpl
-
-                    # unary rule
-                    for child_tpl in inside[start][end]:
-                        child = child_tpl[0]
-                        previous_log_prob = child_tpl[1]
-                        for parent in xrange(self.nnt):
-                            if self.urules[child][parent] == 1:
-                                log_rule_prob = self.log_prob_left(
-                                    parent,
-                                    1,
-                                    left_context[start]
+                                    parent, 1, left_context[start]
                                 ) + self.log_prob_unt(
-                                    parent,
-                                    child,
-                                    left_context[start]
+                                    parent, child, left_context[start]
                                 )
-
-                                curr_log_prob = previous_log_prob + log_rule_prob
+                            curr_log_prob = previous_log_prob + log_rule_prob
+                            tpl_map = (start, end, parent)
+                            left_sib = -1
+                            if not tpl_map in hash_map:
+                                tpl = (parent, curr_log_prob)
+                                inside[start][end].append(tpl)
                                 tpl_map = (start, end, parent)
-                                left_sib = -1
-                                if not tpl_map in hash_map:
-                                    tpl = (parent, curr_log_prob)
-                                    inside[start][end].append(tpl)
-                                    tpl_map = (start, end, parent)
-                                    hash_map[tpl_map] = len(inside[start][end])-1
-                                else:
-                                    idx = hash_map[tpl_map]
-                                    old_log_prob = inside[start][end][idx][1]
-                                    tpl = (parent, self.log_sum_exp(curr_log_prob, old_log_prob))
-                                    inside[start][end][idx] = tpl
-
-            #print "Finish inside algorithm ... "
-            '''
+                                hash_map[tpl_map] = len(inside[start][end])-1
+                            else:
+                                idx = hash_map[tpl_map]
+                                old_log_prob = inside[start][end][idx][1]
+                                tpl = (parent, self.log_sum_exp(curr_log_prob, old_log_prob))
+                                inside[start][end][idx] = tpl
+        #print "Finish inside algorithm ... "
+        
+        tpl_map = (0, length, root_idx)
+        if not tpl_map in hash_map:
             # DEBUG
-            for x in hash_map:
-                print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x]][1].data[0])
+            #for x in hash_map:
+            #    print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x]][1].data[0])
+            return Variable(torch.FloatTensor([-1]))
 
-            '''
-            tpl_map = (0, length, root_idx)
-            posterior = 1
-            if not tpl_map in hash_map:
-                print "No parse at all ! "
-            else:
-                nll -= inside[0][length][hash_map[tpl_map]][1]
-
-        return nll
+        else:
+            return -inside[0][length][hash_map[tpl_map]][1]
 
     def log_prob_ut(self, parent, child, history):
         logsoftmax = nn.LogSoftmax()
@@ -462,83 +415,76 @@ class LCNPModel(nn.Module):
         m = a if a > b else b
         return m + torch.log(torch.exp(a-m) + torch.exp(b-m))
 
-    def supervised(self, seq_term, seq_preterm, 
-        p2l, p2l_target, 
-        pl2r, pl2r_target, 
-        unt, unt_target):
+    def supervised(self, sens,
+        p2l, pl2r, unt, ut,
+        p2l_t, pl2r_t, unt_t, ut_t,
+        p2l_i, pl2r_i, unt_i, ut_i):
 
-        #t0 = time.time()
+        t0 = time.time()
+        # run the LSTM to extract features from left context
+        output, hidden = self.coef_lstm * \
+            self.LSTM(self.encoder_t(sens), self.h0) 
+        output = output.contiguous().view(-1, output.size(2))
 
-        emb_inp = self.encoder_t(seq_term)
-        output, hidden = self.coef_lstm * self.LSTM(emb_inp, self.h0) 
-
-        out = output.clone()
-        nbatch, height, length, depth = p2l.size()
-
-        output = output.contiguous().view(nbatch, 1, length, -1)
-        output = output.repeat(1, height, 1, 1)
-
-        #t1 = time.time()
-
-        p2l = torch.cat((p2l, output), 3)
-        pl2r = torch.cat((pl2r, output), 3)
-        unt = torch.cat((unt, output), 3)
+        t1 = time.time()
 
         logsoftmax = nn.LogSoftmax()
-        preterm = torch.cat((seq_preterm, out), 2)
-        a, b, c = preterm.size()
 
-        preterm = self.ut(preterm.view(-1, c))
-        #preterm = logsoftmax(preterm.mm((self.word2vec_plus.weight).t()))
-        preterm = logsoftmax(preterm.mm((self.word2vec.weight + self.word2vec_plus.weight).t()))
+        p2l = torch.cat((
+                p2l.view(-1, p2l.size(2)), 
+                torch.index_select(output, 0, p2l_i.view(-1)))
+            , 1)
 
-        nll_pret = -torch.sum(preterm.gather(1, seq_term.view(-1).unsqueeze(1)))
-        '''
-        preterm_target = term.view(-1, 1).repeat(1, self.nt)
-        nll_pret = -torch.sum(
-                torch.gather(logsoftmax(preterm), 1, preterm_target)
-            ) / self.nt
-        '''
-        #t2 = time.time()
+        mask = (p2l_t.view(-1) > 0)
+        mask_matrix = mask.repeat(1, self.nnt)
+        matrix = logsoftmax(self.p2l(p2l)).masked_select(mask_matrix).view(-1, self.nnt)
+        target = p2l_t.view(-1).masked_select(mask)
+        nll_p2l = -torch.sum( matrix.gather(1, target.unsqueeze(1)) )
 
-        a, b, c, d = p2l.size()
-        p2l = self.p2l(p2l.view(-1, d))
-        p2l_target = p2l_target.view(-1, 1).repeat(1, self.nnt)
-        mask = p2l_target >=0
-        p2l = p2l.masked_select(mask).view(-1, self.nnt)
-        p2l_target = p2l_target.masked_select(mask).view(-1, self.nnt)
-        nll_p2l = -torch.sum(
-                torch.gather(logsoftmax(p2l), 1, p2l_target)
-            ) / self.nnt
+        t2 = time.time()
 
-        #t3 = time.time()
+        pl2r = torch.cat((
+                pl2r.view(-1, pl2r.size(2)), 
+                torch.index_select(output, 0, pl2r_i.view(-1)))
+            , 1)
 
-        a, b, c, d = pl2r.size()
-        pl2r = self.pl2r(pl2r.view(-1, d))
-        pl2r_target = pl2r_target.view(-1, 1).repeat(1, self.nnt)
-        mask = (pl2r_target >= 0)
-        pl2r = pl2r.masked_select(mask).view(-1, self.nnt)
-        pl2r_target = pl2r_target.masked_select(mask).view(-1, self.nnt)
-        nll_pl2r = -torch.sum(
-                torch.gather(logsoftmax(pl2r), 1, pl2r_target)
-            ) / self.nnt
+        mask = (pl2r_t.view(-1) > 0)
+        mask_matrix = mask.repeat(1, self.nnt)
+        matrix = logsoftmax(self.pl2r(pl2r)).masked_select(mask_matrix).view(-1, self.nnt)
+        target = pl2r_t.view(-1).masked_select(mask)
+        nll_pl2r = -torch.sum( matrix.gather(1, target.unsqueeze(1)) )
 
-        #t4 = time.time()
+        t3 = time.time()
 
-        a, b, c, d = unt.size()
-        unt = self.unt(unt.view(-1, d))
-        unt_target = unt_target.view(-1, 1).repeat(1, self.nnt)
-        mask = (unt_target >= 0)
-        unt = unt.masked_select(mask).view(-1, self.nnt)
-        unt_target = unt_target.masked_select(mask).view(-1, self.nnt)
-        nll_unt = -torch.sum(
-                torch.gather(logsoftmax(unt), 1, unt_target)
-            ) / self.nnt
+        unt = torch.cat((
+                unt.view(-1, unt.size(2)), 
+                torch.index_select(output, 0, unt_i.view(-1)))
+            , 1)
 
-        #t5 = time.time()
+        mask = (unt_t.view(-1) > 0)
+        mask_matrix = mask.repeat(1, self.nnt)
+        matrix = logsoftmax(self.unt(unt)).masked_select(mask_matrix).view(-1, self.nnt)
+        target = unt_t.view(-1).masked_select(mask)
+        nll_unt = -torch.sum( matrix.gather(1, target.unsqueeze(1)) )
 
-        #print "needs %.4f, %.4f, %.4f, %.4f, %.4f secs" % (round(t1- t0, 5), round(t2- t1, 5), round(t3- t2, 5), round(t4- t3, 5), round(t5-t4, 5))
-        nll = nll_pret + nll_p2l + nll_pl2r + nll_unt
+        t4 = time.time()
+
+        ut = torch.cat((
+                ut.view(-1, ut.size(2)), 
+                torch.index_select(output, 0, ut_i.view(-1)))
+            , 1)
+
+        mask = (ut_t.view(-1) > 0)
+        mask_matrix = mask.repeat(1, self.nt)
+        matrix = self.ut(ut).mm((self.word2vec.weight + self.word2vec_plus.weight).t())
+        matrix = logsoftmax(matrix).masked_select(mask_matrix).view(-1, self.nt)
+        target = ut_t.view(-1).masked_select(mask)
+        nll_ut = -torch.sum( matrix.gather(1, target.unsqueeze(1)) )
+
+        t5 = time.time()
+
+        print "needs %.4f, %.4f, %.4f, %.4f, %.4f secs" % (round(t1- t0, 5), round(t2- t1, 5), round(t3- t2, 5), round(t4- t3, 5), round(t5-t4, 5))
+        nll = nll_p2l + nll_pl2r + nll_unt + nll_ut
 
         return nll
 
