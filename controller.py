@@ -29,9 +29,9 @@ def spv_train_LCNP(p, cmd_inp):
 
         # model
         'coef_lstm': cmd_inp['coef_lstm'],
+        'nlayers': cmd_inp['layer_lstm'],
         'bsz': batch_size,
         'dhid': cmd_inp['dim_model'],
-        'nlayers': 1,
         'initrange': 1,
         'lexicon': p.lexicon,
         'urules': p.unary,
@@ -105,9 +105,9 @@ def uspv_train_LCNP(p, cmd_inp):
 
         # model
         'coef_lstm': cmd_inp['coef_lstm'],
+        'nlayers': cmd_inp['layer_lstm'],
         'bsz': batch_size,
         'dhid': cmd_inp['dim_model'],
-        'nlayers': 1,
         'initrange': 1,
         'lexicon': p.lexicon,
         'urules': p.unary,
@@ -172,9 +172,9 @@ def parse_LCNP(p, sen2parse, cmd_inp):
 
         # model
         'coef_lstm': cmd_inp['coef_lstm'],
+        'nlayers': cmd_inp['layer_lstm'],
         'bsz': batch_size,
         'dhid': cmd_inp['dim_model'],
-        'nlayers': 1,
         'initrange': 1,
         'lexicon': p.lexicon,
         'urules': p.unary,

@@ -57,11 +57,15 @@ def main():
     )
 
     parser.add_argument(
-        '-lstm', '--CoefLSTM', required=False, default=1,
+        '-lstm_coef', '--CoefLSTM', required=False, default=1,
     )
 
     parser.add_argument(
-        '-d', '--DimLSTM', required=False, default=100,
+        '-lstm_layer', '--LayerLSTM', required=False, default=3,
+    )
+
+    parser.add_argument(
+        '-lstm_dim', '--DimLSTM', required=False, default=100,
         help='Dimension of LSTM model '
     )
 
@@ -114,6 +118,7 @@ def main():
     print (" You want the %s mode of the model" % args.Mode ) 
     print (" Seed is : %s" % str(args.Seed) )
     print (" LSTM coefficient is : %s" % str(args.CoefLSTM))
+    print (" LSTM number of layer is : %s" % str(args.LayerLSTM))
     print (" DimLSTM is : %s" % str(args.DimLSTM) )
     print (" CoefL2 is : %s" % str(args.CoefL2) )
 
@@ -132,6 +137,7 @@ def main():
 
         'seed_random': args.Seed,
         'coef_lstm': args.CoefLSTM,
+        'layer_lstm': args.LayerLSTM,
         'dim_model': args.DimLSTM,
         'coef_l2': args.CoefL2,
 

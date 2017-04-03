@@ -39,7 +39,10 @@ class LCNPModel(nn.Module):
         self.word2vec_plus = nn.Embedding(self.nt, self.dt)
         self.word2vec = nn.Embedding(self.nt, self.dt) 
 
-        self.LSTM = nn.LSTM(self.dt, self.dhid, self.nlayers, batch_first=True, bias=True)
+        self.LSTM = nn.LSTM(
+                self.dt, self.dhid, self.nlayers,
+                batch_first=True, dropout=0.5, bias=True
+            )
         # the initial states for h0 and c0 of LSTM
         self.h0 = (Variable(torch.zeros(self.nlayers, self.bsz, self.dhid)),
                 Variable(torch.zeros(self.nlayers, self.bsz, self.dhid)))
@@ -60,8 +63,6 @@ class LCNPModel(nn.Module):
 
         self.init_weights(initrange)
 
-        self.l2 = itertools.ifilter(lambda p: p.requires_grad == True, self.parameters())
-
     def init_weights(self, initrange=1.0):
         self.word2vec_plus.weight.data.fill_(0)
         self.word2vec.weight.data = self.term_emb
@@ -69,6 +70,27 @@ class LCNPModel(nn.Module):
 
         self.word2vec.weight.requires_grad = False
         self.encoder_nt.weight.requires_grad = False 
+
+        # Below are initial setup for LSTM
+        lstm_weight_range = 0.2
+
+        self.LSTM.weight_ih_l0.data.uniform_(-lstm_weight_range, lstm_weight_range)
+        self.LSTM.weight_ih_l1.data.uniform_(-lstm_weight_range, lstm_weight_range)
+        self.LSTM.weight_ih_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)
+        self.LSTM.weight_hh_l0.data.uniform_(-lstm_weight_range, lstm_weight_range)
+        self.LSTM.weight_hh_l1.data.uniform_(-lstm_weight_range, lstm_weight_range)
+        self.LSTM.weight_hh_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)
+
+        size = len(self.LSTM.bias_ih_l1)
+        section = size / 4
+        for i in xrange(section, 2*section):
+            self.LSTM.bias_ih_l0.data[i] = 1.0
+            self.LSTM.bias_ih_l1.data[i] = 1.0
+            self.LSTM.bias_ih_l2.data[i] = 1.0
+            self.LSTM.bias_hh_l0.data[i] = 1.0
+            self.LSTM.bias_hh_l1.data[i] = 1.0
+            self.LSTM.bias_hh_l2.data[i] = 1.0
+
 
         self.p2l.bias.data.fill_(0)
         self.p2l.weight.data.uniform_(-initrange, initrange)
