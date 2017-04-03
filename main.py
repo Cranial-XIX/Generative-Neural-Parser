@@ -142,7 +142,7 @@ def main():
         'coef_l2': args.CoefL2,
 
         'max_epoch': args.MaxEpoch,
-        'batch_size': args.BatchSize,
+        'batch_size': int(args.BatchSize),
         'learning_rate': args.LearningRate,
     }
 
