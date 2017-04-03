@@ -135,15 +135,15 @@ def main():
         'dt': args.TerminalDimension,
         'rd': args.ShouldReadData == "yes",
 
-        'seed_random': args.Seed,
-        'coef_lstm': args.CoefLSTM,
-        'layer_lstm': args.LayerLSTM,
-        'dim_model': args.DimLSTM,
-        'coef_l2': args.CoefL2,
+        'seed_random': int(args.Seed),
+        'coef_lstm': float(args.CoefLSTM),
+        'layer_lstm': int(args.LayerLSTM),
+        'dim_model': int(args.DimLSTM),
+        'coef_l2': float(args.CoefL2),
 
-        'max_epoch': args.MaxEpoch,
+        'max_epoch': int(args.MaxEpoch),
         'batch_size': int(args.BatchSize),
-        'learning_rate': args.LearningRate,
+        'learning_rate': float(args.LearningRate),
     }
 
     p = data_processor.Processor(cmd_inp)
