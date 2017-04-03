@@ -37,8 +37,13 @@ def spv_train_LCNP(p, cmd_inp):
         'urules': p.unary,
         'brules': p.binary
     }
-    
+
     model = LCNPModel(inputs)
+    if not cmd_inp['pretrain'] == None:
+        print " - use pretrained model from ", cmd_inp['pretrain']
+        pretrain = torch.load(cmd_inp['pretrain'])
+        model.load_state_dict(pretrain['state_dict'])
+
     parameters = itertools.ifilter(
         lambda x: x.requires_grad, model.parameters())
 
@@ -78,6 +83,9 @@ def spv_train_LCNP(p, cmd_inp):
                         round(t0 - train_start, 5),
                         round(t1 - t0, 5),
                         round(train_end - t1, 5) )
+    torch.save({
+            'state_dict': model.state_dict()
+        }, cmd_inp['save'])
 
     print "Finish training"
 
@@ -107,6 +115,11 @@ def uspv_train_LCNP(p, cmd_inp):
     }
     
     model = LCNPModel(inputs)
+    if not cmd_inp['pretrain'] == None:
+        print " - use pretrained model from ", cmd_inp['pretrain']
+        pretrain = torch.load(cmd_inp['pretrain'])
+        model.load_state_dict(pretrain['state_dict'])
+
     parameters = itertools.ifilter(
         lambda x: x.requires_grad, model.parameters())
 
@@ -168,7 +181,11 @@ def parse_LCNP(p, sen2parse, cmd_inp):
         'brules': p.binary
     }
     
-    model = LCNPModel(inputs)   
+    model = LCNPModel(inputs)
+    if not cmd_inp['pretrain'] == None:
+        print " - use pretrained model from ", cmd_inp['pretrain']
+        pretrain = torch.load(cmd_inp['pretrain'])
+        model.load_state_dict(pretrain['state_dict']) 
 
     inp = p.get_idx(sen2parse)
 

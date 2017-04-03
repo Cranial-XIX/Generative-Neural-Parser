@@ -97,7 +97,7 @@ def main():
     path_folder = './output/' + tag_model + '/'
     os.makedirs(path_folder)
 
-    file_save = os.path.abspath(path_folder + 'log.txt')
+    file_save = os.path.abspath(path_folder + 'model_dict.tar')
 
     ## show values ##
     print ""
