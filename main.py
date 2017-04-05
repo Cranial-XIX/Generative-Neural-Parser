@@ -5,6 +5,7 @@ import numpy
 import os
 import pickle
 import time
+import torch
 
 import constants
 import controller
@@ -90,9 +91,18 @@ def main():
         '-lr', '--LearningRate', required=False, default=0.02,
         help="Initial learning rate"
     )
+    
+    parser.add_argument('--cuda', action='store_true',
+        help='use CUDA')
 
     args = parser.parse_args()
 
+    if torch.cuda.is_available():
+        if not args.cuda:
+            print("WARNING: You have a CUDA device, so you should probably run with --cuda")
+        else:
+            torch.cuda.manual_seed(args.Seed)
+        
     # Create folder to save model and log files
     id_process = os.getpid()
     time_current = datetime.datetime.now().isoformat()
@@ -144,6 +154,7 @@ def main():
         'max_epoch': int(args.MaxEpoch),
         'batch_size': int(args.BatchSize),
         'learning_rate': float(args.LearningRate),
+        'cuda': args.cuda
     }
 
     p = data_processor.Processor(cmd_inp)

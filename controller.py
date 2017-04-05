@@ -39,6 +39,8 @@ def spv_train_LCNP(p, cmd_inp):
     }
 
     model = LCNPModel(inputs)
+    if cmd_inp['cuda']:
+        model.cuda()
     if not cmd_inp['pretrain'] == None:
         print " - use pretrained model from ", cmd_inp['pretrain']
         pretrain = torch.load(cmd_inp['pretrain'])
@@ -61,7 +63,7 @@ def spv_train_LCNP(p, cmd_inp):
                 print "\nBatch %d -----------------------------------------" % batch
                 train_start = time.time()
                 optimizer.zero_grad()
-                loss = model(Variable(p.sens),
+                p_array = [Variable(p.sens),
                     Variable(p.p2l), Variable(p.pl2r),
                     Variable(p.unt), Variable(p.ut),
 
@@ -69,7 +71,18 @@ def spv_train_LCNP(p, cmd_inp):
                     Variable(p.unt_t), Variable(p.ut_t),
 
                     Variable(p.p2l_hi), Variable(p.pl2r_hi),
-                    Variable(p.unt_hi), Variable(p.ut_hi))
+                    Variable(p.unt_hi), Variable(p.ut_hi)]
+                if cmd_inp['cuda']:
+                    p_array = [x.cuda() for x in p_array]
+                loss = model(p_array[0],
+                            p_array[1], p_array[2],
+                            p_array[3], p_array[4],
+                            
+                            p_array[5], p_array[6],
+                            p_array[7], p_array[8],
+                            
+                            p_array[9], p_array[10],
+                            p_array[11], p_array[12])
 
                 t0 = time.time()
                 print " - NLL Loss: ", loss
