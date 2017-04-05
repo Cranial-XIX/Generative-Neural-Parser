@@ -119,12 +119,12 @@ class LCNPModel(nn.Module):
 
     def parse(self, sen):
         emb_inp = self.encoder_t(sen)
-        output, hidden = self.coef_lstm * self.LSTM(emb_inp, self.h0)       
+        output, hidden = self.LSTM(emb_inp, self.h0)       
 
         nll = Variable(torch.FloatTensor([0]))
 
         sen = sen.view(-1)
-        left_context = output[0]
+        left_context = self.coef_lstm * output[0]
 
         length = len(sen)
         # every entry is a list of tuples, with each tuple indicate a potential nonterminal 
@@ -260,9 +260,9 @@ class LCNPModel(nn.Module):
 
     def unsupervised(self, sen):
         emb_inp = self.encoder_t(sen)
-        output, hidden = self.coef_lstm * self.LSTM(emb_inp, self.h0)
+        output, hidden = self.LSTM(emb_inp, self.h0)
 
-        left_context = output.squeeze(0)
+        left_context = self.coef_lstm * output.squeeze(0)
 
         sen = sen.view(-1)
         length = len(sen)
@@ -444,9 +444,8 @@ class LCNPModel(nn.Module):
 
         t0 = time.time()
         # run the LSTM to extract features from left context
-        output, hidden = self.coef_lstm * \
-            self.LSTM(self.encoder_t(sens), self.h0) 
-        output = output.contiguous().view(-1, output.size(2))
+        output, hidden = self.LSTM(self.encoder_t(sens), self.h0) 
+        output = self.coef_lstm * output.contiguous().view(-1, output.size(2))
 
         t1 = time.time()
 
