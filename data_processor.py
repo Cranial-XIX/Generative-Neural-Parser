@@ -156,6 +156,12 @@ class Processor(object):
                             if not child in self.lexicon:
                                 self.lexicon[child] = set()
                             self.lexicon[child].add(parent)
+            lexicon = [ [ x for x in iter(self.lexicon[s]) ] for s in self.lexicon ]
+            unary = [ [ x for x in iter(self.unary[s]) ] for s in self.unary ]
+            binary = [ [ x for x in iter(self.binary[s]) ] for s in self.binary ]   
+            self.lexicon = lexicon
+            self.unary = unary
+            self.binary = binary        
         else:
             print "No such input file, the filename is %s" % self.file_data
         return
