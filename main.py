@@ -58,7 +58,7 @@ def main():
     )
 
     parser.add_argument(
-        '-lstm_coef', '--CoefLSTM', required=False, default=1,
+        '-lstm_coef', '--CoefLSTM', required=False, default=1.0,
     )
 
     parser.add_argument(
