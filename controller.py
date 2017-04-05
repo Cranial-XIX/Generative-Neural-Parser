@@ -51,54 +51,59 @@ def spv_train_LCNP(p, cmd_inp):
 
     optimizer = optim.Adam(parameters, lr=cmd_inp['learning_rate'],
         weight_decay=cmd_inp['coef_l2'])
+    try:
+        for epoch in range(cmd_inp['max_epoch']):
+            print "\nTraining epoch %d =====================================" % epoch
+            idx = 0
+            batch = 0
+            while not idx == -1:
+                idx = p.next(idx, batch_size)
+                if not idx == -1:
+                    batch += 1
+                    print "\nBatch %d -----------------------------------------" % batch
+                    train_start = time.time()
+                    optimizer.zero_grad()
+                    p_array = [Variable(p.sens),
+                        Variable(p.p2l), Variable(p.pl2r),
+                        Variable(p.unt), Variable(p.ut),
 
-    for epoch in range(cmd_inp['max_epoch']):
-        print "\nTraining epoch %d =====================================" % epoch
-        idx = 0
-        batch = 0
-        while not idx == -1:
-            idx = p.next(idx, batch_size)
-            if not idx == -1:
-                batch += 1
-                print "\nBatch %d -----------------------------------------" % batch
-                train_start = time.time()
-                optimizer.zero_grad()
-                p_array = [Variable(p.sens),
-                    Variable(p.p2l), Variable(p.pl2r),
-                    Variable(p.unt), Variable(p.ut),
+                        Variable(p.p2l_t), Variable(p.pl2r_t),
+                        Variable(p.unt_t), Variable(p.ut_t),
 
-                    Variable(p.p2l_t), Variable(p.pl2r_t),
-                    Variable(p.unt_t), Variable(p.ut_t),
+                        Variable(p.p2l_hi), Variable(p.pl2r_hi),
+                        Variable(p.unt_hi), Variable(p.ut_hi)]
+                    if cmd_inp['cuda']:
+                        p_array = [x.cuda() for x in p_array]
+                    loss = model(p_array[0],
+                                p_array[1], p_array[2],
+                                p_array[3], p_array[4],
+                                
+                                p_array[5], p_array[6],
+                                p_array[7], p_array[8],
+                                
+                                p_array[9], p_array[10],
+                                p_array[11], p_array[12])
 
-                    Variable(p.p2l_hi), Variable(p.pl2r_hi),
-                    Variable(p.unt_hi), Variable(p.ut_hi)]
-                if cmd_inp['cuda']:
-                    p_array = [x.cuda() for x in p_array]
-                loss = model(p_array[0],
-                            p_array[1], p_array[2],
-                            p_array[3], p_array[4],
-                            
-                            p_array[5], p_array[6],
-                            p_array[7], p_array[8],
-                            
-                            p_array[9], p_array[10],
-                            p_array[11], p_array[12])
+                    t0 = time.time()
+                    print " - NLL Loss: ", loss
+                    loss.backward()
+                    t1 = time.time()
 
-                t0 = time.time()
-                print " - NLL Loss: ", loss
-                loss.backward()
-                t1 = time.time()
-
-                optimizer.step()
-                train_end = time.time()
-                print " - Training one batch: forward: %.4f, backward: %.4f, "\
-                    "optimize: %.4f secs" % (
-                        round(t0 - train_start, 5),
-                        round(t1 - t0, 5),
-                        round(train_end - t1, 5) )
-    torch.save({
-            'state_dict': model.state_dict()
-        }, cmd_inp['save'])
+                    optimizer.step()
+                    train_end = time.time()
+                    print " - Training one batch: forward: %.4f, backward: %.4f, "\
+                        "optimize: %.4f secs" % (
+                            round(t0 - train_start, 5),
+                            round(t1 - t0, 5),
+                            round(train_end - t1, 5) )
+        torch.save({
+                'state_dict': model.state_dict()
+            }, cmd_inp['save'])
+    except KeyboardInterrupt:
+        print(' - Exiting from training early')
+        torch.save({
+                'state_dict': model.state_dict()
+            }, cmd_inp['save'])
 
     print "Finish training"
 
