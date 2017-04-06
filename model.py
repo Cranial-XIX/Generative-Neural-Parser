@@ -248,15 +248,12 @@ class LCNPModel(nn.Module):
                                 inside[start][end][idx] = tpl
                                 hash_map[tpl_map] = (idx, curr_log_prob)
 
-        '''
-        # DEBUG
-        for x in hash_map:
-            print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x]][1].data[0])
-
-        '''
         tpl_map = (0, length, root_idx)
         posterior = 1
         if not tpl_map in hash_map:
+            # DEBUG
+            for x in hash_map:
+                print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x][0]][1].data[0])
             return -1, None, None, -1, -1
         else:
             nll = -inside[0][length][ hash_map[tpl_map][0] ][1]
@@ -390,8 +387,8 @@ class LCNPModel(nn.Module):
         tpl_map = (0, length, root_idx)
         if not tpl_map in hash_map:
             # DEBUG
-            #for x in hash_map:
-            #    print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x]][1].data[0])
+            for x in hash_map:
+                print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x]][1].data[0])
             return Variable(torch.FloatTensor([-1]))
 
         else:
@@ -447,12 +444,12 @@ class LCNPModel(nn.Module):
         p2l_t, pl2r_t, unt_t, ut_t,
         p2l_i, pl2r_i, unt_i, ut_i):
 
-        t0 = time.time()
+        #t0 = time.time()
         # run the LSTM to extract features from left context
         output, hidden = self.LSTM(self.encoder_t(sens), self.h0) 
         output = self.coef_lstm * output.contiguous().view(-1, output.size(2))
 
-        t1 = time.time()
+        #t1 = time.time()
 
         logsoftmax = nn.LogSoftmax()
 
@@ -467,7 +464,7 @@ class LCNPModel(nn.Module):
         target = p2l_t.view(-1).masked_select(mask)
         nll_p2l = -torch.sum( matrix.gather(1, target.unsqueeze(1)) )
 
-        t2 = time.time()
+        #t2 = time.time()
 
         pl2r = torch.cat((
                 pl2r.view(-1, pl2r.size(2)), 
@@ -480,7 +477,7 @@ class LCNPModel(nn.Module):
         target = pl2r_t.view(-1).masked_select(mask)
         nll_pl2r = -torch.sum( matrix.gather(1, target.unsqueeze(1)) )
 
-        t3 = time.time()
+        #t3 = time.time()
 
         unt = torch.cat((
                 unt.view(-1, unt.size(2)), 
@@ -493,7 +490,7 @@ class LCNPModel(nn.Module):
         target = unt_t.view(-1).masked_select(mask)
         nll_unt = -torch.sum( matrix.gather(1, target.unsqueeze(1)) )
 
-        t4 = time.time()
+        #t4 = time.time()
 
         ut = torch.cat((
                 ut.view(-1, ut.size(2)), 
@@ -507,9 +504,9 @@ class LCNPModel(nn.Module):
         target = ut_t.view(-1).masked_select(mask)
         nll_ut = -torch.sum( matrix.gather(1, target.unsqueeze(1)) )
 
-        t5 = time.time()
+        #t5 = time.time()
 
-        print "needs %.4f, %.4f, %.4f, %.4f, %.4f secs" % (round(t1- t0, 5), round(t2- t1, 5), round(t3- t2, 5), round(t4- t3, 5), round(t5-t4, 5))
+        #print "needs %.4f, %.4f, %.4f, %.4f, %.4f secs" % (round(t1- t0, 5), round(t2- t1, 5), round(t3- t2, 5), round(t4- t3, 5), round(t5-t4, 5))
         nll = nll_p2l + nll_pl2r + nll_unt + nll_ut
 
         return nll
