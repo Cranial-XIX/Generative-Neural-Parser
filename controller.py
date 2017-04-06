@@ -106,7 +106,7 @@ def spv_train_LCNP(p, cmd_inp):
                 'state_dict': model.state_dict()
             }, cmd_inp['save'])
 
-    print "Finish training"
+    print "Finish supervised training"
 
 def uspv_train_LCNP(p, cmd_inp):
 
@@ -132,7 +132,7 @@ def uspv_train_LCNP(p, cmd_inp):
         'urules': p.unary,
         'brules': p.binary
     }
-    
+
     model = LCNPModel(inputs)
     if not cmd_inp['pretrain'] == None:
         print " - use pretrained model from ", cmd_inp['pretrain']
@@ -145,35 +145,44 @@ def uspv_train_LCNP(p, cmd_inp):
     optimizer = optim.Adam(parameters, lr=cmd_inp['learning_rate'],
         weight_decay=cmd_inp['coef_l2'])
 
-    for epoch in range(cmd_inp['max_epoch']):
-        print "\nTraining epoch %d =====================================" % epoch
-        idx = 0
-        batch = 0
-        while not idx == -1:
-            idx = p.next(idx)
-            if not idx == -1:
-                batch += 1
-                print "\nSentence %d -----------------------------------------" % batch
-                train_start = time.time()
-                optimizer.zero_grad()
-                loss = model(Variable(p.sen))
-                if loss.data[0] > 0:
-                    t0 = time.time()
-                    print " - NLL Loss: ", loss
-                    loss.backward()
-                    t1 = time.time()
+    try:
+        for epoch in range(cmd_inp['max_epoch']):
+            print "\nTraining epoch %d =====================================" % epoch
+            idx = 0
+            batch = 0
+            while not idx == -1:
+                idx = p.next(idx)
+                if not idx == -1:
+                    batch += 1
+                    print "\nSentence %d -----------------------------------------" % batch
+                    train_start = time.time()
+                    optimizer.zero_grad()
+                    loss = model(Variable(p.sen))
+                    if loss.data[0] > 0:
+                        t0 = time.time()
+                        print " - NLL Loss: ", loss
+                        loss.backward()
+                        t1 = time.time()
 
-                    optimizer.step()
-                    train_end = time.time()
-                    print " - Training one batch: forward: %.4f, backward: %.4f, "\
-                        "optimize: %.4f secs" % (
-                            round(t0 - train_start, 5),
-                            round(t1 - t0, 5),
-                            round(train_end - t1, 5) )
-                else:
-                    print "No parse for sentence: ", p.get_sen(p.sen.view(-1))
+                        optimizer.step()
+                        train_end = time.time()
+                        print " - Training one batch: forward: %.4f, backward: %.4f, "\
+                            "optimize: %.4f secs" % (
+                                round(t0 - train_start, 5),
+                                round(t1 - t0, 5),
+                                round(train_end - t1, 5) )
+                    else:
+                        print "No parse for sentence: ", p.get_sen(p.sen.view(-1))
+        torch.save({
+                'state_dict': model.state_dict()
+            }, cmd_inp['save'])
+    except KeyboardInterrupt:
+        print(' - Exiting from training early')
+        torch.save({
+                'state_dict': model.state_dict()
+            }, cmd_inp['save'])
 
-    print "Finish training"
+    print "Finish unsupervised training"
 
 def parse_LCNP(p, sen2parse, cmd_inp):
 

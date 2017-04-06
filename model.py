@@ -11,33 +11,29 @@ class LCNPModel(nn.Module):
     def __init__(self, inputs):
         super(LCNPModel, self).__init__()
 
-        # read in necessary inputs
-        initrange = inputs['initrange']
-
         # terminals
-        self.term_emb = inputs['term_emb']
-        self.nt = inputs['nt']              # number of terminals
-        self.dt = inputs['dt']              # dimension of terminals
+        self.term_emb = inputs['term_emb']      # embeddings of terminals
+        self.nt = inputs['nt']                  # number of terminals
+        self.dt = inputs['dt']                  # dimension of terminals
 
         # nonterminals
-        self.nonterm_emb = inputs['nt_emb']
-        self.nnt = inputs['nnt']            # number of nonterminals
-        self.dnt = inputs['dnt']            # dimension of nonterminals
+        self.nonterm_emb = inputs['nt_emb']     # embeddings of nonterminals
+        self.nnt = inputs['nnt']                # number of nonterminals
+        self.dnt = inputs['dnt']                # dimension of nonterminals
 
         # model
-        self.coef_lstm = inputs['coef_lstm']# coefficient of LSTM
-        self.bsz = inputs['bsz']
-        self.dhid = inputs['dhid']          # dimension of hidden layer
-        self.nlayers = inputs['nlayers']    # number of layers in neural net
-        initrange = inputs['initrange']
-        self.urules = inputs['urules']      # dictionary of unary rules
-        self.brules = inputs['brules']      # dictionary of binary rules
-        self.lexicon = inputs['lexicon']
-
+        self.coef_lstm = inputs['coef_lstm']    # coefficient of LSTM
+        self.bsz = inputs['bsz']                # the batch size
+        self.dhid = inputs['dhid']              # dimension of hidden layer
+        self.nlayers = inputs['nlayers']        # number of layers in neural net
+        initrange = inputs['initrange']         # range for uniform initialization
+        self.urules = inputs['urules']          # dictionary of unary rules
+        self.brules = inputs['brules']          # dictionary of binary rules
+        self.lexicon = inputs['lexicon']        # dictionary of lexicon
 
         self.encoder_nt = nn.Embedding(self.nnt, self.dnt)
         self.word2vec_plus = nn.Embedding(self.nt, self.dt)
-        self.word2vec = nn.Embedding(self.nt, self.dt) 
+        self.word2vec = nn.Embedding(self.nt, self.dt)
 
         self.LSTM = nn.LSTM(
                 self.dt, self.dhid, self.nlayers,
@@ -141,9 +137,7 @@ class LCNPModel(nn.Module):
 
         # TODO(@Bo) speed up!
         for i in xrange(length):
-            child = sen.data[i]
-            if not child in self.lexicon:
-                child = 0
+            child = sen.data[i] if child in self.lexicon else 0
             for parent in self.lexicon[child]:
                 # new nonterminal found, append to list
                 # calculate each part of the entry
@@ -228,7 +222,6 @@ class LCNPModel(nn.Module):
                                 ) + self.log_prob_unt(
                                     parent, child, left_context[start]
                                 )
-
                             curr_log_prob = previous_log_prob + log_rule_prob
                             tpl_map = (start, end, parent)
                             left_sib = -1
@@ -247,8 +240,8 @@ class LCNPModel(nn.Module):
         posterior = 1
         if not tpl_map in hash_map:
             # DEBUG
-            for x in hash_map:
-                print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x][0]][1].data[0])
+            #for x in hash_map:
+            #    print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x][0]][1].data[0])
             return -1, None, None, -1, -1
         else:
             nll = -inside[0][length][ hash_map[tpl_map][0] ][1]
@@ -277,9 +270,7 @@ class LCNPModel(nn.Module):
 
         # Initialization
         for i in xrange(length):
-            child = sen.data[i]
-            if not child in self.lexicon:
-                child = 0
+            child = sen.data[i] if child in self.lexicon else 0
             for parent in self.lexicon[child]:
                 # new nonterminal found, append to list
                 # calculate each part of the entry
@@ -382,8 +373,8 @@ class LCNPModel(nn.Module):
         tpl_map = (0, length, root_idx)
         if not tpl_map in hash_map:
             # DEBUG
-            for x in hash_map:
-                print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x]][1].data[0])
+            #for x in hash_map:
+            #    print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x]][1].data[0])
             return Variable(torch.FloatTensor([-1]))
 
         else:
