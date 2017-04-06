@@ -38,7 +38,7 @@ def spv_train_LCNP(p, cmd_inp):
         'brules': p.binary
     }
 
-    model = LCNPModel(inputs)
+    model = LCNPModel(inputs, cmd_inp['cuda'])
     if cmd_inp['cuda']:
         model.cuda()
     if not cmd_inp['pretrain'] == None:

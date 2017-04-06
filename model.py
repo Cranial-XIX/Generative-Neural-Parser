@@ -8,7 +8,7 @@ from torch.autograd import Variable
 class LCNPModel(nn.Module):
     """Container module with an encoder, a recurrent module, and a decoder."""
 
-    def __init__(self, inputs):
+    def __init__(self, inputs, cuda_flag):
         super(LCNPModel, self).__init__()
 
         # read in necessary inputs
@@ -44,8 +44,13 @@ class LCNPModel(nn.Module):
                 batch_first=True, dropout=0.5, bias=True
             )
         # the initial states for h0 and c0 of LSTM
-        self.h0 = (Variable(torch.zeros(self.nlayers, self.bsz, self.dhid)),
+        if cuda_flag:
+            self.h0 = (Variable(torch.zeros(self.nlayers, self.bsz, self.dhid).cuda()),
+                Variable(torch.zeros(self.nlayers, self.bsz, self.dhid)).cuda())
+        else:
+            self.h0 = (Variable(torch.zeros(self.nlayers, self.bsz, self.dhid)),
                 Variable(torch.zeros(self.nlayers, self.bsz, self.dhid)))
+        
 
         self.dp2l = self.dnt + self.dhid
         self.dpl2r = 2 * self.dnt + self.dhid
