@@ -102,16 +102,17 @@ def main():
             print("WARNING: You have a CUDA device, so you should probably run with --cuda")
         else:
             torch.cuda.manual_seed(args.Seed)
-        
+
     # Create folder to save model and log files
     id_process = os.getpid()
     time_current = datetime.datetime.now().isoformat()
-    tag_model = '_PID='+str(id_process)+'_TIME='+time_current
+    tag_model = 'PID='+str(id_process)+'_TIME='+time_current
 
     path_folder = './output/' + tag_model + '/'
-    os.makedirs(path_folder)
-
-    file_save = os.path.abspath(path_folder + 'model_dict.tar')
+    file_save = ""
+    if not args.Mode == 'parse':
+        os.makedirs(path_folder)
+        file_save = os.path.abspath(path_folder + 'model_dict.tar')
 
     ## show values ##
     print ""
@@ -163,6 +164,7 @@ def main():
     if args.Mode == 'spv_train':
         # supervised training
         controller.spv_train_LCNP(p, cmd_inp)
+
         #test.test_next(p)
     elif args.Mode == 'uspv_train':
         # unsupervsied training
@@ -174,6 +176,8 @@ def main():
         while not sen2parse == "":
             sen2parse = raw_input("Please enter the sentence" \
                 "to parse, or press enter to quit the parser: \n")
+            if sen2parse == "":
+                break
             controller.parse_LCNP(p, sen2parse, cmd_inp)
 
 if __name__ == "__main__": main()

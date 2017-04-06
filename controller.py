@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+import constants
 from collections import defaultdict
 from torch.autograd import Variable
 
@@ -156,7 +157,7 @@ def uspv_train_LCNP(p, cmd_inp):
                 train_start = time.time()
                 optimizer.zero_grad()
                 loss = model(Variable(p.sen))
-                if loss[0] > 0:
+                if loss.data[0] > 0:
                     t0 = time.time()
                     print " - NLL Loss: ", loss
                     loss.backward()
@@ -170,7 +171,7 @@ def uspv_train_LCNP(p, cmd_inp):
                             round(t1 - t0, 5),
                             round(train_end - t1, 5) )
                 else:
-                    print "No parse for sentence: ", p.get_sen(p.sen)
+                    print "No parse for sentence: ", p.get_sen(p.sen.view(-1))
 
     print "Finish training"
 
@@ -204,14 +205,24 @@ def parse_LCNP(p, sen2parse, cmd_inp):
         print " - use pretrained model from ", cmd_inp['pretrain']
         pretrain = torch.load(cmd_inp['pretrain'])
         model.load_state_dict(pretrain['state_dict']) 
+    else:
+        print " - use default model from ", constants.PRE_TRAINED_FILE
+        pretrain = torch.load(constants.PRE_TRAINED_FILE)
+        model.load_state_dict(pretrain['state_dict'])
 
     inp = p.get_idx(sen2parse)
 
-    nll, chart, hashmap, end, idx = lcnp.parse(inp)
+    nll, chart, hashmap, end, idx = model.parse(Variable(inp))
 
+    filename = './lbtest.tst'
+    parse_f = open(filename, 'w')
+    print inp
     if nll > 0: # exist parse
         print "The best parse negative log likelihood is ", nll
-        print print_parse(p, chart, hashmap, 0, end, idx)
+        parse = print_parse(p, chart, hashmap, 0, end, idx)
+        print parse
+        parse_f.write(parse)
+        parse_f.write('\n')
     else:
         print "No parses for the sentence."
 

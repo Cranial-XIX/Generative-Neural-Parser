@@ -2,3 +2,4 @@ data/*
 output/*
 *.pyc
 corpus_info.tar
+EVALB/evalb

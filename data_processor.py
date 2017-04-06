@@ -156,9 +156,18 @@ class Processor(object):
                             if not child in self.lexicon:
                                 self.lexicon[child] = set()
                             self.lexicon[child].add(parent)
-            lexicon = [ [ x for x in iter(self.lexicon[s]) ] for s in self.lexicon ]
-            unary = [ [ x for x in iter(self.unary[s]) ] for s in self.unary ]
-            binary = [ [ x for x in iter(self.binary[s]) ] for s in self.binary ]   
+            lexicon = {}
+            for s in self.lexicon:
+                temp = [x for x in iter(self.lexicon[s])]
+                lexicon[s] = temp
+            unary = {}
+            for s in self.unary:
+                temp = [x for x in iter(self.unary[s])]
+                unary[s] = temp
+            binary = {}
+            for s in self.binary:
+                temp = [x for x in iter(self.binary[s])]
+                binary[s] = temp
             self.lexicon = lexicon
             self.unary = unary
             self.binary = binary        
@@ -326,7 +335,7 @@ class Processor(object):
             self.read_corpus()
 
             end = time.time()
-            # self.print_rules()
+            self.print_rules()
 
             # save those for future use
             torch.save({
