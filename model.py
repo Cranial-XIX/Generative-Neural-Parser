@@ -22,6 +22,8 @@ class LCNPModel(nn.Module):
         self.dnt = inputs['dnt']                # dimension of nonterminals
 
         # model
+        self.cuda_flag = cuda_flag
+
         self.coef_lstm = inputs['coef_lstm']    # coefficient of LSTM
         self.bsz = inputs['bsz']                # the batch size
         self.dhid = inputs['dhid']              # dimension of hidden layer
@@ -40,7 +42,7 @@ class LCNPModel(nn.Module):
                 batch_first=True, dropout=0.5, bias=True
             )
         # the initial states for h0 and c0 of LSTM
-        if cuda_flag:
+        if self.cuda_flag:
             self.h0 = (Variable(torch.zeros(self.nlayers, self.bsz, self.dhid).cuda()),
                 Variable(torch.zeros(self.nlayers, self.bsz, self.dhid)).cuda())
         else:
@@ -122,7 +124,10 @@ class LCNPModel(nn.Module):
         emb_inp = self.encoder_t(sen)
         output, hidden = self.LSTM(emb_inp, self.h0)       
 
-        nll = Variable(torch.FloatTensor([0]))
+        if self.cuda_flag:
+            nll = Variable(torch.FloatTensor([0])).cuda()
+        else:
+            nll = Variable(torch.FloatTensor([0]))
 
         sen = sen.view(-1)
         left_context = self.coef_lstm * output[0]
@@ -315,6 +320,7 @@ class LCNPModel(nn.Module):
                             tpl = (parent, self.log_sum_exp(curr_log_prob, old_log_prob))
                             inside[i][i+1][idx] = tpl
 
+        print 'Viterbi algorithm starting'
         # viterbi algorithm
         for width in xrange(2, length+1):
             for start in xrange(0, length-width+1):
@@ -373,13 +379,15 @@ class LCNPModel(nn.Module):
                                 old_log_prob = inside[start][end][idx][1]
                                 tpl = (parent, self.log_sum_exp(curr_log_prob, old_log_prob))
                                 inside[start][end][idx] = tpl
-        #print "Finish inside algorithm ... "
+        print "Finish inside algorithm ... "
         
         tpl_map = (0, length, root_idx)
         if not tpl_map in hash_map:
             # DEBUG
             #for x in hash_map:
             #    print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x]][1].data[0])
+            if self.cuda_flag:
+                return Variable(torch.FloatTensor([-1])).cuda()
             return Variable(torch.FloatTensor([-1]))
 
         else:
@@ -387,8 +395,12 @@ class LCNPModel(nn.Module):
 
     def log_prob_ut(self, parent, child, history):
         logsoftmax = nn.LogSoftmax()
+        if self.cuda_flag:
+            parent_LongTensor = Variable(torch.LongTensor([parent])).cuda()
+        else:
+            parent_LongTensor = Variable(torch.LongTensor([parent]))
         condition = torch.cat((
-                self.encoder_nt(Variable(torch.LongTensor([parent]))), 
+                self.encoder_nt(parent_LongTensor), 
                 history.view(1, -1)
             ), 1)
         #res = (self.word2vec_plus.weight).mm(self.ut(condition).t()).view(1, -1)
@@ -398,8 +410,12 @@ class LCNPModel(nn.Module):
 
     def log_prob_unt(self, parent, child, history):
         logsoftmax = nn.LogSoftmax()
+        if self.cuda_flag:
+            parent_LongTensor = Variable(torch.LongTensor([parent])).cuda()
+        else:
+            parent_LongTensor = Variable(torch.LongTensor([parent]))
         condition = torch.cat((
-                self.encoder_nt(Variable(torch.LongTensor([parent]))), 
+                self.encoder_nt(parent_LongTensor), 
                 history.view(1, -1)
             ), 1)
         res = logsoftmax(self.unt(condition)).view(-1)
@@ -407,8 +423,12 @@ class LCNPModel(nn.Module):
 
     def log_prob_left(self, parent, child, history):
         logsoftmax = nn.LogSoftmax()
+        if self.cuda_flag:
+            parent_LongTensor = Variable(torch.LongTensor([parent])).cuda()
+        else:
+            parent_LongTensor = Variable(torch.LongTensor([parent]))
         condition = torch.cat((
-                self.encoder_nt(Variable(torch.LongTensor([parent]))), 
+                self.encoder_nt(parent_LongTensor), 
                 history.view(1, -1)
             ), 1)
         res = logsoftmax(self.p2l(condition)).view(-1)
@@ -416,10 +436,16 @@ class LCNPModel(nn.Module):
 
     def log_prob_right(self, parent, left_sib, child, history):
         logsoftmax = nn.LogSoftmax()
+        if self.cuda_flag:
+            parent_LongTensor = Variable(torch.LongTensor([parent])).cuda()
+            left_sib_LongTensor = Variable(torch.LongTensor([left_sib])).cuda()
+        else:
+            parent_LongTensor = Variable(torch.LongTensor([parent]))
+            left_sib_LongTensor = Variable(torch.LongTensor([left_sib]))
         condition = torch.cat(
                 (
-                    self.encoder_nt(Variable(torch.LongTensor([parent]))), 
-                    self.encoder_nt(Variable(torch.LongTensor([left_sib]))), 
+                    self.encoder_nt(parent_LongTensor), 
+                    self.encoder_nt(left_sib_LongTensor), 
                     history.view(1, -1)
                 ), 
             1)

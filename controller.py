@@ -132,8 +132,9 @@ def uspv_train_LCNP(p, cmd_inp):
         'urules': p.unary,
         'brules': p.binary
     }
+    
+    model = LCNPModel(inputs, cmd_inp['cuda'])
 
-    model = LCNPModel(inputs)
     if not cmd_inp['pretrain'] == None:
         print " - use pretrained model from ", cmd_inp['pretrain']
         pretrain = torch.load(cmd_inp['pretrain'])
@@ -157,7 +158,11 @@ def uspv_train_LCNP(p, cmd_inp):
                     print "\nSentence %d -----------------------------------------" % batch
                     train_start = time.time()
                     optimizer.zero_grad()
-                    loss = model(Variable(p.sen))
+                    if cmd_inp['cuda']:
+                        p_sen = Variable(p.sen).cuda()
+                    else:
+                        p_sen = Variable(p.sen)
+                    loss = model(p_sen)
                     if loss.data[0] > 0:
                         t0 = time.time()
                         print " - NLL Loss: ", loss
@@ -220,8 +225,11 @@ def parse_LCNP(p, sen2parse, cmd_inp):
         model.load_state_dict(pretrain['state_dict'])
 
     inp = p.get_idx(sen2parse)
-
-    nll, chart, hashmap, end, idx = model.parse(Variable(inp))
+    
+    var_inp = Variable(inp)
+    if cmd_inp['cuda']:
+        var_inp = var_inp.cuda()
+    nll, chart, hashmap, end, idx = model.parse(var_inp)
 
     filename = './lbtest.tst'
     parse_f = open(filename, 'w')

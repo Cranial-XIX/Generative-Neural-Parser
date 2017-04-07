@@ -311,8 +311,13 @@ class Processor(object):
         print "---------------------------------------------------------------"
 
         print "Unary nonterminal rules are: "
+        dickt = {}
         for child in self.unary:
+            dickt[child] = []
             for parent in self.unary[child]:
+                dickt[child].append(parent)
+                if parent in dickt  and  child in dickt[parent]:
+                    print "FUCK WE ARE FUCKED!", parent, " ", child, "###############################################"
                 print "%s ---> %s" \
                     % (self.idx2Nonterm[parent], self.idx2Nonterm[child])
 
