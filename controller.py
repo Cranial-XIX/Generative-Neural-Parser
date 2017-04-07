@@ -209,11 +209,11 @@ def parse_LCNP(p, sen2parse, cmd_inp):
         'brules': p.binary
     }
     
-    model = LCNPModel(inputs)
+    model = LCNPModel(inputs, cmd_inp['cuda'])
     if not cmd_inp['pretrain'] == None:
         print " - use pretrained model from ", cmd_inp['pretrain']
         pretrain = torch.load(cmd_inp['pretrain'])
-        model.load_state_dict(pretrain['state_dict']) 
+        model.load_state_dict(pretrain['state_dict'])
     else:
         print " - use default model from ", constants.PRE_TRAINED_FILE
         pretrain = torch.load(constants.PRE_TRAINED_FILE)

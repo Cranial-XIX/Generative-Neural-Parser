@@ -1,1 +1,1 @@
-(ROOT (S^g (@S^g (PP^g (NP^g we)) (@NP^g (PRN^g (@PRN^g 're) (VP^g about)) (@NP^g (@VP^g to) (@NP^g (NP see) (ADVP (SBAR^g if) (S^g (PP^g (ADJP advertising)) (@NP^g (QP^g works)))))))) (@PP^g .)))
+(ROOT (S^g (@S^g (PP^g (IN we)) (NP^g (@NP^g (DT 're) (NNP about)) (NP^g (CD to) (NP^g (NN see) (`` ('' if) (S^g (PP^g (POS advertising)) (NP^g (PRN^g works)))))))) (@PRN^g .)))

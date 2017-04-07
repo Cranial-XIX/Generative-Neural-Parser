@@ -142,7 +142,7 @@ class LCNPModel(nn.Module):
 
         # TODO(@Bo) speed up!
         for i in xrange(length):
-            child = sen.data[i] if child in self.lexicon else 0
+            child = sen.data[i]
             for parent in self.lexicon[child]:
                 # new nonterminal found, append to list
                 # calculate each part of the entry
@@ -275,7 +275,7 @@ class LCNPModel(nn.Module):
 
         # Initialization
         for i in xrange(length):
-            child = sen.data[i] if child in self.lexicon else 0
+            child = sen.data[i]
             for parent in self.lexicon[child]:
                 # new nonterminal found, append to list
                 # calculate each part of the entry
@@ -353,7 +353,7 @@ class LCNPModel(nn.Module):
                 for child_tpl in inside[start][end]:
                     child = child_tpl[0]
                     previous_log_prob = child_tpl[1]
-                    if parent in self.urules:
+                    if child in self.urules:
                         for parent in self.urules[child]:
                             log_rule_prob = self.log_prob_left(
                                     parent, 1, left_context[start]

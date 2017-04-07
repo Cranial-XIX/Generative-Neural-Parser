@@ -170,7 +170,7 @@ def main():
         # unsupervsied training
         controller.uspv_train_LCNP(p, cmd_inp)
 
-    else:
+    elif args.Mode == 'parse':
         # parsing
         sen2parse = "DEADBEAF"
         while not sen2parse == "":
@@ -179,5 +179,8 @@ def main():
             if sen2parse == "":
                 break
             controller.parse_LCNP(p, sen2parse, cmd_inp)
+    else:
+        print "Cannot recognize the mode, should be chosen from " \
+            "{spv_train, uspv_train, parse}"
 
 if __name__ == "__main__": main()
