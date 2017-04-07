@@ -225,7 +225,7 @@ class LCNPModel(nn.Module):
                 for child_tpl in inside[start][end]:
                     child = child_tpl[0]
                     previous_log_prob = child_tpl[1]
-                    if parent in self.urules:
+                    if child in self.urules:
                         for parent in self.urules[child]:
                             log_rule_prob = self.log_prob_left(
                                     parent, 1, left_context[start]
@@ -242,7 +242,7 @@ class LCNPModel(nn.Module):
                                 hash_map[tpl_map] = (len(inside[start][end])-1, curr_log_prob)
                             elif curr_log_prob > hash_map[tpl_map][1]:
                                 idx = hash_map[tpl_map][0]
-                                tpl = (parent, curr_log_prob, -1, child, end)
+                                tpl = (parent, curr_log_prob, -1, child, start)
                                 inside[start][end][idx] = tpl
                                 hash_map[tpl_map] = (idx, curr_log_prob)
 
@@ -255,8 +255,11 @@ class LCNPModel(nn.Module):
             return -1, None, None, -1, -1
         else:
             nll = -inside[0][length][ hash_map[tpl_map][0] ][1]
+            # DEBUG
+            for x in hash_map:
+                print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x][0]][1].data[0])
             return nll, inside, hash_map, length, root_idx
-
+        
 
     def unsupervised(self, sen):
         emb_inp = self.encoder_t(sen)
@@ -278,7 +281,14 @@ class LCNPModel(nn.Module):
 
         root_idx = 2
 
+        c = 0
+        for i in self.urules:
+            c += len(self.urules[i])
+        for p in self.brules:
+            c += len(self.brules[p])
+        print "size of grammar : ", c
         # Initialization
+        tt0 = time.time()
         for i in xrange(length):
             child = sen.data[i]
             for parent in self.lexicon[child]:
@@ -293,8 +303,11 @@ class LCNPModel(nn.Module):
                 inside[i][i+1].append(tpl)
                 tpl_map = (i, i+1, parent)
                 hash_map[tpl_map] = len(inside[i][i+1])-1
+        tt1 = time.time()
+        print "LEXICON ", tt1-tt0, "---------------------------"
 
         # Unary appending, deal with non_term -> non_term ... -> term chain
+        tt2 = time.time()
         for i in xrange(length):
             for child_tpl in inside[i][i+1]:
                 child = child_tpl[0]
@@ -319,7 +332,9 @@ class LCNPModel(nn.Module):
                             old_log_prob = inside[i][i+1][idx][1]
                             tpl = (parent, self.log_sum_exp(curr_log_prob, old_log_prob))
                             inside[i][i+1][idx] = tpl
-
+        tt3 = time.time()
+        print "UNARY ", tt3-tt2, "---------------------------"
+                            
         print 'Viterbi algorithm starting'
         # viterbi algorithm
         for width in xrange(2, length+1):
@@ -341,7 +356,7 @@ class LCNPModel(nn.Module):
                                             parent, child, left_context[start]
                                         ) + self.log_prob_right(
                                             parent, left_sib, child, left_context[mid]
-                                        )
+                                        )                                   
                                     curr_log_prob = previous_log_prob + log_rule_prob
                                     tpl_map = (start, end, parent)
                                     if not tpl_map in hash_map:
