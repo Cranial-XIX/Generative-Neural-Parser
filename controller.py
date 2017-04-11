@@ -225,7 +225,7 @@ def parse_LCNP(p, sen2parse, cmd_inp):
         model.load_state_dict(pretrain['state_dict'])
 
     inp = p.get_idx(sen2parse)
-    
+
     var_inp = Variable(inp)
     if cmd_inp['cuda']:
         var_inp = var_inp.cuda()

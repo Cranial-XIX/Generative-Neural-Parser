@@ -132,7 +132,7 @@ class LCNPModel(nn.Module):
         sen = sen.view(-1)
         left_context = self.coef_lstm * output[0]
 
-        length = len(sen)
+        length = len(sen) - 1
         # every entry is a list of tuples, with each tuple indicate a potential nonterminal 
         # at this position (nonterminal idx, sum of log probability over the constituent)
         inside = [[[] for i in xrange(length + 1)] for j in xrange(length + 1)]
@@ -147,7 +147,7 @@ class LCNPModel(nn.Module):
 
         # TODO(@Bo) speed up!
         for i in xrange(length):
-            child = sen.data[i]
+            child = sen.data[i+1]
             for parent in self.lexicon[child]:
                 # new nonterminal found, append to list
                 # calculate each part of the entry
@@ -180,12 +180,6 @@ class LCNPModel(nn.Module):
                             tpl = (parent, curr_log_prob, -1, child, i)
                             inside[i][i+1].append(tpl)
                             hash_map[tpl_map] = (len(inside[i][i+1])-1, curr_log_prob)
-                        elif curr_log_prob > hash_map[tpl_map][1]:
-                            left_sib = -1
-                            idx = hash_map[tpl_map][0]
-                            tpl = (parent, curr_log_prob, -1, child, i)
-                            inside[i][i+1][idx] = tpl
-                            hash_map[tpl_map] = (idx, curr_log_prob)
 
         # viterbi algorithm
         for width in xrange(2, length+1):
@@ -240,11 +234,6 @@ class LCNPModel(nn.Module):
                                 inside[start][end].append(tpl)
                                 tpl_map = (start, end, parent)
                                 hash_map[tpl_map] = (len(inside[start][end])-1, curr_log_prob)
-                            elif curr_log_prob > hash_map[tpl_map][1]:
-                                idx = hash_map[tpl_map][0]
-                                tpl = (parent, curr_log_prob, -1, child, start)
-                                inside[start][end][idx] = tpl
-                                hash_map[tpl_map] = (idx, curr_log_prob)
 
         tpl_map = (0, length, root_idx)
         posterior = 1
