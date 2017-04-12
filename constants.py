@@ -1,4 +1,4 @@
-WORD_EMBEDDING_FILE_PREFIX = "data/embeddings/glove.6B."
+WORD_EMBEDDING_FILE_PREFIX = "data/embeddings/glove-trimmed."
 WORD_EMBEDDING_FILE_SUFFIX = "d.txt"
 NON_TERMINAL_EMBEDDING_FILE = "data/embeddings/nonterminalMapping.txt"
 FILE_DATA = "data/tree2Matrix/1.txt"
