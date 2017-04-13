@@ -225,7 +225,7 @@ def parse_LCNP(p, sen2parse, cmd_inp):
         model.load_state_dict(pretrain['state_dict'])
 
     inp = p.get_idx(sen2parse)
-    
+
     var_inp = Variable(inp)
     if cmd_inp['cuda']:
         var_inp = var_inp.cuda()
@@ -245,6 +245,8 @@ def parse_LCNP(p, sen2parse, cmd_inp):
 
 
 def print_parse(p, cky_chart, hash_map, start, end, idx):
+    if start == end:
+        return "<start == end>"
     tpl_map = (start, end, idx)
     parent, curr_log_prob, left_sib, child, mid = cky_chart[start][end][hash_map[tpl_map][0]]
 
