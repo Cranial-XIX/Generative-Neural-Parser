@@ -94,7 +94,6 @@ class LCNPModel(nn.Module):
             self.LSTM.bias_hh_l1.data[i] = 1.0
             self.LSTM.bias_hh_l2.data[i] = 1.0
 
-
         self.p2l.bias.data.fill_(0)
         self.p2l.weight.data.uniform_(-initrange, initrange)
 
@@ -180,12 +179,6 @@ class LCNPModel(nn.Module):
                             tpl = (parent, curr_log_prob, -1, child, i)
                             inside[i][i+1].append(tpl)
                             hash_map[tpl_map] = (len(inside[i][i+1])-1, curr_log_prob)
-                        elif curr_log_prob > hash_map[tpl_map][1]:
-                            left_sib = -1
-                            idx = hash_map[tpl_map][0]
-                            tpl = (parent, curr_log_prob, -1, child, i)
-                            inside[i][i+1][idx] = tpl
-                            hash_map[tpl_map] = (idx, curr_log_prob)
 
         # viterbi algorithm
         for width in xrange(2, length+1):
@@ -222,29 +215,25 @@ class LCNPModel(nn.Module):
                                         hash_map[tpl_map] = (idx, curr_log_prob)
 
                 # unary rule
+                
                 for child_tpl in inside[start][end]:
                     child = child_tpl[0]
                     previous_log_prob = child_tpl[1]
-                    if parent in self.urules:
+                    if child in self.urules:
                         for parent in self.urules[child]:
-                            log_rule_prob = self.log_prob_left(
-                                    parent, 1, left_context[start]
-                                ) + self.log_prob_unt(
-                                    parent, child, left_context[start]
-                                )
-                            curr_log_prob = previous_log_prob + log_rule_prob
-                            tpl_map = (start, end, parent)
-                            left_sib = -1
-                            if not tpl_map in hash_map:
-                                tpl = (parent, curr_log_prob, -1, child, start)
-                                inside[start][end].append(tpl)
+                                log_rule_prob = self.log_prob_left(
+                                        parent, 1, left_context[start]
+                                    ) + self.log_prob_unt(
+                                        parent, child, left_context[start]
+                                    )
+                                curr_log_prob = previous_log_prob + log_rule_prob
                                 tpl_map = (start, end, parent)
-                                hash_map[tpl_map] = (len(inside[start][end])-1, curr_log_prob)
-                            elif curr_log_prob > hash_map[tpl_map][1]:
-                                idx = hash_map[tpl_map][0]
-                                tpl = (parent, curr_log_prob, -1, child, end)
-                                inside[start][end][idx] = tpl
-                                hash_map[tpl_map] = (idx, curr_log_prob)
+                                left_sib = -1
+                                if not tpl_map in hash_map:
+                                    tpl = (parent, curr_log_prob, -1, child, start)
+                                    inside[start][end].append(tpl)
+                                    tpl_map = (start, end, parent)
+                                    hash_map[tpl_map] = (len(inside[start][end])-1, curr_log_prob)
 
         tpl_map = (0, length, root_idx)
         posterior = 1

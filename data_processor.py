@@ -389,7 +389,7 @@ class Processor(object):
         return " ".join([self.idx2Word[i] for i in indices])
 
     def get_idx(self, sen):
-        sen_w = [w.lower() for w in sen.split()]
+        sen_w = ['BOS'] + [w.lower() for w in sen.split()]
         sen_i = torch.LongTensor(1, len(sen_w))
         for i in xrange(len(sen_w)):
             try:
