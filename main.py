@@ -45,6 +45,12 @@ def main():
         '-rd', '--ShouldReadData', required=False, default="yes",
         help='Whether read and process new data'
     )
+    
+    parser.add_argument(
+        '-v', '--Verbose', required=False, default="yes",
+        help='Whether to print logging information'
+    )
+    
     # Below are variables associated with model
     # =========================================================================
     parser.add_argument(
@@ -99,7 +105,8 @@ def main():
 
     if torch.cuda.is_available():
         if not args.cuda:
-            print("WARNING: You have a CUDA device, so you should probably run with --cuda")
+            if args.Verbose == 'yes':
+                print("WARNING: You have a CUDA device, so you should probably run with --cuda")
         else:
             torch.cuda.manual_seed(args.Seed)
 
@@ -112,32 +119,33 @@ def main():
     file_save = ""
     if not args.Mode == 'parse':
         os.makedirs(path_folder)
-        file_save = os.path.abspath(path_folder + 'model_dict.tar')
+        file_save = os.path.abspath(path_folder + 'model_dict')
 
     ## show values ##
-    print ""
-    print ("PID is : %s" % str(id_process) )
-    print ("TIME is : %s" % time_current )
+    if args.Verbose == 'yes':
+        print ""
+        print ("PID is : %s" % str(id_process) )
+        print ("TIME is : %s" % time_current )
 
-    print "- Files:"
-    print (" FileData is : %s" % args.FileData )
-    print (" FilePretrain is : %s" % args.FilePretrain)
-    print (" Terminal's dimension is : %s" % args.TerminalDimension)
-    print (" Whether read and process new data : %s") % str(args.ShouldReadData)
+        print "- Files:"
+        print (" FileData is : %s" % args.FileData )
+        print (" FilePretrain is : %s" % args.FilePretrain)
+        print (" Terminal's dimension is : %s" % args.TerminalDimension)
+        print (" Whether read and process new data : %s") % str(args.ShouldReadData)
 
-    print "- Model:"
-    print (" You want the %s mode of the model" % args.Mode ) 
-    print (" Seed is : %s" % str(args.Seed) )
-    print (" LSTM coefficient is : %s" % str(args.CoefLSTM))
-    print (" LSTM number of layer is : %s" % str(args.LayerLSTM))
-    print (" DimLSTM is : %s" % str(args.DimLSTM) )
-    print (" CoefL2 is : %s" % str(args.CoefL2) )
+        print "- Model:"
+        print (" You want the %s mode of the model" % args.Mode ) 
+        print (" Seed is : %s" % str(args.Seed) )
+        print (" LSTM coefficient is : %s" % str(args.CoefLSTM))
+        print (" LSTM number of layer is : %s" % str(args.LayerLSTM))
+        print (" DimLSTM is : %s" % str(args.DimLSTM) )
+        print (" CoefL2 is : %s" % str(args.CoefL2) )
 
-    print "- Train:"
-    print (" MaxEpoch is : %s" % str(args.MaxEpoch) )
-    print (" BatchSize is : %s" % str(args.BatchSize) )
-    print (" InitialLearningRate is : %s" % str(args.LearningRate) )
-    print "==================================================================="
+        print "- Train:"
+        print (" MaxEpoch is : %s" % str(args.MaxEpoch) )
+        print (" BatchSize is : %s" % str(args.BatchSize) )
+        print (" InitialLearningRate is : %s" % str(args.LearningRate) )
+        print "==================================================================="
 
     cmd_inp = {
         'pretrain': args.FilePretrain,
@@ -155,7 +163,8 @@ def main():
         'max_epoch': int(args.MaxEpoch),
         'batch_size': int(args.BatchSize),
         'learning_rate': float(args.LearningRate),
-        'cuda': args.cuda
+        'cuda': args.cuda,
+        'verbose': args.Verbose
     }
 
     p = data_processor.Processor(cmd_inp)
@@ -174,9 +183,15 @@ def main():
         # parsing
         sen2parse = "DEADBEAF"
         while not sen2parse == "":
-            sen2parse = raw_input("Please enter the sentence" \
-                "to parse, or press enter to quit the parser: \n")
-            if sen2parse == "":
+            try:
+                if args.Verbose == 'yes':
+                    sen2parse = raw_input("Please enter the sentence" \
+                        "to parse, or press enter to quit the parser: \n")
+                else:
+                    sen2parse = raw_input()
+                if sen2parse == "":
+                    break
+            except (EOFError):
                 break
             controller.parse_LCNP(p, sen2parse, cmd_inp)
     else:
