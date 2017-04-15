@@ -11,6 +11,7 @@ class Processor(object):
     def __init__(self, cmd_inp):
         self.file_data = cmd_inp['data']
         self.read_data = cmd_inp['rd']
+        self.verbose = cmd_inp['verbose']
 
         ## Terminals
         self.dt = cmd_inp['dt']         # dimension of terminal, as in word2vec
@@ -58,11 +59,13 @@ class Processor(object):
             self.nt = wordIdx
             self.term_emb = self.term_emb.narrow(0, 0, self.nt)
             end_time = time.time()
-            print "-- Reading word2vec takes %.4f, secs" % round(end_time - begin_time, 5)
+            if self.verbose == 'yes':
+                print "-- Reading word2vec takes %.4f, secs" % round(end_time - begin_time, 5)
         else:
             # the file does not exist
-            print "No embeddings of the given dimension," \
-            " the filename is %s" % w2v_file
+            if self.verbose == 'yes':
+                print "No embeddings of the given dimension," \
+                    " the filename is %s" % w2v_file
         return
 
     ## this method reads and creates the nonterminal embeddings
@@ -77,8 +80,9 @@ class Processor(object):
                 self.dnt = self.nnt = int(nt.next().split('\t', 1)[0]) + 2
 
                 self.nonterm_emb = torch.eye(self.nnt, self.dnt)
-                print "The number of nonterminals" \
-                "(include symbols U_TM and U_NTM) is %d" % self.nnt
+                if self.verbose == 'yes':
+                    print "The number of nonterminals" \
+                    "(include symbols U_TM and U_NTM) is %d" % self.nnt
 
                 # Set up the special symbol UNARY for 
                 # unary terminal and nonterminal rules:
@@ -102,12 +106,14 @@ class Processor(object):
                     self.nonterm2Idx[nonterminal] = index
                     self.idx2Nonterm[index] = nonterminal
             end_time = time.time()
-            print "-- Reading nonterminals takes %.4f, secs" \
-                % round(end_time - begin_time, 5)
+            if self.verbose == 'yes':
+                print "-- Reading nonterminals takes %.4f, secs" \
+                    % round(end_time - begin_time, 5)
         else:
              # the file does not exist
-            print "No such nonterminal embedding file," \
-                " the filename is %s" % nt_file         
+             if self.verbose == 'yes':
+                print "No such nonterminal embedding file," \
+                    " the filename is %s" % nt_file         
         return
 
     ##  read corpus
@@ -126,7 +132,8 @@ class Processor(object):
                 self.lines = data.readlines()
                 nsen = len(self.lines) / 2
                 assert (len(self.lines) % 2 == 0)
-                print "There are %d sentences in data" % nsen
+                if self.verbose == 'yes':
+                    print "There are %d sentences in data" % nsen
 
                 for i in xrange(nsen):           
                     # look at the parse
@@ -290,7 +297,8 @@ class Processor(object):
                         i_pl2r += 1
                 senIdx += 1
             end = time.time()
-            print " - Extracting input takes %.4f" % round(end - start, 5)
+            if self.verbose == 'yes':
+                print " - Extracting input takes %.4f" % round(end - start, 5)
 
             return -1 if wrong else senIdx
 
@@ -302,37 +310,39 @@ class Processor(object):
             return False
 
     def print_rules(self):
-        print "Lexicon is: "
-        for word in self.lexicon:
-            for NT in self.lexicon[word]:
-                print "%s ---> %s" \
-                    % (self.idx2Nonterm[NT], self.idx2Word[word])                   
+        if self.verbose == 'yes':
+            print "Lexicon is: "
+            for word in self.lexicon:
+                for NT in self.lexicon[word]:
+                    print "%s ---> %s" \
+                        % (self.idx2Nonterm[NT], self.idx2Word[word])                   
 
-        print "---------------------------------------------------------------"
+            print "---------------------------------------------------------------"
 
-        print "Unary nonterminal rules are: "
-        dickt = {}
-        for child in self.unary:
-            dickt[child] = []
-            for parent in self.unary[child]:
-                dickt[child].append(parent)
-                if parent in dickt  and  child in dickt[parent]:
-                    print "FUCK WE ARE FUCKED!", parent, " ", child, "###############################################"
-                print "%s ---> %s" \
-                    % (self.idx2Nonterm[parent], self.idx2Nonterm[child])
+            print "Unary nonterminal rules are: "
+            dickt = {}
+            for child in self.unary:
+                dickt[child] = []
+                for parent in self.unary[child]:
+                    dickt[child].append(parent)
+                    if parent in dickt  and  child in dickt[parent]:
+                        print "FUCK WE ARE FUCKED!", parent, " ", child, "###############################################"
+                    print "%s ---> %s" \
+                        % (self.idx2Nonterm[parent], self.idx2Nonterm[child])
 
-        print "---------------------------------------------------------------"
+            print "---------------------------------------------------------------"
 
-        print "Binary rules are: "
-        for key in self.binary:
-            for parent in self.binary[key]:
-                print "%s ---> %s %s" % (self.idx2Nonterm[parent], self.idx2Nonterm[key[0]], self.idx2Nonterm[key[1]])
+            print "Binary rules are: "
+            for key in self.binary:
+                for parent in self.binary[key]:
+                    print "%s ---> %s %s" % (self.idx2Nonterm[parent], self.idx2Nonterm[key[0]], self.idx2Nonterm[key[1]])
 
     def read_and_process(self):
         if self.read_data:
             if os.path.exists(constants.CORPUS_INFO_FILE):
                 os.remove(constants.CORPUS_INFO_FILE)
-            print "Reading and processing data ... "
+            if self.verbose == 'yes':
+                print "Reading and processing data ... "
             start = time.time()
 
             self.read_word2vec()
@@ -361,7 +371,8 @@ class Processor(object):
                 }, constants.CORPUS_INFO_FILE)
         else:
             # read existing data, so we don't need to process again
-            print "Reading existing data ... "
+            if self.verbose == 'yes':
+                print "Reading existing data ... "
             start = time.time()      
             if not os.path.exists(constants.CORPUS_INFO_FILE):
                 print "Error, no corpus info file found"
@@ -383,7 +394,8 @@ class Processor(object):
             self.binary = d['binary']
             self.new_nt_num = 2
             end = time.time()
-        print "Reading data takes %.4f secs" % round(end - start, 5)
+        if self.verbose == 'yes':
+            print "Reading data takes %.4f secs" % round(end - start, 5)
 
     def get_sen(self, indices):
         return " ".join([self.idx2Word[i] for i in indices])
