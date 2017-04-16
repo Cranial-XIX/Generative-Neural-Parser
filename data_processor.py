@@ -313,30 +313,35 @@ class Processor(object):
             return False
 
     def print_rules(self):
-        print "Lexicon is: "
+
+        nl = 0
         for word in self.lexicon:
             for NT in self.lexicon[word]:
+                nl += 1
                 print "%s ---> %s" \
                     % (self.idx2Nonterm[NT], self.idx2Word[word])                   
-
+        print "Lexicon size : ", nl
         print "-" * 80
 
-        print "Unary nonterminal rules are: "
+        nu = 0
         for child in self.unary:
             for parent in self.unary[child]:
+                nu += 1
                 print "%s ---> %s" \
                     % (self.idx2Nonterm[parent], self.idx2Nonterm[child])
-
+        print "Unary nonterminal rules in total : ", nu
         print "-" * 80
 
-        print "Binary rules are: "
+        nb = 0
         for key in self.binary:
             for parent in self.binary[key]:
+                nb += 1
                 print "%s ---> %s %s" % (
                         self.idx2Nonterm[parent], 
                         self.idx2Nonterm[key[0]], 
                         self.idx2Nonterm[key[1]]
                     )
+        print "Binary rules in total : ", nb
 
     def read_and_process(self):
         if self.read_data:
@@ -352,7 +357,7 @@ class Processor(object):
 
             end = time.time()
 
-            # self.print_rules()
+            #self.print_rules()
 
             # save those for future use
             torch.save({
@@ -397,6 +402,7 @@ class Processor(object):
             self.new_nt_num = 2
             end = time.time()
         if self.verbose == 'yes':
+            self.print_rules()
             print "Reading data takes %.4f secs" % round(end - start, 5)
 
     def get_sen(self, indices):
