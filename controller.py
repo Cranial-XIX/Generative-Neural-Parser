@@ -42,6 +42,7 @@ def spv_train_LCNP(p, cmd_inp):
     model = LCNPModel(inputs, cmd_inp['cuda'], cmd_inp['verbose'])
     if cmd_inp['cuda']:
         model.cuda()
+
     if not cmd_inp['pretrain'] == None:
         if cmd_inp['verbose'] == 'yes':
             print " - use pretrained model from ", cmd_inp['pretrain']
@@ -53,6 +54,7 @@ def spv_train_LCNP(p, cmd_inp):
 
     optimizer = optim.Adam(parameters, lr=cmd_inp['learning_rate'],
         weight_decay=cmd_inp['coef_l2'])
+
     try:
         for epoch in range(cmd_inp['max_epoch']):
             if cmd_inp['verbose'] == 'yes':
@@ -106,7 +108,7 @@ def spv_train_LCNP(p, cmd_inp):
                 'state_dict': model.state_dict()
             }, cmd_inp['save'])
     except KeyboardInterrupt:
-        print(' - Exiting from training early')
+        print " - Exiting from training early"
         torch.save({
                 'state_dict': model.state_dict()
             }, cmd_inp['save'])
@@ -231,12 +233,14 @@ def parse_LCNP(p, sen2parse, cmd_inp):
     if not cmd_inp['pretrain'] == None:
         if cmd_inp['verbose'] == 'yes':
             print " - use pretrained model from ", cmd_inp['pretrain']
-        pretrain = torch.load(cmd_inp['pretrain'])
+        pretrain = torch.load(cmd_inp['pretrain'], \
+            map_location=lambda storage, loc: storage)
         model.load_state_dict(pretrain['state_dict'])
     else:
         if cmd_inp['verbose'] == 'yes':
             print " - use default model from ", constants.PRE_TRAINED_FILE
-        pretrain = torch.load(constants.PRE_TRAINED_FILE)
+        pretrain = torch.load(constants.PRE_TRAINED_FILE, \
+            map_location=lambda storage, loc: storage)
         model.load_state_dict(pretrain['state_dict'])
 
     inp = p.get_idx(sen2parse)
