@@ -42,6 +42,7 @@ def spv_train_LCNP(p, cmd_inp):
     model = LCNPModel(inputs, cmd_inp['cuda'], cmd_inp['verbose'])
     if cmd_inp['cuda']:
         model.cuda()
+
     if not cmd_inp['pretrain'] == None:
         if cmd_inp['verbose'] == 'yes':
             print " - use pretrained model from ", cmd_inp['pretrain']
@@ -53,6 +54,7 @@ def spv_train_LCNP(p, cmd_inp):
 
     optimizer = optim.Adam(parameters, lr=cmd_inp['learning_rate'],
         weight_decay=cmd_inp['coef_l2'])
+
     try:
         for epoch in range(cmd_inp['max_epoch']):
             if cmd_inp['verbose'] == 'yes':
@@ -97,16 +99,18 @@ def spv_train_LCNP(p, cmd_inp):
                     optimizer.step()
                     train_end = time.time()
                     if cmd_inp['verbose'] == 'yes':
-                        print " - Training one batch: forward: %.4f, backward: %.4f, "\
-                            "optimize: %.4f secs" % (
-                            round(t0 - train_start, 5),
-                            round(t1 - t0, 5),
-                            round(train_end - t1, 5) )
+                        print " - Training one batch: " \
+                            "forward: %.4f, backward: %.4f, optimize: %.4f secs" \
+                            % (
+                                round(t0 - train_start, 5), 
+                                round(t1 - t0, 5),
+                                round(train_end - t1, 5)
+                            )
         torch.save({
                 'state_dict': model.state_dict()
             }, cmd_inp['save'])
     except KeyboardInterrupt:
-        print(' - Exiting from training early')
+        print " - Exiting from training early"
         torch.save({
                 'state_dict': model.state_dict()
             }, cmd_inp['save'])
@@ -226,17 +230,19 @@ def parse_LCNP(p, sen2parse, cmd_inp):
         'urules': p.unary,
         'brules': p.binary
     }
-    
+
     model = LCNPModel(inputs, cmd_inp['cuda'], cmd_inp['verbose'])
     if not cmd_inp['pretrain'] == None:
         if cmd_inp['verbose'] == 'yes':
             print " - use pretrained model from ", cmd_inp['pretrain']
-        pretrain = torch.load(cmd_inp['pretrain'])
+        pretrain = torch.load(cmd_inp['pretrain'], \
+            map_location=lambda storage, loc: storage)
         model.load_state_dict(pretrain['state_dict'])
     else:
         if cmd_inp['verbose'] == 'yes':
             print " - use default model from ", constants.PRE_TRAINED_FILE
-        pretrain = torch.load(constants.PRE_TRAINED_FILE)
+        pretrain = torch.load(constants.PRE_TRAINED_FILE, \
+            map_location=lambda storage, loc: storage)
         model.load_state_dict(pretrain['state_dict'])
 
     inp = p.get_idx(sen2parse)
@@ -266,16 +272,21 @@ def print_parse(p, cky_chart, hash_map, start, end, idx):
     if start == end:
         return "<start == end>"
     tpl_map = (start, end, idx)
-    parent, curr_log_prob, left_sib, child, mid = cky_chart[start][end][hash_map[tpl_map][0]]
+    parent, curr_log_prob, left_sib, child, mid = \
+        cky_chart[start][end][hash_map[tpl_map][0]]
 
     if left_sib == -2:
         # is terminal rule
         return "(" + p.idx2Nonterm[parent] + " " + p.idx2Word[child] + ")"
     elif left_sib >= 0:
-        return  "(" + p.idx2Nonterm[parent] + " " + print_parse(p, cky_chart, hash_map, start, mid, left_sib) + " " \
-        + print_parse(p, cky_chart, hash_map, mid, end, child) + ")"        
+        # binary rule
+        return  "(" + p.idx2Nonterm[parent] + " " \
+            + print_parse(p, cky_chart, hash_map, start, mid, left_sib) + " " \
+            + print_parse(p, cky_chart, hash_map, mid, end, child) + ")"    
     else:
-        return  "(" + p.idx2Nonterm[parent] + " "  + print_parse(p, cky_chart, hash_map, mid, end, child) + ")"      
+        # unary rule
+        return  "(" + p.idx2Nonterm[parent] + " "  \
+            + print_parse(p, cky_chart, hash_map, mid, end, child) + ")" 
         
 
 

@@ -14,26 +14,26 @@ class LCNPModel(nn.Module):
         self.verbose = verbose_flag
         
         # terminals
-        self.term_emb = inputs['term_emb']      # embeddings of terminals
-        self.nt = inputs['nt']                  # number of terminals
-        self.dt = inputs['dt']                  # dimension of terminals
+        self.term_emb = inputs['term_emb']   # embeddings of terminals
+        self.nt = inputs['nt']               # number of terminals
+        self.dt = inputs['dt']               # dimension of terminals
 
         # nonterminals
-        self.nonterm_emb = inputs['nt_emb']     # embeddings of nonterminals
-        self.nnt = inputs['nnt']                # number of nonterminals
-        self.dnt = inputs['dnt']                # dimension of nonterminals
+        self.nonterm_emb = inputs['nt_emb']  # embeddings of nonterminals
+        self.nnt = inputs['nnt']             # number of nonterminals
+        self.dnt = inputs['dnt']             # dimension of nonterminals
 
         # model
         self.cuda_flag = cuda_flag
 
-        self.coef_lstm = inputs['coef_lstm']    # coefficient of LSTM
-        self.bsz = inputs['bsz']                # the batch size
-        self.dhid = inputs['dhid']              # dimension of hidden layer
-        self.nlayers = inputs['nlayers']        # number of layers in neural net
-        initrange = inputs['initrange']         # range for uniform initialization
-        self.urules = inputs['urules']          # dictionary of unary rules
-        self.brules = inputs['brules']          # dictionary of binary rules
-        self.lexicon = inputs['lexicon']        # dictionary of lexicon
+        self.coef_lstm = inputs['coef_lstm'] # coefficient of LSTM
+        self.bsz = inputs['bsz']             # the batch size
+        self.dhid = inputs['dhid']           # dimension of hidden layer
+        self.nlayers = inputs['nlayers']     # number of layers in neural net
+        initrange = inputs['initrange']      # range for uniform initialization
+        self.urules = inputs['urules']       # dictionary of unary rules
+        self.brules = inputs['brules']       # dictionary of binary rules
+        self.lexicon = inputs['lexicon']     # dictionary of lexicon
 
         self.encoder_nt = nn.Embedding(self.nnt, self.dnt)
         self.word2vec_plus = nn.Embedding(self.nt, self.dt)
@@ -43,6 +43,7 @@ class LCNPModel(nn.Module):
                 self.dt, self.dhid, self.nlayers,
                 batch_first=True, dropout=0.5, bias=True
             )
+
         # the initial states for h0 and c0 of LSTM
         if self.cuda_flag:
             self.h0 = (Variable(torch.zeros(self.nlayers, self.bsz, self.dhid).cuda()),
@@ -123,7 +124,7 @@ class LCNPModel(nn.Module):
 
     def parse(self, sen):
         emb_inp = self.encoder_t(sen)
-        output, hidden = self.LSTM(emb_inp, self.h0)       
+        output, hidden = self.LSTM(emb_inp, self.h0)
 
         if self.cuda_flag:
             nll = Variable(torch.FloatTensor([0])).cuda()
@@ -165,7 +166,7 @@ class LCNPModel(nn.Module):
         tt1 = time.time()
         if self.verbose == 'yes':
             print "LEXICON ", tt1-tt0, "---------------------------"
-         
+
         tt0 = time.time()
         # Unary appending, deal with non_term -> non_term ... -> term chain
         for i in xrange(length):
@@ -260,8 +261,8 @@ class LCNPModel(nn.Module):
         posterior = 1
         if not tpl_map in hash_map:
             # DEBUG
-            #for x in hash_map:
-            #    print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x][0]][1].data[0])
+            for x in hash_map:
+                print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x][0]][1].data[0])
             return -1, None, None, -1, -1
         else:
             nll = -inside[0][length][ hash_map[tpl_map][0] ][1]

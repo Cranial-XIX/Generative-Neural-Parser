@@ -11,8 +11,6 @@ import constants
 import controller
 import data_processor
 
-import test
-
 def main():
 
     parser = argparse.ArgumentParser(

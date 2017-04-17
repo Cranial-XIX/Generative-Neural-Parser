@@ -28,12 +28,12 @@ class Processor(object):
 
     ## This method reads in word embeddings from the Word2vec file 
     ## and store them into a hash map.
-    def read_word2vec(self):        
+    def read_word2vec(self):
         # Get the filename
-        w2v_file = "%s%d%s"  % (constants.WORD_EMBEDDING_FILE_PREFIX, 
-            self.dt, constants.WORD_EMBEDDING_FILE_SUFFIX)
+        w2v_file = constants.W2V_FILE
 
-        self.term_emb = torch.FloatTensor(int(constants.MAX_VOCAB_SIZE), self.dt)
+        self.term_emb = torch.FloatTensor(
+            int(constants.MAX_VOCAB_SIZE), self.dt)
 
         # Deal with OOV (TODO@Bo: change this to be more signature specific)
         self.term_emb[0] = torch.ones(self.dt)  # for OOV
@@ -53,7 +53,7 @@ class Processor(object):
                     embedding = torch.FloatTensor([float(v_i) for v_i in embeddingStr])
                     self.term_emb[wordIdx] = embedding
                     self.word2Idx[word] = wordIdx
-                    self.idx2Word[wordIdx] = word    
+                    self.idx2Word[wordIdx] = word
                     wordIdx += 1
             # record the size of our vocabulary
             self.nt = wordIdx
@@ -71,7 +71,7 @@ class Processor(object):
     ## this method reads and creates the nonterminal embeddings
     def create_nt_emb(self):
 
-        nt_file = constants.NON_TERMINAL_EMBEDDING_FILE
+        nt_file = constants.NT_EMB_FILE
 
         if os.path.exists(nt_file):
             begin_time = time.time()
@@ -123,9 +123,9 @@ class Processor(object):
         # unary_dict = (nnt, nnt)
         # binary_dict = (nnt, nnt, nnt)
 
-        self.lexicon = {}
-        self.unary = {}
-        self.binary = {}
+        lexicon = {}
+        unary = {}
+        binary = {}
 
         if os.path.exists(self.file_data):
             with open(self.file_data, 'r') as data:
@@ -141,45 +141,47 @@ class Processor(object):
                     for j in xrange(len(parse)/4):
                         if self.is_digit(parse[4*j+2]):
                             # binary rule
+                            print "&"*30
                             parent = int(parse[4*j+1]) + self.new_nt_num
                             left = int(parse[4*j+2]) + self.new_nt_num
                             right = int(parse[4*j+3]) + self.new_nt_num
                             tpl = (left, right)
-                            if not tpl in self.binary:
-                                self.binary[tpl] = set()
-                            self.binary[tpl].add(parent)
+                            if not tpl in binary:
+                                binary[tpl] = set()
+                            binary[tpl].add(parent)
                         elif parse[4*j+2] == 'u':
+                            # unary nonterminal rule
                             parent = int(parse[4*j+1]) + self.new_nt_num
                             child = int(parse[4*j+3]) + self.new_nt_num
-                            if not child in self.unary:
-                                self.unary[child] = set()
-                            self.unary[child].add(parent)
+                            if not child in unary:
+                                unary[child] = set()
+                            unary[child].add(parent)
                         elif parse[4*j+2] == 't':
+                            # unary terminal rule
                             parent = int(parse[4*j+1]) + self.new_nt_num
-                            try:
-                                child = self.word2Idx[parse[4*j+3].lower()]
-                            except KeyError:
-                                child = 0
-                            if not child in self.lexicon:
-                                self.lexicon[child] = set()
-                            self.lexicon[child].add(parent)
-            lexicon = {}
-            for s in self.lexicon:
-                temp = [x for x in iter(self.lexicon[s])]
-                lexicon[s] = temp
-            unary = {}
-            for s in self.unary:
-                temp = [x for x in iter(self.unary[s])]
-                unary[s] = temp
-            binary = {}
-            for s in self.binary:
-                temp = [x for x in iter(self.binary[s])]
-                binary[s] = temp
-            self.lexicon = lexicon
-            self.unary = unary
-            self.binary = binary        
+                            word = parse[4*j+3].lower()
+                            child = self.word2Idx[word] \
+                                if word in self.word2Idx else 0
+
+                            if not child in lexicon:
+                                lexicon[child] = set()
+                            lexicon[child].add(parent)     
         else:
-            print "No such input file, the filename is %s" % self.file_data
+            print "No such corpus with filename: %s" % self.file_data
+
+        self.lexicon = {}
+        self.unary = {}
+        self.binary = {}
+
+        for s in lexicon:
+            self.lexicon[s] = list(lexicon[s])
+
+        for u in unary:
+            self.unary[u] = list(unary[u])
+
+        for b in binary:
+            self.binary[b] = list(binary[b])
+
         return
 
     def next(self, idx, bzs=None):
@@ -311,31 +313,34 @@ class Processor(object):
 
     def print_rules(self):
         if self.verbose == 'yes':
-            print "Lexicon is: "
+            nl = 0
             for word in self.lexicon:
                 for NT in self.lexicon[word]:
+                    nl += 1
                     print "%s ---> %s" \
                         % (self.idx2Nonterm[NT], self.idx2Word[word])                   
+            print "Lexicon size : ", nl
+            print "-" * 80
 
-            print "---------------------------------------------------------------"
-
-            print "Unary nonterminal rules are: "
-            dickt = {}
+            nu = 0
             for child in self.unary:
-                dickt[child] = []
                 for parent in self.unary[child]:
-                    dickt[child].append(parent)
-                    if parent in dickt  and  child in dickt[parent]:
-                        print "FUCK WE ARE FUCKED!", parent, " ", child, "###############################################"
+                    nu += 1
                     print "%s ---> %s" \
                         % (self.idx2Nonterm[parent], self.idx2Nonterm[child])
+            print "Unary nonterminal rules in total : ", nu
+            print "-" * 80
 
-            print "---------------------------------------------------------------"
-
-            print "Binary rules are: "
+            nb = 0
             for key in self.binary:
                 for parent in self.binary[key]:
-                    print "%s ---> %s %s" % (self.idx2Nonterm[parent], self.idx2Nonterm[key[0]], self.idx2Nonterm[key[1]])
+                    nb += 1
+                    print "%s ---> %s %s" % (
+                            self.idx2Nonterm[parent], 
+                            self.idx2Nonterm[key[0]], 
+                            self.idx2Nonterm[key[1]]
+                        )
+            print "Binary rules in total : ", nb
 
     def read_and_process(self):
         if self.read_data:
@@ -350,7 +355,8 @@ class Processor(object):
             self.read_corpus()
 
             end = time.time()
-            self.print_rules()
+
+            #self.print_rules()
 
             # save those for future use
             torch.save({
@@ -395,6 +401,7 @@ class Processor(object):
             self.new_nt_num = 2
             end = time.time()
         if self.verbose == 'yes':
+            self.print_rules()
             print "Reading data takes %.4f secs" % round(end - start, 5)
 
     def get_sen(self, indices):
