@@ -39,11 +39,12 @@ def spv_train_LCNP(p, cmd_inp):
         'brules': p.binary
     }
 
-    model = LCNPModel(inputs, cmd_inp['cuda'])
+    model = LCNPModel(inputs, cmd_inp['cuda'], cmd_inp['verbose'])
     if cmd_inp['cuda']:
         model.cuda()
     if not cmd_inp['pretrain'] == None:
-        print " - use pretrained model from ", cmd_inp['pretrain']
+        if cmd_inp['verbose'] == 'yes':
+            print " - use pretrained model from ", cmd_inp['pretrain']
         pretrain = torch.load(cmd_inp['pretrain'])
         model.load_state_dict(pretrain['state_dict'])
 
@@ -54,14 +55,16 @@ def spv_train_LCNP(p, cmd_inp):
         weight_decay=cmd_inp['coef_l2'])
     try:
         for epoch in range(cmd_inp['max_epoch']):
-            print "\nTraining epoch %d =====================================" % epoch
+            if cmd_inp['verbose'] == 'yes':
+                print "\nTraining epoch %d =====================================" % epoch
             idx = 0
             batch = 0
             while not idx == -1:
                 idx = p.next(idx, batch_size)
                 if not idx == -1:
                     batch += 1
-                    print "\nBatch %d -----------------------------------------" % batch
+                    if cmd_inp['verbose'] == 'yes':
+                        print "\nBatch %d -----------------------------------------" % batch
                     train_start = time.time()
                     optimizer.zero_grad()
                     p_array = [Variable(p.sens),
@@ -86,14 +89,16 @@ def spv_train_LCNP(p, cmd_inp):
                                 p_array[11], p_array[12])
 
                     t0 = time.time()
-                    print " - NLL Loss: ", loss
+                    if cmd_inp['verbose'] == 'yes':
+                        print " - NLL Loss: ", loss
                     loss.backward()
                     t1 = time.time()
 
                     optimizer.step()
                     train_end = time.time()
-                    print " - Training one batch: forward: %.4f, backward: %.4f, "\
-                        "optimize: %.4f secs" % (
+                    if cmd_inp['verbose'] == 'yes':
+                        print " - Training one batch: forward: %.4f, backward: %.4f, "\
+                            "optimize: %.4f secs" % (
                             round(t0 - train_start, 5),
                             round(t1 - t0, 5),
                             round(train_end - t1, 5) )
@@ -106,7 +111,8 @@ def spv_train_LCNP(p, cmd_inp):
                 'state_dict': model.state_dict()
             }, cmd_inp['save'])
 
-    print "Finish supervised training"
+    if cmd_inp['verbose'] == 'yes':
+        print "Finish supervised training"
 
 def uspv_train_LCNP(p, cmd_inp):
 
@@ -136,7 +142,8 @@ def uspv_train_LCNP(p, cmd_inp):
     model = LCNPModel(inputs, cmd_inp['cuda'])
 
     if not cmd_inp['pretrain'] == None:
-        print " - use pretrained model from ", cmd_inp['pretrain']
+        if cmd_inp['verbose'] == 'yes':
+            print " - use pretrained model from ", cmd_inp['pretrain']
         pretrain = torch.load(cmd_inp['pretrain'])
         model.load_state_dict(pretrain['state_dict'])
 
@@ -148,14 +155,16 @@ def uspv_train_LCNP(p, cmd_inp):
 
     try:
         for epoch in range(cmd_inp['max_epoch']):
-            print "\nTraining epoch %d =====================================" % epoch
+            if cmd_inp['verbose'] == 'yes':
+                print "\nTraining epoch %d =====================================" % epoch
             idx = 0
             batch = 0
             while not idx == -1:
                 idx = p.next(idx)
                 if not idx == -1:
                     batch += 1
-                    print "\nSentence %d -----------------------------------------" % batch
+                    if cmd_inp['verbose'] == 'yes':
+                        print "\nSentence %d -----------------------------------------" % batch
                     train_start = time.time()
                     optimizer.zero_grad()
                     if cmd_inp['cuda']:
@@ -165,19 +174,22 @@ def uspv_train_LCNP(p, cmd_inp):
                     loss = model(p_sen)
                     if loss.data[0] > 0:
                         t0 = time.time()
-                        print " - NLL Loss: ", loss
+                        if cmd_inp['verbose'] == 'yes':
+                            print " - NLL Loss: ", loss
                         loss.backward()
                         t1 = time.time()
 
                         optimizer.step()
                         train_end = time.time()
-                        print " - Training one batch: forward: %.4f, backward: %.4f, "\
-                            "optimize: %.4f secs" % (
+                        if cmd_inp['verbose'] == 'yes':
+                            print " - Training one batch: forward: %.4f, backward: %.4f, "\
+                                "optimize: %.4f secs" % (
                                 round(t0 - train_start, 5),
                                 round(t1 - t0, 5),
                                 round(train_end - t1, 5) )
                     else:
-                        print "No parse for sentence: ", p.get_sen(p.sen.view(-1))
+                        if cmd_inp['verbose'] == 'yes':
+                            print "No parse for sentence: ", p.get_sen(p.sen.view(-1))
         torch.save({
                 'state_dict': model.state_dict()
             }, cmd_inp['save'])
@@ -187,7 +199,8 @@ def uspv_train_LCNP(p, cmd_inp):
                 'state_dict': model.state_dict()
             }, cmd_inp['save'])
 
-    print "Finish unsupervised training"
+    if cmd_inp['verbose'] == 'yes':
+        print "Finish unsupervised training"
 
 def parse_LCNP(p, sen2parse, cmd_inp):
 
@@ -214,13 +227,15 @@ def parse_LCNP(p, sen2parse, cmd_inp):
         'brules': p.binary
     }
     
-    model = LCNPModel(inputs, cmd_inp['cuda'])
+    model = LCNPModel(inputs, cmd_inp['cuda'], cmd_inp['verbose'])
     if not cmd_inp['pretrain'] == None:
-        print " - use pretrained model from ", cmd_inp['pretrain']
+        if cmd_inp['verbose'] == 'yes':
+            print " - use pretrained model from ", cmd_inp['pretrain']
         pretrain = torch.load(cmd_inp['pretrain'])
         model.load_state_dict(pretrain['state_dict'])
     else:
-        print " - use default model from ", constants.PRE_TRAINED_FILE
+        if cmd_inp['verbose'] == 'yes':
+            print " - use default model from ", constants.PRE_TRAINED_FILE
         pretrain = torch.load(constants.PRE_TRAINED_FILE)
         model.load_state_dict(pretrain['state_dict'])
 
@@ -233,15 +248,18 @@ def parse_LCNP(p, sen2parse, cmd_inp):
 
     filename = './lbtest.tst'
     parse_f = open(filename, 'w')
-    print inp
+    if cmd_inp['verbose'] == 'yes':
+        print inp
     if nll > 0: # exist parse
-        print "The best parse negative log likelihood is ", nll
+        if cmd_inp['verbose'] == 'yes':
+            print "The best parse negative log likelihood is ", nll
         parse = print_parse(p, chart, hashmap, 0, end, idx)
         print parse
         parse_f.write(parse)
         parse_f.write('\n')
     else:
-        print "No parses for the sentence."
+        if cmd_inp['verbose'] == 'yes':
+            print "No parses for the sentence."
 
 
 def print_parse(p, cky_chart, hash_map, start, end, idx):

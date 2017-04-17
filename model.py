@@ -8,9 +8,11 @@ from torch.autograd import Variable
 class LCNPModel(nn.Module):
     """Container module with an encoder, a recurrent module, and a decoder."""
 
-    def __init__(self, inputs, cuda_flag):
+    def __init__(self, inputs, cuda_flag, verbose_flag):
         super(LCNPModel, self).__init__()
 
+        self.verbose = verbose_flag
+        
         # terminals
         self.term_emb = inputs['term_emb']      # embeddings of terminals
         self.nt = inputs['nt']                  # number of terminals
@@ -94,7 +96,6 @@ class LCNPModel(nn.Module):
             self.LSTM.bias_hh_l1.data[i] = 1.0
             self.LSTM.bias_hh_l2.data[i] = 1.0
 
-
         self.p2l.bias.data.fill_(0)
         self.p2l.weight.data.uniform_(-initrange, initrange)
 
@@ -146,6 +147,7 @@ class LCNPModel(nn.Module):
         # Initialization
 
         # TODO(@Bo) speed up!
+        tt0 = time.time()
         for i in xrange(length):
             child = sen.data[i+1]
             for parent in self.lexicon[child]:
@@ -160,7 +162,11 @@ class LCNPModel(nn.Module):
                 inside[i][i+1].append(tpl)
                 tpl_map = (i, i+1, parent)
                 hash_map[tpl_map] = (len(inside[i][i+1])-1, log_rule_prob)
-
+        tt1 = time.time()
+        if self.verbose == 'yes':
+            print "LEXICON ", tt1-tt0, "---------------------------"
+         
+        tt0 = time.time()
         # Unary appending, deal with non_term -> non_term ... -> term chain
         for i in xrange(length):
             for child_tpl in inside[i][i+1]:
@@ -180,12 +186,17 @@ class LCNPModel(nn.Module):
                             tpl = (parent, curr_log_prob, -1, child, i)
                             inside[i][i+1].append(tpl)
                             hash_map[tpl_map] = (len(inside[i][i+1])-1, curr_log_prob)
-
+        tt1 = time.time()
+        if self.verbose == 'yes':
+            print "Unary appending ", tt1-tt0, "---------------------------"
+            
         # viterbi algorithm
+        tt0 = time.time()
         for width in xrange(2, length+1):
             for start in xrange(0, length-width+1):
                 end = start + width
                 # binary rule
+                t00 = time.time()
                 for mid in xrange(start+1, end):
                     for left_sib_tpl in inside[start][mid]:
                         for child_tpl in inside[mid][end]:
@@ -214,27 +225,37 @@ class LCNPModel(nn.Module):
                                         tpl = (parent, curr_log_prob, left_sib, child, mid)
                                         inside[start][end][idx] = tpl
                                         hash_map[tpl_map] = (idx, curr_log_prob)
+                t01 = time.time()
+                if self.verbose == 'yes':
+                    print "Binary rules ", t01-t00, "---------------------------"                                        
 
                 # unary rule
+                t00 = time.time()
                 for child_tpl in inside[start][end]:
                     child = child_tpl[0]
                     previous_log_prob = child_tpl[1]
                     if child in self.urules:
                         for parent in self.urules[child]:
-                            log_rule_prob = self.log_prob_left(
-                                    parent, 1, left_context[start]
-                                ) + self.log_prob_unt(
-                                    parent, child, left_context[start]
-                                )
-                            curr_log_prob = previous_log_prob + log_rule_prob
-                            tpl_map = (start, end, parent)
-                            left_sib = -1
-                            if not tpl_map in hash_map:
-                                tpl = (parent, curr_log_prob, -1, child, start)
-                                inside[start][end].append(tpl)
+                                log_rule_prob = self.log_prob_left(
+                                        parent, 1, left_context[start]
+                                    ) + self.log_prob_unt(
+                                        parent, child, left_context[start]
+                                    )
+                                curr_log_prob = previous_log_prob + log_rule_prob
                                 tpl_map = (start, end, parent)
-                                hash_map[tpl_map] = (len(inside[start][end])-1, curr_log_prob)
-
+                                left_sib = -1
+                                if not tpl_map in hash_map:
+                                    tpl = (parent, curr_log_prob, -1, child, start)
+                                    inside[start][end].append(tpl)
+                                    tpl_map = (start, end, parent)
+                                    hash_map[tpl_map] = (len(inside[start][end])-1, curr_log_prob)
+                t01 = time.time()
+                if self.verbose == 'yes':
+                    print "Unary rules ", t01-t00, "---------------------------"
+        tt1 = time.time()
+        if self.verbose == 'yes':
+            print "VITERBI ", tt1-tt0, "---------------------------"
+            
         tpl_map = (0, length, root_idx)
         posterior = 1
         if not tpl_map in hash_map:
@@ -245,8 +266,9 @@ class LCNPModel(nn.Module):
         else:
             nll = -inside[0][length][ hash_map[tpl_map][0] ][1]
             # DEBUG
-            for x in hash_map:
-                print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x][0]][1].data[0])
+            #if self.verbose == 'yes':
+            #    for x in hash_map:
+            #        print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x][0]][1].data[0])
             return nll, inside, hash_map, length, root_idx
         
 
@@ -275,7 +297,8 @@ class LCNPModel(nn.Module):
             c += len(self.urules[i])
         for p in self.brules:
             c += len(self.brules[p])
-        print "size of grammar : ", c
+        if self.verbose == 'yes':
+            print "size of grammar : ", c
         # Initialization
         tt0 = time.time()
         for i in xrange(length):
@@ -293,7 +316,8 @@ class LCNPModel(nn.Module):
                 tpl_map = (i, i+1, parent)
                 hash_map[tpl_map] = len(inside[i][i+1])-1
         tt1 = time.time()
-        print "LEXICON ", tt1-tt0, "---------------------------"
+        if self.verbose == 'yes':
+            print "LEXICON ", tt1-tt0, "---------------------------"
 
         # Unary appending, deal with non_term -> non_term ... -> term chain
         tt2 = time.time()
@@ -322,12 +346,17 @@ class LCNPModel(nn.Module):
                             tpl = (parent, self.log_sum_exp(curr_log_prob, old_log_prob))
                             inside[i][i+1][idx] = tpl
         tt3 = time.time()
-        print "UNARY ", tt3-tt2, "---------------------------"
+        if self.verbose == 'yes':
+            print "UNARY ", tt3-tt2, "---------------------------"
                             
-        print 'Viterbi algorithm starting'
+        if self.verbose == 'yes':
+            print 'Viterbi algorithm starting'
         # viterbi algorithm
+        tt4 = time.time()
         for width in xrange(2, length+1):
             for start in xrange(0, length-width+1):
+                if self.verbose == 'yes':
+                    print width, " ", start, " binary rules"
                 end = start + width
                 # binary rule
                 for mid in xrange(start+1, end):
@@ -360,6 +389,8 @@ class LCNPModel(nn.Module):
                                         inside[start][end][idx] = tpl
 
                 # unary rule
+                if self.verbose == 'yes':
+                    print width, " ", start, " unary rules"
                 for child_tpl in inside[start][end]:
                     child = child_tpl[0]
                     previous_log_prob = child_tpl[1]
@@ -383,7 +414,9 @@ class LCNPModel(nn.Module):
                                 old_log_prob = inside[start][end][idx][1]
                                 tpl = (parent, self.log_sum_exp(curr_log_prob, old_log_prob))
                                 inside[start][end][idx] = tpl
-        print "Finish inside algorithm ... "
+        tt5 = time.time()
+        if self.verbose == 'yes':
+            print "Finish inside algorithm ... ", tt5 - tt4
         
         tpl_map = (0, length, root_idx)
         if not tpl_map in hash_map:
@@ -398,6 +431,7 @@ class LCNPModel(nn.Module):
             return -inside[0][length][hash_map[tpl_map]][1]
 
     def log_prob_ut(self, parent, child, history):
+        t0 = time.time()
         logsoftmax = nn.LogSoftmax()
         if self.cuda_flag:
             parent_LongTensor = Variable(torch.LongTensor([parent])).cuda()
@@ -407,12 +441,18 @@ class LCNPModel(nn.Module):
                 self.encoder_nt(parent_LongTensor), 
                 history.view(1, -1)
             ), 1)
+        t1 = time.time()
         #res = (self.word2vec_plus.weight).mm(self.ut(condition).t()).view(1, -1)
         res = (self.word2vec.weight + self.word2vec_plus.weight).mm(self.ut(condition).t()).view(1, -1)
+        t2 = time.time()
         res = logsoftmax(res).view(-1)
+        t3 = time.time()
+        if self.verbose == 'yes':
+            print "log_prob_ut ", parent, " ", child, " ", t1-t0, " ", t2-t1, " ", t3-t2
         return res[child]
 
     def log_prob_unt(self, parent, child, history):
+        dragon = time.time()
         logsoftmax = nn.LogSoftmax()
         if self.cuda_flag:
             parent_LongTensor = Variable(torch.LongTensor([parent])).cuda()
@@ -423,9 +463,13 @@ class LCNPModel(nn.Module):
                 history.view(1, -1)
             ), 1)
         res = logsoftmax(self.unt(condition)).view(-1)
+        titi = time.time()
+        if self.verbose == 'yes':
+            pass#print "log_prob_unt ", titi-dragon
         return res[child]
 
     def log_prob_left(self, parent, child, history):
+        dragon = time.time()
         logsoftmax = nn.LogSoftmax()
         if self.cuda_flag:
             parent_LongTensor = Variable(torch.LongTensor([parent])).cuda()
@@ -436,9 +480,13 @@ class LCNPModel(nn.Module):
                 history.view(1, -1)
             ), 1)
         res = logsoftmax(self.p2l(condition)).view(-1)
+        titi = time.time()
+        if self.verbose == 'yes':
+            pass#print "log_prob_left ", titi-dragon
         return res[child]
 
     def log_prob_right(self, parent, left_sib, child, history):
+        dragon = time.time()
         logsoftmax = nn.LogSoftmax()
         if self.cuda_flag:
             parent_LongTensor = Variable(torch.LongTensor([parent])).cuda()
@@ -454,6 +502,9 @@ class LCNPModel(nn.Module):
                 ), 
             1)
         res = logsoftmax(self.pl2r(condition)).view(-1)
+        titi = time.time()
+        if self.verbose == 'yes':
+            pass#print "log_prob_right ", titi-dragon
         return res[child]
 
     def log_sum_exp(self, a, b):
