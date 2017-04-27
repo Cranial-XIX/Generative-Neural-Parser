@@ -1,5 +1,7 @@
+import copy
 import itertools
 import math
+import numpy as np
 import time
 import torch
 import torch.nn as nn
@@ -123,394 +125,225 @@ class LCNPModel(nn.Module):
         return self.word2vec_plus(seq) + self.word2vec(seq)
 
     def parse(self, sen):
+
         emb_inp = self.encoder_t(sen)
         output, hidden = self.LSTM(emb_inp, self.h0)
-
-        if self.cuda_flag:
-            nll = Variable(torch.FloatTensor([0])).cuda()
-        else:
-            nll = Variable(torch.FloatTensor([0]))
-
-        sen = sen.view(-1)
-        left_context = self.coef_lstm * output[0]
-
-        length = len(sen) - 1
-        # every entry is a list of tuples, with each tuple indicate a potential nonterminal 
-        # at this position (nonterminal idx, sum of log probability over the constituent)
-        inside = [[[] for i in xrange(length + 1)] for j in xrange(length + 1)]
-
-        # a hashmap that stores the total prob of certain constituent
-        hash_map = {}
-
-        ## Inside Algorithm
-        root_idx = 2
-
-        # Initialization
-
-        # TODO(@Bo) speed up!
-        tt0 = time.time()
-        for i in xrange(length):
-            child = sen.data[i+1]
-            for parent in self.lexicon[child]:
-                # new nonterminal found, append to list
-                # calculate each part of the entry
-                log_rule_prob = self.log_prob_left(
-                        parent, 0, left_context[i]
-                    ) + self.log_prob_ut(
-                        parent, child, left_context[i]
-                    )
-                tpl = (parent, log_rule_prob, -2, child, i)
-                inside[i][i+1].append(tpl)
-                tpl_map = (i, i+1, parent)
-                hash_map[tpl_map] = (len(inside[i][i+1])-1, log_rule_prob)
-        tt1 = time.time()
-        if self.verbose == 'yes':
-            print "LEXICON ", tt1-tt0, "---------------------------"
-
-        tt0 = time.time()
-        # Unary appending, deal with non_term -> non_term ... -> term chain
-        for i in xrange(length):
-            for child_tpl in inside[i][i+1]:
-                child = child_tpl[0]
-                previous_log_prob = child_tpl[1]
-                if child in self.urules:
-                    for parent in self.urules[child]:
-                        log_rule_prob = self.log_prob_left(
-                                parent, 1, left_context[i]
-                            ) + self.log_prob_unt(
-                                parent, child, left_context[i]
-                            )
-                        curr_log_prob = previous_log_prob + log_rule_prob
-                        tpl_map = (i, i+1, parent)
-                        if not tpl_map in hash_map:
-                            left_sib = -1
-                            tpl = (parent, curr_log_prob, -1, child, i)
-                            inside[i][i+1].append(tpl)
-                            hash_map[tpl_map] = (len(inside[i][i+1])-1, curr_log_prob)
-        tt1 = time.time()
-        if self.verbose == 'yes':
-            print "Unary appending ", tt1-tt0, "---------------------------"
-            
-        # viterbi algorithm
-        tt0 = time.time()
-        for width in xrange(2, length+1):
-            for start in xrange(0, length-width+1):
-                end = start + width
-                # binary rule
-                t00 = time.time()
-                for mid in xrange(start+1, end):
-                    for left_sib_tpl in inside[start][mid]:
-                        for child_tpl in inside[mid][end]:
-                            left_sib = left_sib_tpl[0]
-                            left_sib_log_prob = left_sib_tpl[1]
-                            child = child_tpl[0]
-                            child_log_prob = child_tpl[1]
-                            previous_log_prob = left_sib_log_prob + child_log_prob
-                            children = (left_sib, child)
-                            if children in self.brules:
-                                for parent in self.brules[children]:
-                                    log_rule_prob = self.log_prob_left(
-                                            parent, child, left_context[start]
-                                        ) + self.log_prob_right(
-                                            parent, left_sib, child, left_context[mid]
-                                        )
-                                    curr_log_prob = previous_log_prob + log_rule_prob
-                                    tpl_map = (start, end, parent)
-                                    if not tpl_map in hash_map:
-                                        tpl = (parent, curr_log_prob, left_sib, child, mid)
-                                        inside[start][end].append(tpl)
-                                        tpl_map = (start, end, parent)
-                                        hash_map[tpl_map] = (len(inside[start][end])-1, curr_log_prob)
-                                    elif curr_log_prob > hash_map[tpl_map][1]:
-                                        idx = hash_map[tpl_map][0]
-                                        tpl = (parent, curr_log_prob, left_sib, child, mid)
-                                        inside[start][end][idx] = tpl
-                                        hash_map[tpl_map] = (idx, curr_log_prob)
-                t01 = time.time()
-                if self.verbose == 'yes':
-                    print "Binary rules ", t01-t00, "---------------------------"                                        
-
-                # unary rule
-                t00 = time.time()
-                for child_tpl in inside[start][end]:
-                    child = child_tpl[0]
-                    previous_log_prob = child_tpl[1]
-                    if child in self.urules:
-                        for parent in self.urules[child]:
-                                log_rule_prob = self.log_prob_left(
-                                        parent, 1, left_context[start]
-                                    ) + self.log_prob_unt(
-                                        parent, child, left_context[start]
-                                    )
-                                curr_log_prob = previous_log_prob + log_rule_prob
-                                tpl_map = (start, end, parent)
-                                left_sib = -1
-                                if not tpl_map in hash_map:
-                                    tpl = (parent, curr_log_prob, -1, child, start)
-                                    inside[start][end].append(tpl)
-                                    tpl_map = (start, end, parent)
-                                    hash_map[tpl_map] = (len(inside[start][end])-1, curr_log_prob)
-                t01 = time.time()
-                if self.verbose == 'yes':
-                    print "Unary rules ", t01-t00, "---------------------------"
-        tt1 = time.time()
-        if self.verbose == 'yes':
-            print "VITERBI ", tt1-tt0, "---------------------------"
-            
-        tpl_map = (0, length, root_idx)
-        posterior = 1
-        if not tpl_map in hash_map:
-            # DEBUG
-            for x in hash_map:
-                print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x][0]][1].data[0])
-            return -1, None, None, -1, -1
-        else:
-            nll = -inside[0][length][ hash_map[tpl_map][0] ][1]
-            # DEBUG
-            #if self.verbose == 'yes':
-            #    for x in hash_map:
-            #        print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x][0]][1].data[0])
-            return nll, inside, hash_map, length, root_idx
-        
-
-    def unsupervised(self, sen):
-        emb_inp = self.encoder_t(sen)
-        output, hidden = self.LSTM(emb_inp, self.h0)
-
-        left_context = self.coef_lstm * output.squeeze(0)
-
-        sen = sen.view(-1)
+        h = self.coef_lstm * output.squeeze(0) # left context
+        sen = sen.view(-1).data
         length = len(sen)
-        # every entry is a list of tuples, with each tuple indicate
-        # a potential nonterminal at this position 
-        # (nonterminal idx, sum of log probability over the constituent)
-        inside = [[[] for i in xrange(length+1)] for j in xrange(length+1)]
 
-        # a hashmap that stores the total prob of certain constituent
-        hash_map = {}
+        ## Viterbi Algorithm
 
-        ## Inside Algorithm
+        cky = [[[] for j in xrange(length+1)] for i in xrange(length)]
+        bp = [[[[None] for k in xrange(self.nnt)] for j in xrange(length+1)] for i in xrange(length)]
+        viscore = Variable(torch.zeros(length, length+1, self.nnt))
 
         root_idx = 2
+        lsm = nn.LogSoftmax()
+        w2v_w = self.word2vec.weight + self.word2vec_plus.weight
+        ut_w = w2v_w.mm(self.ut.weight).t()
+        ut_b = w2v_w.mm(self.ut.bias).t()
 
-        c = 0
-        for i in self.urules:
-            c += len(self.urules[i])
-        for p in self.brules:
-            c += len(self.brules[p])
-        if self.verbose == 'yes':
-            print "size of grammar : ", c
-        # Initialization
+        # Initialize the chart
         tt0 = time.time()
-        for i in xrange(length):
-            child = sen.data[i]
-            for parent in self.lexicon[child]:
-                # new nonterminal found, append to list
-                # calculate each part of the entry
-                log_rule_prob = self.log_prob_left(
-                        parent, 0, left_context[i]
-                    ) + self.log_prob_ut(
-                        parent, child, left_context[i]
-                    )
-                tpl = (parent, log_rule_prob)
-                inside[i][i+1].append(tpl)
-                tpl_map = (i, i+1, parent)
-                hash_map[tpl_map] = len(inside[i][i+1])-1
+        for start in xrange(length):
+            end = start + 1
+            c = sen[start]
+            for p in self.lexicon[c]:
+                cky[start][end].append(p)
+                viscore[start][end][p] = self.log_prob_ut(lsm, ut_w, ut_b, p, c, h[start])
+
         tt1 = time.time()
         if self.verbose == 'yes':
             print "LEXICON ", tt1-tt0, "---------------------------"
 
         # Unary appending, deal with non_term -> non_term ... -> term chain
         tt2 = time.time()
-        for i in xrange(length):
-            for child_tpl in inside[i][i+1]:
-                child = child_tpl[0]
-                previous_log_prob = child_tpl[1]
-                if child in self.urules:
-                    for parent in self.urules[child]:
-                        log_rule_prob = self.log_prob_left(
-                                parent, 1, left_context[i]
-                            ) + self.log_prob_unt(
-                                parent, child, left_context[i]
-                            )
-                        curr_log_prob = previous_log_prob + log_rule_prob
-                        tpl_map = (i, i+1, parent)
-                        if not tpl_map in hash_map:
-                            left_sib = -1
-                            tpl = (parent, curr_log_prob)
-                            inside[i][i+1].append(tpl)
-                            hash_map[tpl_map] = len(inside[i][i+1])-1
-                        else:
-                            left_sib = -1
-                            idx = hash_map[tpl_map]
-                            old_log_prob = inside[i][i+1][idx][1]
-                            tpl = (parent, self.log_sum_exp(curr_log_prob, old_log_prob))
-                            inside[i][i+1][idx] = tpl
+        for start in xrange(length):
+            end = start + 1
+            tmp = []
+            for c in cky[start][end]:
+                if c in self.urules:
+                    for p in self.urules[c]:
+                        if viscore[start][end][p] == 0:
+                            tmp.append(p)
+                        newProb = self.log_prob_unt(lsm, p, c, h[start]) + viscore[start][end][c]
+                        if newProb > viscore[start][end][p]:
+                            viscore[start][end][p] = newProb
+                            bp[start][end][p] = (None, None, c)
+            cky[start][end] += tmp
+
         tt3 = time.time()
         if self.verbose == 'yes':
             print "UNARY ", tt3-tt2, "---------------------------"
-                            
-        if self.verbose == 'yes':
-            print 'Viterbi algorithm starting'
+
         # viterbi algorithm
         tt4 = time.time()
         for width in xrange(2, length+1):
             for start in xrange(0, length-width+1):
-                if self.verbose == 'yes':
-                    print width, " ", start, " binary rules"
                 end = start + width
                 # binary rule
                 for mid in xrange(start+1, end):
-                    for left_sib_tpl in inside[start][mid]:
-                        for child_tpl in inside[mid][end]:
-                            left_sib = left_sib_tpl[0]
-                            left_sib_log_prob = left_sib_tpl[1]
-                            child = child_tpl[0]
-                            child_log_prob = child_tpl[1]
-                            previous_log_prob = left_sib_log_prob + child_log_prob
-                            children = (left_sib, child)
-                            if children in self.brules:
-                                for parent in self.brules[children]:
-                                    log_rule_prob = self.log_prob_left(
-                                            parent, child, left_context[start]
-                                        ) + self.log_prob_right(
-                                            parent, left_sib, child, left_context[mid]
-                                        )                                   
-                                    curr_log_prob = previous_log_prob + log_rule_prob
-                                    tpl_map = (start, end, parent)
-                                    if not tpl_map in hash_map:
-                                        tpl = (parent, curr_log_prob)
-                                        inside[start][end].append(tpl)
-                                        tpl_map = (start, end, parent)
-                                        hash_map[tpl_map] = len(inside[start][end])-1
-                                    else:
-                                        idx = hash_map[tpl_map]
-                                        old_log_prob = inside[start][end][idx][1]
-                                        tpl = (parent, self.log_sum_exp(curr_log_prob, old_log_prob))
-                                        inside[start][end][idx] = tpl
+                    for l in cky[start][mid]:
+                        for r in cky[mid][end]:
+                            if (l, r) in self.brules:
+                                for p in self.brules[(l, r)]:
+                                    if viscore[start][end][p] == 0:
+                                        cky[start][end].append(p)
+                                    newProb = self.log_prob_binary(lsm, p, l, r, h[mid]) + viscore[start][mid][l] + viscore[mid][end][r]
+                                    if newProb > viscore[start][end][p]:
+                                        viscore[start][end][p] = newProb
+                                        bp[start][end][p] = (mid, l, r)
 
                 # unary rule
-                if self.verbose == 'yes':
-                    print width, " ", start, " unary rules"
-                for child_tpl in inside[start][end]:
-                    child = child_tpl[0]
-                    previous_log_prob = child_tpl[1]
-                    if child in self.urules:
-                        for parent in self.urules[child]:
-                            log_rule_prob = self.log_prob_left(
-                                    parent, 1, left_context[start]
-                                ) + self.log_prob_unt(
-                                    parent, child, left_context[start]
-                                )
-                            curr_log_prob = previous_log_prob + log_rule_prob
-                            tpl_map = (start, end, parent)
-                            left_sib = -1
-                            if not tpl_map in hash_map:
-                                tpl = (parent, curr_log_prob)
-                                inside[start][end].append(tpl)
-                                tpl_map = (start, end, parent)
-                                hash_map[tpl_map] = len(inside[start][end])-1
-                            else:
-                                idx = hash_map[tpl_map]
-                                old_log_prob = inside[start][end][idx][1]
-                                tpl = (parent, self.log_sum_exp(curr_log_prob, old_log_prob))
-                                inside[start][end][idx] = tpl
+                for c in cky[start][end]:
+                    tmp = []
+                    if c in self.urules:
+                        for p in self.urules[c]:
+                            if viscore[start][end][p] == 0:
+                                tmp.append(p)
+                            newProb = self.log_prob_unt(lsm, p, c, h[start]) + viscore[start][end][c]
+                            if newProb > viscore[start][end][p]:
+                                viscore[start][end][p] = newProb
+                                bp[start][end][p] = (None, None, c)
+                    cky[start][end] += tmp
+
         tt5 = time.time()
         if self.verbose == 'yes':
             print "Finish inside algorithm ... ", tt5 - tt4
-        
-        tpl_map = (0, length, root_idx)
-        if not tpl_map in hash_map:
-            # DEBUG
-            #for x in hash_map:
-            #    print "%d covers from %d to %d with prob %f" % (x[2], x[0], x[1], inside[x[0]][x[1]][hash_map[x]][1].data[0])
+
+        return bp
+
+    def unsupervised(self, sen):
+
+        emb_inp = self.encoder_t(sen)
+        output, hidden = self.LSTM(emb_inp, self.h0)
+        h = self.coef_lstm * output.squeeze(0) # left context
+        sen = sen.view(-1).data
+        length = len(sen)
+
+        ## Inside Algorithm
+
+        cky = [[[] for j in xrange(length+1)] for i in xrange(length)]
+        iscore = Variable(torch.zeros(length, length+1, self.nnt))
+
+        root_idx = 2
+        lsm = nn.LogSoftmax()
+        w2v_w = self.word2vec.weight + self.word2vec_plus.weight
+        ut_w = w2v_w.mm(self.ut.weight).t()
+        ut_b = w2v_w.mm(self.ut.bias).t()
+
+        # Initialize the chart
+        tt0 = time.time()
+        for start in xrange(length):
+            end = start + 1
+            c = sen[start]
+            for p in self.lexicon[c]:
+                cky[start][end].append(p)
+                iscore[start][end][p] = self.log_prob_ut(lsm, ut_w, ut_b, p, c, h[start])
+
+        tt1 = time.time()
+        if self.verbose == 'yes':
+            print "LEXICON ", tt1-tt0, "---------------------------"
+
+        # Unary appending, deal with non_term -> non_term ... -> term chain
+        tt2 = time.time()
+        for start in xrange(length):
+            end = start + 1
+            tmp = []
+            for c in cky[start][end]:
+                if c in self.urules:
+                    for p in self.urules[c]:
+                        if iscore[start][end][p] == 0:
+                            tmp.append(p)
+                        iscore[start][end][p] += self.log_prob_unt(lsm, p, c, h[start]) + iscore[start][end][c]
+            cky[start][end] += tmp
+
+        tt3 = time.time()
+        if self.verbose == 'yes':
+            print "UNARY ", tt3-tt2, "---------------------------"
+
+        # viterbi algorithm
+        tt4 = time.time()
+        for width in xrange(2, length+1):
+            for start in xrange(0, length-width+1):
+                end = start + width
+                # binary rule
+                for mid in xrange(start+1, end):
+                    for l in cky[start][mid]:
+                        for r in cky[mid][end]:
+                            if (l, r) in self.brules:
+                                for p in self.brules[(l, r)]:
+                                    if iscore[start][end][p] == 0:
+                                        cky[start][end].append(p)
+                                    iscore[start][end][p] += \
+                                        self.log_prob_binary(lsm, p, l, r, h[mid]) + iscore[start][mid][l] + iscore[mid][end][r]
+
+                # unary rule
+                for c in cky[start][end]:
+                    tmp = []
+                    if c in self.urules:
+                        for p in self.urules[c]:
+                            if iscore[start][end][p] == 0:
+                                tmp.append(p)
+                            iscore[start][end][p] += self.log_prob_unt(lsm, p, c, h[start]) + iscore[start][end][c]
+                    cky[start][end] += tmp
+
+        tt5 = time.time()
+        if self.verbose == 'yes':
+            print "Finish inside algorithm ... ", tt5 - tt4
+
+        if cky[0][length][2] == 0:
             if self.cuda_flag:
                 return Variable(torch.FloatTensor([-1])).cuda()
             return Variable(torch.FloatTensor([-1]))
-
         else:
-            return -inside[0][length][hash_map[tpl_map]][1]
+            return -iscore[0][length][2]
 
-    def log_prob_ut(self, parent, child, history):
-        t0 = time.time()
-        logsoftmax = nn.LogSoftmax()
+
+    def log_prob_ut(self, lsm, ut_w, ut_b, p, c, h):
+        pi = Variable(torch.LongTensor([p]))
+        h = h.view(1, -1)
         if self.cuda_flag:
-            parent_LongTensor = Variable(torch.LongTensor([parent])).cuda()
-        else:
-            parent_LongTensor = Variable(torch.LongTensor([parent]))
-        condition = torch.cat((
-                self.encoder_nt(parent_LongTensor), 
-                history.view(1, -1)
-            ), 1)
-        t1 = time.time()
-        #res = (self.word2vec_plus.weight).mm(self.ut(condition).t()).view(1, -1)
-        res = (self.word2vec.weight + self.word2vec_plus.weight).mm(self.ut(condition).t()).view(1, -1)
-        t2 = time.time()
-        res = logsoftmax(res).view(-1)
-        t3 = time.time()
-        if self.verbose == 'yes':
-            print "log_prob_ut ", parent, " ", child, " ", t1-t0, " ", t2-t1, " ", t3-t2
-        return res[child]
+            pi = pi.cuda()
+            h = h.cuda()
 
-    def log_prob_unt(self, parent, child, history):
-        dragon = time.time()
-        logsoftmax = nn.LogSoftmax()
-        if self.cuda_flag:
-            parent_LongTensor = Variable(torch.LongTensor([parent])).cuda()
-        else:
-            parent_LongTensor = Variable(torch.LongTensor([parent]))
-        condition = torch.cat((
-                self.encoder_nt(parent_LongTensor), 
-                history.view(1, -1)
-            ), 1)
-        res = logsoftmax(self.unt(condition)).view(-1)
-        titi = time.time()
-        if self.verbose == 'yes':
-            pass#print "log_prob_unt ", titi-dragon
-        return res[child]
+        cond = torch.cat((self.encoder_nt(pi), h), 1)
+        res = cond.mm(ut_w) + ut_b
+        return lsm(self.p2l(cond))[0][0] + lsm(res)[0][c] 
 
-    def log_prob_left(self, parent, child, history):
-        dragon = time.time()
-        logsoftmax = nn.LogSoftmax()
+    def log_prob_unt(self, lsm, p, c, h):
+        pi = Variable(torch.LongTensor([p]))
+        h = h.view(1, -1)
         if self.cuda_flag:
-            parent_LongTensor = Variable(torch.LongTensor([parent])).cuda()
-        else:
-            parent_LongTensor = Variable(torch.LongTensor([parent]))
-        condition = torch.cat((
-                self.encoder_nt(parent_LongTensor), 
-                history.view(1, -1)
-            ), 1)
-        res = logsoftmax(self.p2l(condition)).view(-1)
-        titi = time.time()
-        if self.verbose == 'yes':
-            pass#print "log_prob_left ", titi-dragon
-        return res[child]
+            pi = pi.cuda()
+            h = h.cuda()
 
-    def log_prob_right(self, parent, left_sib, child, history):
-        dragon = time.time()
-        logsoftmax = nn.LogSoftmax()
+        cond = torch.cat((self.encoder_nt(pi), h), 1)
+        return lsm(self.p2l(cond))[0][1] + lsm(self.pl2r(cond))[0][c]
+
+    def log_prob_binary(self, lsm, p, l, r, h):
+        pi = Variable(torch.LongTensor([p]))
+        pli = Variable(torch.LongTensor([p, l]))
+        h = h.view(1, -1)
         if self.cuda_flag:
-            parent_LongTensor = Variable(torch.LongTensor([parent])).cuda()
-            left_sib_LongTensor = Variable(torch.LongTensor([left_sib])).cuda()
-        else:
-            parent_LongTensor = Variable(torch.LongTensor([parent]))
-            left_sib_LongTensor = Variable(torch.LongTensor([left_sib]))
-        condition = torch.cat(
-                (
-                    self.encoder_nt(parent_LongTensor), 
-                    self.encoder_nt(left_sib_LongTensor), 
-                    history.view(1, -1)
-                ), 
-            1)
-        res = logsoftmax(self.pl2r(condition)).view(-1)
-        titi = time.time()
-        if self.verbose == 'yes':
-            pass#print "log_prob_right ", titi-dragon
-        return res[child]
+            pi = pi.cuda()
+            pli = pli.cuda()
+            h = h.cuda()
+
+        p2l_cond = torch.cat((self.encoder_nt(pi), h), 1)
+        pl2r_cond = torch.cat((self.encoder_nt(pli).view(1,-1), h), 1)
+        return lsm(self.p2l(p2l_cond))[0][l] + lsm(self.pl2r(pl2r_cond))[0][r]
 
     def log_sum_exp(self, a, b):
         m = a if a > b else b
         return m + torch.log(torch.exp(a-m) + torch.exp(b-m))
+
+    def max(self, a, b):
+        if a > b:
+            return a
+        else:
+            return b
 
     def supervised(self, sens,
         p2l, pl2r, unt, ut,

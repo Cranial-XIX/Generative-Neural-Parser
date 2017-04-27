@@ -119,7 +119,6 @@ def spv_train_LCNP(p, cmd_inp):
         print "Finish supervised training"
 
 def uspv_train_LCNP(p, cmd_inp):
-
     batch_size = 1
     inputs = {
         # terminals
@@ -232,61 +231,55 @@ def parse_LCNP(p, sen2parse, cmd_inp):
     }
 
     model = LCNPModel(inputs, cmd_inp['cuda'], cmd_inp['verbose'])
-    if not cmd_inp['pretrain'] == None:
-        if cmd_inp['verbose'] == 'yes':
-            print " - use pretrained model from ", cmd_inp['pretrain']
-        pretrain = torch.load(cmd_inp['pretrain'], \
-            map_location=lambda storage, loc: storage)
-        model.load_state_dict(pretrain['state_dict'])
-    else:
+    if cmd_inp['pretrain'] == None:
         if cmd_inp['verbose'] == 'yes':
             print " - use default model from ", constants.PRE_TRAINED_FILE
         pretrain = torch.load(constants.PRE_TRAINED_FILE, \
             map_location=lambda storage, loc: storage)
         model.load_state_dict(pretrain['state_dict'])
+    else:
+        if cmd_inp['verbose'] == 'yes':
+            print " - use pretrained model from ", cmd_inp['pretrain']
+        pretrain = torch.load(cmd_inp['pretrain'], \
+            map_location=lambda storage, loc: storage)
+        model.load_state_dict(pretrain['state_dict'])
 
     inp = p.get_idx(sen2parse)
+    length = len(sen2parse)
 
     var_inp = Variable(inp)
     if cmd_inp['cuda']:
         var_inp = var_inp.cuda()
-    nll, chart, hashmap, end, idx = model.parse(var_inp)
+    bp = model.parse(var_inp)
 
-    filename = './lbtest.tst'
-    parse_f = open(filename, 'w')
-    if cmd_inp['verbose'] == 'yes':
-        print inp
-    if nll > 0: # exist parse
-        if cmd_inp['verbose'] == 'yes':
-            print "The best parse negative log likelihood is ", nll
-        parse = print_parse(p, chart, hashmap, 0, end, idx)
-        print parse
-        parse_f.write(parse)
-        parse_f.write('\n')
-    else:
+    #filename = './lbtest.tst'
+    #parse_f = open(filename, 'w')
+
+    if bp[0][length][2] == null:
         if cmd_inp['verbose'] == 'yes':
             print "No parses for the sentence."
+    else: 
+        # exist parse
+        parse = print_parse(p, sen2parse, bp, 0, length, 2)
+        print parse
+        #parse_f.write(parse)
+        #parse_f.write('\n')
 
 
-def print_parse(p, cky_chart, hash_map, start, end, idx):
-    if start == end:
-        return "<start == end>"
-    tpl_map = (start, end, idx)
-    parent, curr_log_prob, left_sib, child, mid = \
-        cky_chart[start][end][hash_map[tpl_map][0]]
-
-    if left_sib == -2:
+def print_parse(p, sen, bp, start, end, node):
+    next = bp[start][end][node]
+    if next == None:
         # is terminal rule
-        return "(" + p.idx2Nonterm[parent] + " " + p.idx2Word[child] + ")"
-    elif left_sib >= 0:
+        return "(" + p.idx2Nonterm[node] + " " + sen[start] + ")"
+    elif next[0] == None:
+        # unary rule
+        return  "(" + p.idx2Nonterm[node] + " "  \
+            + print_parse(p, sen, bp, start, end, next[2]) + ")" 
+    else:
         # binary rule
         return  "(" + p.idx2Nonterm[parent] + " " \
-            + print_parse(p, cky_chart, hash_map, start, mid, left_sib) + " " \
-            + print_parse(p, cky_chart, hash_map, mid, end, child) + ")"    
-    else:
-        # unary rule
-        return  "(" + p.idx2Nonterm[parent] + " "  \
-            + print_parse(p, cky_chart, hash_map, mid, end, child) + ")" 
+            + print_parse(p, sen, bp, start, next[0], next[1]) + " " \
+            + print_parse(p, sen, bp, next[0], end, next[2]) + ")"    
         
 
 
