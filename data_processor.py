@@ -76,7 +76,7 @@ class Processor(object):
         if os.path.exists(nt_file):
             begin_time = time.time()
             with open(nt_file, 'r') as nt:
-                nt.next()
+                nt.next() # skip the comment
                 self.dnt = self.nnt = int(nt.next().split('\t', 1)[0]) + 2
 
                 self.nonterm_emb = torch.eye(self.nnt, self.dnt)
@@ -97,14 +97,11 @@ class Processor(object):
                 self.idx2Nonterm[1] = 'U_NTM'
                 self.new_nt_num = 2
 
-                for line in nt:
-                    mapping = line.split()
-
-                    nonterminal = mapping.pop(0)
-                    index = int(mapping.pop(0)) + self.new_nt_num    
-
-                    self.nonterm2Idx[nonterminal] = index
+                idx = self.new_nt_num
+                for nonterminal in nt: 
+                    self.nonterm2Idx[nonterminal] = idx
                     self.idx2Nonterm[index] = nonterminal
+                    idx += 1
             end_time = time.time()
             if self.verbose == 'yes':
                 print "-- Reading nonterminals takes %.4f, secs" \
