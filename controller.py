@@ -36,7 +36,10 @@ def spv_train_LCNP(p, cmd_inp):
         'initrange': 1,
         'lexicon': p.lexicon,
         'urules': p.unary,
-        'brules': p.binary
+        'brules': p.binary,
+        'unt_pre': p.unt_pre,
+        'p2l_pre': p.p2l_pre,
+        'pl2r_pre': p.pl2r_pre
     }
 
     model = LCNPModel(inputs, cmd_inp['cuda'], cmd_inp['verbose'])
@@ -139,7 +142,10 @@ def uspv_train_LCNP(p, cmd_inp):
         'initrange': 1,
         'lexicon': p.lexicon,
         'urules': p.unary,
-        'brules': p.binary
+        'brules': p.binary,
+        'unt_pre': p.unt_pre,
+        'p2l_pre': p.p2l_pre,
+        'pl2r_pre': p.pl2r_pre
     }
     
     model = LCNPModel(inputs, cmd_inp['cuda'])
@@ -227,19 +233,18 @@ def parse_LCNP(p, sen2parse, cmd_inp):
         'initrange': 1,
         'lexicon': p.lexicon,
         'urules': p.unary,
-        'brules': p.binary
+        'brules': p.binary,
+        'unt_pre': p.unt_pre,
+        'p2l_pre': p.p2l_pre,
+        'pl2r_pre': p.pl2r_pre
     }
 
     model = LCNPModel(inputs, cmd_inp['cuda'], cmd_inp['verbose'])
     if cmd_inp['pretrain'] == None:
-        if cmd_inp['verbose'] == 'yes':
-            print " - use default model from ", constants.PRE_TRAINED_FILE
         pretrain = torch.load(constants.PRE_TRAINED_FILE, \
             map_location=lambda storage, loc: storage)
         model.load_state_dict(pretrain['state_dict'])
     else:
-        if cmd_inp['verbose'] == 'yes':
-            print " - use pretrained model from ", cmd_inp['pretrain']
         pretrain = torch.load(cmd_inp['pretrain'], \
             map_location=lambda storage, loc: storage)
         model.load_state_dict(pretrain['state_dict'])

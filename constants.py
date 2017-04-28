@@ -1,6 +1,7 @@
-W2V_FILE = "data/embeddings/glove-trimmed-filter3-100.txt"
-NT_EMB_FILE = "data/embeddings/nonterminalMapping.txt"
-FILE_DATA = "data/tree2Matrix/treeToList-19.txt"
+W2V_FILE = "data/embed/w2v.txt"
+NT_EMB_FILE = "data/embed/nt.txt"
+TRAIN = "data/corpus/train19.txt"
+
 PRE_TRAINED_FILE = "output/default_cpu/model_dict"
 CORPUS_INFO_FILE = "corpus_info.tar"
 MAX_SEN_LENGTH = 30                  # maximum lenght of a sentence

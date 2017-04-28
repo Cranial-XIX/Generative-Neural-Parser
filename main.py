@@ -20,22 +20,22 @@ def main():
     # Below are variables associated with files
     # =========================================================================
     parser.add_argument(
-        '-fd', '--FileData', required=False, default=constants.FILE_DATA,
-        help='Path of the dataset'
+        '-train', '--TrainFile', required=False, default=constants.TRAIN,
+        help='Train file path'
     )
 
     parser.add_argument(
-        '-fp', '--FilePretrain', required=False,
-        help='File of pretrained model'
+        '-pretrain', '--PretrainedFile', required=False,
+        help='Pretrained file path'
     )
 
     parser.add_argument(
-        '-c', '--UseStoredCorpus', required=False,
+        '-corpus', '--UseStoredCorpus', required=False, default="no",
         help='Whether to use stored corpus: True or False'
     )
 
     parser.add_argument(
-        '-td', '--TerminalDimension', required=False, default=100,
+        '-dt', '--TerminalDimension', required=False, default=100,
         help='Terminal\'s dimension'
     )
 
@@ -96,8 +96,10 @@ def main():
         help="Initial learning rate"
     )
     
-    parser.add_argument('--cuda', action='store_true',
-        help='use CUDA')
+    parser.add_argument(
+        '-cuda', action='store_true',
+        help='use CUDA'
+    )
 
     args = parser.parse_args()
 
@@ -126,8 +128,8 @@ def main():
         print ("TIME is : %s" % time_current )
 
         print "- Files:"
-        print (" FileData is : %s" % args.FileData )
-        print (" FilePretrain is : %s" % args.FilePretrain)
+        print (" Train file is : %s" % args.TrainFile )
+        print (" Pretrained file is : %s" % args.PretrainedFile)
         print (" Terminal's dimension is : %s" % args.TerminalDimension)
         print (" Whether read and process new data : %s") % str(args.ShouldReadData)
 
@@ -146,8 +148,8 @@ def main():
         print "==================================================================="
 
     cmd_inp = {
-        'pretrain': args.FilePretrain,
-        'data': args.FileData,
+        'pretrain': args.PretrainedFile,
+        'train': args.TrainFile,
         'save': file_save,
         'dt': args.TerminalDimension,
         'rd': args.ShouldReadData == "yes",

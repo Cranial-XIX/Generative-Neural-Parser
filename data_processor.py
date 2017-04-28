@@ -9,7 +9,7 @@ import constants
 class Processor(object):  
 
     def __init__(self, cmd_inp):
-        self.file_data = cmd_inp['data']
+        self.train_data = cmd_inp['train']
         self.read_data = cmd_inp['rd']
         self.verbose = cmd_inp['verbose']
 
@@ -23,7 +23,7 @@ class Processor(object):
         self.dnt = -1                   # dimension of nonterminal feature
         self.nnt = -1                   # number of nonterminals
         self.nonterm2Idx = {}           # (string -> int)
-        self.idx2Nonterm = {}           # (int -> string)
+        self.idx2Nonterm = []           # (int -> string)
 
 
     ## This method reads in word embeddings from the Word2vec file 
@@ -93,14 +93,15 @@ class Processor(object):
 
                 self.nonterm2Idx['U_TM'] = 0
                 self.nonterm2Idx['U_NTM'] = 1
-                self.idx2Nonterm[0] = 'U_TM'
-                self.idx2Nonterm[1] = 'U_NTM'
+                self.idx2Nonterm.append('U_TM')
+                self.idx2Nonterm.append('U_NTM')
                 self.new_nt_num = 2
 
                 idx = self.new_nt_num
-                for nonterminal in nt: 
+                for n in nt: 
+                    nonterminal = n.strip()
                     self.nonterm2Idx[nonterminal] = idx
-                    self.idx2Nonterm[index] = nonterminal
+                    self.idx2Nonterm.append(nonterminal)
                     idx += 1
             end_time = time.time()
             if self.verbose == 'yes':
@@ -124,8 +125,8 @@ class Processor(object):
         unary = {}
         binary = {}
 
-        if os.path.exists(self.file_data):
-            with open(self.file_data, 'r') as data:
+        if os.path.exists(self.train_data):
+            with open(self.train_data, 'r') as data:
                 self.lines = data.readlines()
                 nsen = len(self.lines) / 2
                 assert (len(self.lines) % 2 == 0)
@@ -138,7 +139,6 @@ class Processor(object):
                     for j in xrange(len(parse)/4):
                         if self.is_digit(parse[4*j+2]):
                             # binary rule
-                            print "&"*30
                             parent = int(parse[4*j+1]) + self.new_nt_num
                             left = int(parse[4*j+2]) + self.new_nt_num
                             right = int(parse[4*j+3]) + self.new_nt_num
@@ -164,7 +164,7 @@ class Processor(object):
                                 lexicon[child] = set()
                             lexicon[child].add(parent)     
         else:
-            print "No such corpus with filename: %s" % self.file_data
+            print "No such corpus with filename: %s" % self.train_data
 
         self.lexicon = {}
         self.unary = {}
@@ -339,6 +339,39 @@ class Processor(object):
                         )
             print "Binary rules in total : ", nb
 
+    def create_precomputed_matrix(self):
+        self.unt_pre = torch.FloatTensor(self.nnt, self.nnt).zero_()
+        self.p2l_pre = torch.FloatTensor(self.nnt, self.nnt).zero_()
+        self.pl2r_pre = torch.FloatTensor(self.nnt, self.nnt, 2*self.nnt).zero_()
+
+        unt_p = set()
+        p2l_p = set()
+        pl2r_p = set()
+
+        for child in self.unary:
+            for parent in self.unary[child]:
+                if not parent in unt_p:
+                    self.unt_pre[parent] = self.nonterm_emb[parent]
+                    unt_p.add(parent)
+
+        #print len(unt_p)
+
+        self.p2l_pre[0] = self.nonterm_emb[0]
+        self.p2l_pre[1] = self.nonterm_emb[1]
+
+        for key in self.binary:
+            for parent in self.binary[key]:
+                if not parent in p2l_p:
+                    p2l_p.add(parent)
+                    self.p2l_pre[parent] = self.nonterm_emb[parent]
+                if not (parent, key[0]) in pl2r_p:
+                    pl2r_p.add((parent, key[0]))
+                    self.pl2r_pre[parent][key[0]] = \
+                        torch.cat((self.nonterm_emb[parent], self.nonterm_emb[key[0]]), 0).view(1, -1)
+
+        #print len(p2l_p)
+        #print len(pl2r_p)
+
     def read_and_process(self):
         if self.read_data:
             if os.path.exists(constants.CORPUS_INFO_FILE):
@@ -350,6 +383,7 @@ class Processor(object):
             self.read_word2vec()
             self.create_nt_emb()
             self.read_corpus()
+            self.create_precomputed_matrix()
 
             end = time.time()
 
@@ -370,7 +404,10 @@ class Processor(object):
                     'lexicon': self.lexicon,
                     'unary': self.unary,
                     'binary': self.binary,
-                    'lines': self.lines
+                    'lines': self.lines,
+                    'unt_pre': self.unt_pre,
+                    'p2l_pre': self.p2l_pre,
+                    'pl2r_pre': self.pl2r_pre
                 }, constants.CORPUS_INFO_FILE)
         else:
             # read existing data, so we don't need to process again
@@ -395,10 +432,14 @@ class Processor(object):
             self.lexicon = d['lexicon']
             self.unary = d['unary']
             self.binary = d['binary']
+            self.unt_pre = d['unt_pre']
+            self.p2l_pre = d['p2l_pre']
+            self.pl2r_pre = d['pl2r_pre']
             self.new_nt_num = 2
+            #self.print_rules()
             end = time.time()
+
         if self.verbose == 'yes':
-            self.print_rules()
             print "Reading data takes %.4f secs" % round(end - start, 5)
 
     def get_sen(self, indices):

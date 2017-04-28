@@ -14,7 +14,7 @@ class LCNPModel(nn.Module):
         super(LCNPModel, self).__init__()
 
         self.verbose = verbose_flag
-        
+
         # terminals
         self.term_emb = inputs['term_emb']   # embeddings of terminals
         self.nt = inputs['nt']               # number of terminals
@@ -36,6 +36,11 @@ class LCNPModel(nn.Module):
         self.urules = inputs['urules']       # dictionary of unary rules
         self.brules = inputs['brules']       # dictionary of binary rules
         self.lexicon = inputs['lexicon']     # dictionary of lexicon
+
+        # the precomputed matrix that will be used in unsupervised learning
+        self.unt_pre = Variable(inputs['unt_pre'].unsqueeze(1))
+        self.p2l_pre = Variable(inputs['p2l_pre'].unsqueeze(1))
+        self.pl2r_pre = Variable(inputs['pl2r_pre'].unsqueeze(2))
 
         self.encoder_nt = nn.Embedding(self.nnt, self.dnt)
         self.word2vec_plus = nn.Embedding(self.nt, self.dt)
@@ -128,21 +133,22 @@ class LCNPModel(nn.Module):
 
         emb_inp = self.encoder_t(sen)
         output, hidden = self.LSTM(emb_inp, self.h0)
-        h = self.coef_lstm * output.squeeze(0) # left context
-        sen = sen.view(-1).data
+        sen = sen.view(-1).data[1:]
         length = len(sen)
+        h = output.squeeze(0).narrow(0, 0, length) # left context
 
         ## Viterbi Algorithm
 
         cky = [[[] for j in xrange(length+1)] for i in xrange(length)]
-        bp = [[[[None] for k in xrange(self.nnt)] for j in xrange(length+1)] for i in xrange(length)]
-        viscore = Variable(torch.zeros(length, length+1, self.nnt))
+        bp = [[[None for k in xrange(self.nnt)] for j in xrange(length+1)] for i in xrange(length)]
+        viscore = [[[0 for k in xrange(self.nnt)] for j in xrange(length+1)] for i in xrange(length)]
 
-        root_idx = 2
         lsm = nn.LogSoftmax()
         w2v_w = self.word2vec.weight + self.word2vec_plus.weight
         ut_w = w2v_w.mm(self.ut.weight).t()
-        ut_b = w2v_w.mm(self.ut.bias).t()
+        ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
+
+        filter = Variable(torch.FloatTensor([-20]))
 
         # Initialize the chart
         tt0 = time.time()
@@ -150,8 +156,10 @@ class LCNPModel(nn.Module):
             end = start + 1
             c = sen[start]
             for p in self.lexicon[c]:
-                cky[start][end].append(p)
-                viscore[start][end][p] = self.log_prob_ut(lsm, ut_w, ut_b, p, c, h[start])
+                prob = self.log_prob_ut(lsm, ut_w, ut_b, p, c, h[start])
+                if prob > filter:
+                    cky[start][end].append(p)
+                    viscore[start][end][p] = prob
 
         tt1 = time.time()
         if self.verbose == 'yes':
@@ -165,12 +173,15 @@ class LCNPModel(nn.Module):
             for c in cky[start][end]:
                 if c in self.urules:
                     for p in self.urules[c]:
-                        if viscore[start][end][p] == 0:
-                            tmp.append(p)
+                        if p == c:
+                            continue
                         newProb = self.log_prob_unt(lsm, p, c, h[start]) + viscore[start][end][c]
-                        if newProb > viscore[start][end][p]:
+                        if newProb > self.max(viscore[start][end][p], filter):
+                            if viscore[start][end][p] == 0:
+                                tmp.append(p)
                             viscore[start][end][p] = newProb
                             bp[start][end][p] = (None, None, c)
+                            print "nonterminal ", p, " has prob ", newProb
             cky[start][end] += tmp
 
         tt3 = time.time()
@@ -186,6 +197,7 @@ class LCNPModel(nn.Module):
                 for mid in xrange(start+1, end):
                     for l in cky[start][mid]:
                         for r in cky[mid][end]:
+                            time1 = time.time()
                             if (l, r) in self.brules:
                                 for p in self.brules[(l, r)]:
                                     if viscore[start][end][p] == 0:
@@ -194,19 +206,25 @@ class LCNPModel(nn.Module):
                                     if newProb > viscore[start][end][p]:
                                         viscore[start][end][p] = newProb
                                         bp[start][end][p] = (mid, l, r)
-
+                            print "binary takes ------ ", time.time() - time1, l, r, p
+                print "comes unary"
                 # unary rule
+                time1 = time.time()
+                tmp = []
                 for c in cky[start][end]:
-                    tmp = []
                     if c in self.urules:
                         for p in self.urules[c]:
+                            print "inside unary ", "p = ", p, " c = ", c
+                            if p == c:
+                                continue
                             if viscore[start][end][p] == 0:
                                 tmp.append(p)
                             newProb = self.log_prob_unt(lsm, p, c, h[start]) + viscore[start][end][c]
                             if newProb > viscore[start][end][p]:
                                 viscore[start][end][p] = newProb
                                 bp[start][end][p] = (None, None, c)
-                    cky[start][end] += tmp
+                cky[start][end] += tmp
+                print "binary takes ------ ", time.time() - time1
 
         tt5 = time.time()
         if self.verbose == 'yes':
@@ -218,20 +236,42 @@ class LCNPModel(nn.Module):
 
         emb_inp = self.encoder_t(sen)
         output, hidden = self.LSTM(emb_inp, self.h0)
-        h = self.coef_lstm * output.squeeze(0) # left context
         sen = sen.view(-1).data
         length = len(sen)
+        lsm = nn.LogSoftmax()
+
+        ## pre-compute all probabilities
+
+        h1 = output.repeat(self.nnt, 1, 1)
+        h2 = output.unsqueeze(0).repeat(self.nnt, self.nnt, 1, 1)
+
+        unt_i = self.unt_pre.repeat(1, length, 1)
+        p2l_i = self.p2l_pre.repeat(1, length, 1)
+        pl2r_i = self.pl2r_pre.repeat(1, 1, length, 1)
+
+        unt_cond = torch.cat((unt_i, h1), 2)
+        p2l_cond = torch.cat((p2l_i, h1), 2)
+        pl2r_cond = torch.cat((pl2r_i, h2), 3)
+        size = unt_cond.size()
+        size2 = pl2r_cond.size()
+
+        # parent to unary child
+        unt_pr = lsm(self.unt(unt_cond.view(-1, size[2]))).view(size[0], size[1], -1)
+
+        # parent to left
+        p2l_pr = lsm(self.p2l(p2l_cond.view(-1, size[2]))).view(size[0], size[1], -1)
+
+        # parent left to right
+        pl2r_pr = lsm(self.pl2r(p2lr_cond.view(-1, size[3]))).view(size2[0], size2[1], size2[2], -1)
 
         ## Inside Algorithm
 
         cky = [[[] for j in xrange(length+1)] for i in xrange(length)]
-        iscore = Variable(torch.zeros(length, length+1, self.nnt))
+        viscore = [[[0 for k in xrange(self.nnt)] for j in xrange(length+1)] for i in xrange(length)]
 
-        root_idx = 2
-        lsm = nn.LogSoftmax()
         w2v_w = self.word2vec.weight + self.word2vec_plus.weight
         ut_w = w2v_w.mm(self.ut.weight).t()
-        ut_b = w2v_w.mm(self.ut.bias).t()
+        ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
 
         # Initialize the chart
         tt0 = time.time()
@@ -286,7 +326,8 @@ class LCNPModel(nn.Module):
                         for p in self.urules[c]:
                             if iscore[start][end][p] == 0:
                                 tmp.append(p)
-                            iscore[start][end][p] += self.log_prob_unt(lsm, p, c, h[start]) + iscore[start][end][c]
+                            iscore[start][end][p] += \
+                                self.log_prob_unt(lsm, p, c, h[start]) + iscore[start][end][c]
                     cky[start][end] += tmp
 
         tt5 = time.time()
@@ -300,7 +341,7 @@ class LCNPModel(nn.Module):
         else:
             return -iscore[0][length][2]
 
-
+    '''
     def log_prob_ut(self, lsm, ut_w, ut_b, p, c, h):
         pi = Variable(torch.LongTensor([p]))
         h = h.view(1, -1)
@@ -320,7 +361,7 @@ class LCNPModel(nn.Module):
             h = h.cuda()
 
         cond = torch.cat((self.encoder_nt(pi), h), 1)
-        return lsm(self.p2l(cond))[0][1] + lsm(self.pl2r(cond))[0][c]
+        return lsm(self.p2l(cond))[0][1] + lsm(self.unt(cond))[0][c]
 
     def log_prob_binary(self, lsm, p, l, r, h):
         pi = Variable(torch.LongTensor([p]))
@@ -334,6 +375,7 @@ class LCNPModel(nn.Module):
         p2l_cond = torch.cat((self.encoder_nt(pi), h), 1)
         pl2r_cond = torch.cat((self.encoder_nt(pli).view(1,-1), h), 1)
         return lsm(self.p2l(p2l_cond))[0][l] + lsm(self.pl2r(pl2r_cond))[0][r]
+    '''
 
     def log_sum_exp(self, a, b):
         m = a if a > b else b
@@ -416,4 +458,3 @@ class LCNPModel(nn.Module):
         nll = nll_p2l + nll_pl2r + nll_unt + nll_ut
 
         return nll
-

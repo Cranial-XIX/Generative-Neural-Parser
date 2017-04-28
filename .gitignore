@@ -1,4 +1,5 @@
-data/*
+data/grammar
+data/corpus
 output/*
 *.pyc
 corpus_info.tar
