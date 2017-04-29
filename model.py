@@ -341,7 +341,7 @@ class LCNPModel(nn.Module):
         else:
             return -iscore[0][length][2]
 
-    '''
+
     def log_prob_ut(self, lsm, ut_w, ut_b, p, c, h):
         pi = Variable(torch.LongTensor([p]))
         h = h.view(1, -1)
@@ -375,7 +375,6 @@ class LCNPModel(nn.Module):
         p2l_cond = torch.cat((self.encoder_nt(pi), h), 1)
         pl2r_cond = torch.cat((self.encoder_nt(pli).view(1,-1), h), 1)
         return lsm(self.p2l(p2l_cond))[0][l] + lsm(self.pl2r(pl2r_cond))[0][r]
-    '''
 
     def log_sum_exp(self, a, b):
         m = a if a > b else b
