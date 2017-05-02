@@ -1,0 +1,16 @@
+1. read in the corpus (lexicon, grammar (unary & binary))
+  a.) Remove X -> X rules
+
+2. combine unary rules as in Berkeley's
+  a.) Find sum and max of {A -> B, A -> C -> B} combo
+  b.) For each max combo, tell Bo what C is (can be null)
+  c.) prune unlikely binary rules and lexicons w/ a threshold
+  d.) ??? How to prune unary rules?
+
+3. create a method called "parse(String sentence)"
+  a.) do Inside Alg; pr(sentence) = \beta[0][len]["ROOT"]
+  b.) do Outside Alg
+  c.) prune the chart by posterior prob =  \beta * \alpha / pr(sentence)
+  d.) (?) return the best viterbi parse
+
+4. compare F1
