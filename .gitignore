@@ -4,3 +4,7 @@ output/*
 *.pyc
 corpus_info.tar
 EVALB/evalb
+*.so
+*.html
+*.cpp
+*.c
