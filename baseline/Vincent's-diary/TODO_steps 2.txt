@@ -6,3 +6,8 @@
 
 4. Use the evalb.py or some utils to calculate the F1 score
 
+
+
+Progress:
+Parsing takes 15.3395 secs
+Parsing takes 12.2315 secs

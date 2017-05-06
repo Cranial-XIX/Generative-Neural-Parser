@@ -21,7 +21,11 @@ def run(GrammarObject):
     begin = time.time()
     test = "../data/corpus/test.sen"
     with open(test, 'r') as file:
+        i = 0
         for sentence in file:
+            if i == 5:
+                break
+            i += 1
             prob_sentence = grammer_obj.do_inside_outside(sentence)
             #t4 = time.time()
             #print "Inside-outside takes %.4f secs" % round(t4 - t3, 5)

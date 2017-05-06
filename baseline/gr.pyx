@@ -146,6 +146,8 @@ cdef class GrammarObject(object):
                         self.unary_rule_forward_dict[parent].append(l)
  
     def compute_sum_and_max_of_unary_combos(self):
+        cdef int p, c
+    
         self.sum_unary_combo = [[0 for x in xrange(self.num_nt)] for y in xrange(self.num_nt)]
         self.max_unary_combo = [[0 for x in xrange(self.num_nt)] for y in xrange(self.num_nt)]
         self.C_in_max_unary_combo = [[0 for x in xrange(self.num_nt)] for y in xrange(self.num_nt)]
@@ -176,6 +178,8 @@ cdef class GrammarObject(object):
 
 
     def prune_unlikely_rules_and_lexicon(self, threshold):
+        cdef int l, r
+    
         # Prune lexicon
         for word in self.lexicon_dict:
             for tag in self.lexicon_dict[word]:
@@ -195,7 +199,7 @@ cdef class GrammarObject(object):
         pass #TODO dunno what to do yet
     
     
-    def do_inside_outside(self, sentence):
+    def do_inside_outside(self, sentence):   
         words_in_sent = sentence.strip().split()
         cdef int n = len(words_in_sent)
         cdef int i, tag, w, j, l, r, p, c
@@ -287,6 +291,8 @@ cdef class GrammarObject(object):
         return betas[0,n,ri]
 
     def prune_the_chart(self, sentence, prob_sentence, posterior_threshold):
+        cdef int n, i, j
+    
         words_in_sent = sentence.strip().split()
         n = len(words_in_sent)
         unnormalized_threshold = posterior_threshold * prob_sentence
@@ -302,6 +308,8 @@ cdef class GrammarObject(object):
                         self.prune_chart[i,j,nonterminal] = 1
 
     def parse(self, sentence):
+        cdef int i, tag, w, j, l, r, p, c
+    
         words_in_sent = sentence.strip().split()
         n = len(words_in_sent)
         #print "before aaaaa: ", betas[0][n][self.nt2idx['ROOT']]
@@ -389,6 +397,8 @@ cdef class GrammarObject(object):
             return None
 
     def validate_read_grammar(self):
+        cdef int key, i, j, k
+    
         for key in self.nt2idx:
             print key, self.nt2idx[key]
 
@@ -428,6 +438,8 @@ cdef class GrammarObject(object):
                     print self.idx2nt[i], self.idx2nt[j], self.max_unary_combo[i][j]
 
     def debinarize(self, parse):
+        cdef int i
+    
         if parse == None:
             return "NO_PARSE"
         stack = [1 for x in xrange(len(parse))]
