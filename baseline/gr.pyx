@@ -8,7 +8,6 @@
 #distutils: libraries=['stdc++']
 
 import os, sys
-import torch
 import time
 import numpy as np
 
@@ -26,7 +25,7 @@ cdef class GrammarObject(object):
     cdef object w2idx     # word to index
     cdef object idx2w     # index to word
     cdef int num_words
-                                      
+
     cdef object lexicons                    # (NP, time) -> 0.3
     cdef object lexicon_dict                # (time) -> Set([NP, ...])
     cdef object binary_rules                # (S, NP, VP) -> 0.5
@@ -57,7 +56,7 @@ cdef class GrammarObject(object):
         self.w2idx = {}     # word to index
         self.idx2w = []     # index to word
         self.num_words = 0
-                                          
+
         self.lexicons = None                    # (NP, time) -> 0.3
         self.lexicon_dict = {}                  # (time) -> Set([NP, ...])
         self.binary_rules = None                # (S, NP, VP) -> 0.5
@@ -104,7 +103,7 @@ cdef class GrammarObject(object):
                 self.idx2w.append(w)
                 i += 1
         self.num_words = len(self.idx2w)
-        
+
         # Read lexicon file        
         self.lexicons = [[0 for x in xrange(self.num_words+1)] for y in xrange(self.num_nt)] # index 0 in 2nd dimension is OOV
         with open(lex_file, 'r') as file:  
@@ -215,7 +214,6 @@ cdef class GrammarObject(object):
                 if words_in_sent[i] in self.w2idx:
                     word = words_in_sent[i]
                 else:  # if word is OOV
-                    print 'Found OOV word: ', words_in_sent[i]
                     word = 'OOV'
                 tag_prob = self.lexicons[tag][self.w2idx[word]]
                 if tag_prob == 0:
@@ -251,8 +249,8 @@ cdef class GrammarObject(object):
                         betas[i,k,unary_p] += self.sum_unary_combo[unary_p][p] * betas[i,k,p]
 
         t1 = time.time()
-        print "inside takes ", t1 - t0
-        
+        #print "inside takes ", t1 - t0
+
         # Do outside algorithm
         self.alphas = np.zeros((n, n+1, self.num_nt))
         self.alphas[0,n,ri] = 1
@@ -284,8 +282,8 @@ cdef class GrammarObject(object):
                             # Skipping \alphas[A -> BC]
                             self.alphas[i,j,l] += out * betas[j,k,r]                
                             self.alphas[j,k,r] += out * betas[i,j,l]
-    
-        print "outside takes ", time.time() - t1
+
+        #print "outside takes ", time.time() - t1
         return betas[0,n,ri]
 
     def prune_the_chart(self, sentence, prob_sentence, posterior_threshold):
@@ -318,7 +316,7 @@ cdef class GrammarObject(object):
                 if words_in_sent[i] in self.w2idx:
                     word = words_in_sent[i]
                 else:  # if word is OOV
-                    print 'Found OOV word: ', words_in_sent[i]
+                    #print 'Found OOV word: ', words_in_sent[i]
                     word = 'OOV'
                 tag_prob = self.lexicons[tag][self.w2idx[word]]
                 if tag_prob == 0:
@@ -430,6 +428,8 @@ cdef class GrammarObject(object):
                     print self.idx2nt[i], self.idx2nt[j], self.max_unary_combo[i][j]
 
     def debinarize(self, parse):
+        if parse == None:
+            return "NO_PARSE"
         stack = [1 for x in xrange(len(parse))]
         newparse = []
         pointer = -1
