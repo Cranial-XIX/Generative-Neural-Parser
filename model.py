@@ -256,13 +256,22 @@ class LCNPModel(nn.Module):
         size2 = pl2r_cond.size()
 
         # parent to unary child
+        t0 = time.time()
         unt_pr = lsm(self.unt(unt_cond.view(-1, size[2]))).view(size[0], size[1], -1)
+        t1 = time.time()
+        print "@@One ", t1 - t0
 
         # parent to left
+        t0 = time.time()
         p2l_pr = lsm(self.p2l(p2l_cond.view(-1, size[2]))).view(size[0], size[1], -1)
+        t1 = time.time()
+        print "@@Two ", t1 - t0
 
         # parent left to right
+        t0 = time.time()
         pl2r_pr = lsm(self.pl2r(p2lr_cond.view(-1, size[3]))).view(size2[0], size2[1], size2[2], -1)
+        t1 = time.time()
+        print "@@Three ", t1 - t0
 
         ## Inside Algorithm
 

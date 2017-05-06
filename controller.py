@@ -148,7 +148,9 @@ def uspv_train_LCNP(p, cmd_inp):
         'pl2r_pre': p.pl2r_pre
     }
     
-    model = LCNPModel(inputs, cmd_inp['cuda'])
+    model = LCNPModel(inputs, cmd_inp['cuda'], cmd_inp['verbose'])
+    if cmd_inp['cuda']:
+        model.cuda()
 
     if not cmd_inp['pretrain'] == None:
         if cmd_inp['verbose'] == 'yes':
