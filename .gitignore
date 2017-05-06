@@ -4,3 +4,4 @@ output/*
 *.pyc
 corpus_info.tar
 EVALB/evalb
+baseline/output.txt

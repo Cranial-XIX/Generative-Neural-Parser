@@ -20,7 +20,7 @@ class GrammarObject(object):
         self.w2idx = {}     # word to index
         self.idx2w = []     # index to word
         self.num_words = 0
-                                          
+
         self.lexicons = None                    # (NP, time) -> 0.3
         self.lexicon_dict = {}                  # (time) -> Set([NP, ...])
         self.binary_rules = None                # (S, NP, VP) -> 0.5
@@ -100,6 +100,7 @@ class GrammarObject(object):
                 rule = line.strip().split()
                 parent = self.nt2idx[rule[0][:-2]]    # [:-2] is to remove "_0" from "NP_0" to form "NP"
                 l = self.nt2idx[rule[2][:-2]]
+
                 if len(rule) == 5:  # binary rule
                     r = self.nt2idx[rule[3][:-2]]
                     self.binary_rules[parent][l][r] = float(rule[4])
@@ -112,7 +113,7 @@ class GrammarObject(object):
                         self.unary_rules[parent][l] = float(rule[3])
                         self.unary_rule_backward_dict[l].append(parent)
                         self.unary_rule_forward_dict[parent].append(l)
- 
+
     def compute_sum_and_max_of_unary_combos(self):
         self.sum_unary_combo = [[0 for x in xrange(self.num_nt)] for y in xrange(self.num_nt)]
         self.max_unary_combo = [[0 for x in xrange(self.num_nt)] for y in xrange(self.num_nt)]
