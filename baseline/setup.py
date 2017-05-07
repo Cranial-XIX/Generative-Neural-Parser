@@ -3,5 +3,9 @@ from Cython.Build import cythonize
 
 setup(
   name = 'gr',
-  ext_modules = cythonize("gr.pyx"),
+  ext_modules = cythonize(
+    "gr.pyx",
+    sources=["gr.cpp"],
+    language="c++",
+  )
 )

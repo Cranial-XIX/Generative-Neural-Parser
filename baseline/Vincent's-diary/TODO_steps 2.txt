@@ -1,8 +1,8 @@
 1. Change the loop into left-child loop (r_y_xz, r_y_x)
 
-2. Make gr.pyx more cython-like
+2. Change the viterbi parsing into log space
 
-3. Change the viterbi parsing into log space
+3. Make gr.pyx more cython-like
 
 4. Use the evalb.py or some utils to calculate the F1 score
 
@@ -12,3 +12,4 @@ Progress:
 initial:  	Parsing takes 15.3395 secs
 cdef int:	Parsing takes 12.3071 secs
 rule_y_x:	Parsing takes 12.3664 secs
+rule_y_xz:	Parsing takes 7.9364 secs
