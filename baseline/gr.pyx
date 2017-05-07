@@ -55,7 +55,6 @@ cdef class GrammarObject(object):
     cdef object lexicons                    # (NP, time) -> 0.3
     cdef object lexicon_dict                # (time) -> Set([NP, ...])
     cdef object binary_rules                # (S, NP, VP) -> 0.5
-    cdef object DISGUISED_TOAST            # (NP, VP) -> [S, ...]
     cdef vector[BRv] rule_y_xz              # [NP] -> [(S,VP,0.6), ...]
     cdef object binary_rule_forward_dict
     cdef object unary_rules                 # (ROOT, S) -> 0.6
@@ -170,7 +169,6 @@ cdef class GrammarObject(object):
                     br.parent = parent
                     br.weight = float(rule[4])
                     self.rule_y_xz[l].push_back(br)
-                    #TODO self.DISGUISED_TOAST[ (l, r) ].append(parent)
                 if len(rule) == 4:  # unary rule
                     if parent != l:    # Do not allow self-recurring X -> X rules
                         #TODO redundant
@@ -226,12 +224,6 @@ cdef class GrammarObject(object):
             for br in deref(self.rule_y_xz[l]):
                 if br.weight < threshold:
                     self.binary_rules[br.parent][l][br.right] = 0
-            #TODODO rm for r in xrange(self.num_nt):
-                # if (l, r) not in self.DISGUISED_TOAST:
-                    # continue
-                # for p in self.DISGUISED_TOAST[ (l, r) ]:
-                    # if self.binary_rules[p][l][r] < threshold:
-                        # self.binary_rules[p][l][r] = 0
 
         # Prune unary rules
         pass #TODO dunno what to do yet
@@ -275,15 +267,10 @@ cdef class GrammarObject(object):
                     for l in xrange(self.num_nt):
                         if betas[i,j,l] == 0:
                             continue
-                        for r in xrange(self.num_nt):
-                            if betas[j,k,r] == 0:
-                                continue
-                            if (l, r) not in self.DISGUISED_TOAST:
-                                continue
-                            for p in self.DISGUISED_TOAST[ (l, r) ]:
-                                rule_prob = self.binary_rules[p][l][r] * betas[i,j,l] * betas[j,k,r]
-                                if rule_prob > 0:
-                                    betas[i,k,p] += rule_prob
+                        for br in deref(self.rule_y_xz[l]):
+                            rule_prob = self.binary_rules[br.parent][l][br.right] * betas[i,j,l] * betas[j,k,br.right]
+                            if rule_prob > 0:
+                                betas[i,k,br.parent] += rule_prob
 
                 # Unary appending
                 for p in xrange(self.num_nt):
@@ -350,7 +337,7 @@ cdef class GrammarObject(object):
 
     def parse(self, sentence):
         cdef int i, tag, w, j, l, r, p, c
-
+    
         words_in_sent = sentence.strip().split()
         n = len(words_in_sent)
         #print "before aaaaa: ", betas[0][n][self.nt2idx['ROOT']]
@@ -360,7 +347,7 @@ cdef class GrammarObject(object):
 
         for i in xrange(n):  # w-1 constituents
             for tag in xrange(self.num_nt):
-                if not self.prune_chart[i][i+1][tag]:
+                if not self.prune_chart[i,i+1,tag]:
                     continue
                 if words_in_sent[i] in self.w2idx:
                     word = words_in_sent[i]
@@ -375,7 +362,7 @@ cdef class GrammarObject(object):
                 # Unary appending 
                 for ur in deref(self.rule_y_x[tag]):
                     p = ur.parent
-                    if not self.prune_chart[i][i+1][p]:
+                    if not self.prune_chart[i,i+1,p]:
                         continue
                     prob = self.max_unary_combo[p][tag] * tag_prob
                     if prob > self.viterbi[i][i+1][p]:
@@ -393,18 +380,13 @@ cdef class GrammarObject(object):
                     for l in xrange(self.num_nt):
                         if self.viterbi[i][j][l] == 0:
                             continue
-                        for r in xrange(self.num_nt):
-                            if self.viterbi[j][k][r] == 0:
+                        for br in deref(self.rule_y_xz[l]):
+                            if not self.prune_chart[i,k,br.parent]:
                                 continue
-                            if (l, r) not in self.DISGUISED_TOAST:
-                                continue
-                            for p in self.DISGUISED_TOAST[ (l, r) ]:
-                                if not self.prune_chart[i][k][p]:
-                                    continue
-                                rule_prob = self.binary_rules[p][l][r] * self.viterbi[i][j][l] * self.viterbi[j][k][r]
-                                if rule_prob > self.viterbi[i][k][p]:
-                                    self.viterbi[i][k][p] = rule_prob
-                                    self.bp[i][k][p] = (j, l, r)
+                            rule_prob = self.binary_rules[br.parent][l][br.right] * self.viterbi[i][j][l] * self.viterbi[j][k][br.right]
+                            if rule_prob > self.viterbi[i][k][br.parent]:
+                                self.viterbi[i][k][br.parent] = rule_prob
+                                self.bp[i][k][br.parent] = (j, l, br.right)
 
                 # Unary appending
                 for p in xrange(self.num_nt):
@@ -412,7 +394,7 @@ cdef class GrammarObject(object):
                         continue
                     for ur in deref(self.rule_y_x[p]):
                         unary_p = ur.parent
-                        if not self.prune_chart[i][k][unary_p]:
+                        if not self.prune_chart[i,k,unary_p]:
                             continue
                         u_prob = self.max_unary_combo[unary_p][p] * self.viterbi[i][k][p]
                         if u_prob > self.viterbi[i][k][unary_p]:
@@ -482,7 +464,7 @@ cdef class GrammarObject(object):
 
     def debinarize(self, parse):
         cdef int i
-
+    
         if parse == None:
             return "NO_PARSE"
         stack = [1 for x in xrange(len(parse))]

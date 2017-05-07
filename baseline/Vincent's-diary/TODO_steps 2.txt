@@ -12,3 +12,4 @@ Progress:
 initial:  	Parsing takes 15.3395 secs
 cdef int:	Parsing takes 12.3071 secs
 rule_y_x:	Parsing takes 12.3664 secs
+rule_y_xz:	Parsing takes 7.9364 secs
