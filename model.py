@@ -38,27 +38,33 @@ class LCNPModel(nn.Module):
         self.lexicon = inputs['lexicon']     # dictionary of lexicon
 
         # the precomputed matrix that will be used in unsupervised learning
-        self.unt_pre = Variable(inputs['unt_pre'].unsqueeze(1))
-        self.p2l_pre = Variable(inputs['p2l_pre'].unsqueeze(1))
-        self.pl2r_pre = Variable(inputs['pl2r_pre'].unsqueeze(2))
+        if self.cuda_flag:
+            # the initial states for h0 and c0 of LSTM
+            self.h0 = (Variable(torch.zeros(self.nlayers, self.bsz, self.dhid).cuda()),
+                Variable(torch.zeros(self.nlayers, self.bsz, self.dhid)).cuda())
+            # initialize precomputed matrix
+            self.unt_pre = Variable(inputs['unt_pre']).cuda()
+            self.p2l_pre = Variable(inputs['p2l_pre']).cuda()
+            self.pl2r_pre = Variable(inputs['pl2r_pre']).cuda()
+        else:
+            self.h0 = (Variable(torch.zeros(self.nlayers, self.bsz, self.dhid)),
+                Variable(torch.zeros(self.nlayers, self.bsz, self.dhid)))
+            self.unt_pre = Variable(inputs['unt_pre'])
+            self.p2l_pre = Variable(inputs['p2l_pre'])
+            self.pl2r_pre = Variable(inputs['pl2r_pre'])
 
+
+        # nonterminal embedding and w2v embedding, w2v_plus 
+        # is the deviation from w2v
         self.encoder_nt = nn.Embedding(self.nnt, self.dnt)
         self.word2vec_plus = nn.Embedding(self.nt, self.dt)
         self.word2vec = nn.Embedding(self.nt, self.dt)
 
+        # The LSTM and some linear transformation layers
         self.LSTM = nn.LSTM(
                 self.dt, self.dhid, self.nlayers,
                 batch_first=True, dropout=0.5, bias=True
             )
-
-        # the initial states for h0 and c0 of LSTM
-        if self.cuda_flag:
-            self.h0 = (Variable(torch.zeros(self.nlayers, self.bsz, self.dhid).cuda()),
-                Variable(torch.zeros(self.nlayers, self.bsz, self.dhid)).cuda())
-        else:
-            self.h0 = (Variable(torch.zeros(self.nlayers, self.bsz, self.dhid)),
-                Variable(torch.zeros(self.nlayers, self.bsz, self.dhid)))
-        
 
         self.dp2l = self.dnt + self.dhid
         self.dpl2r = 2 * self.dnt + self.dhid
@@ -130,124 +136,89 @@ class LCNPModel(nn.Module):
         return self.word2vec_plus(seq) + self.word2vec(seq)
 
     def parse(self, sen):
+        start = time.time()
 
         emb_inp = self.encoder_t(sen)
         output, hidden = self.LSTM(emb_inp, self.h0)
         sen = sen.view(-1).data[1:]
-        length = len(sen)
-        h = output.squeeze(0).narrow(0, 0, length) # left context
-
-        ## Viterbi Algorithm
-
-        cky = [[[] for j in xrange(length+1)] for i in xrange(length)]
-        bp = [[[None for k in xrange(self.nnt)] for j in xrange(length+1)] for i in xrange(length)]
-        viscore = [[[0 for k in xrange(self.nnt)] for j in xrange(length+1)] for i in xrange(length)]
-
-        lsm = nn.LogSoftmax()
-        w2v_w = self.word2vec.weight + self.word2vec_plus.weight
-        ut_w = w2v_w.mm(self.ut.weight).t()
-        ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
-
-        filter = Variable(torch.FloatTensor([-20]))
-
-        # Initialize the chart
-        tt0 = time.time()
-        for start in xrange(length):
-            end = start + 1
-            c = sen[start]
-            for p in self.lexicon[c]:
-                prob = self.log_prob_ut(lsm, ut_w, ut_b, p, c, h[start])
-                if prob > filter:
-                    cky[start][end].append(p)
-                    viscore[start][end][p] = prob
-
-        tt1 = time.time()
-        if self.verbose == 'yes':
-            print "LEXICON ", tt1-tt0, "---------------------------"
-
-        # Unary appending, deal with non_term -> non_term ... -> term chain
-        tt2 = time.time()
-        for start in xrange(length):
-            end = start + 1
-            tmp = []
-            for c in cky[start][end]:
-                if c in self.urules:
-                    for p in self.urules[c]:
-                        if p == c:
-                            continue
-                        newProb = self.log_prob_unt(lsm, p, c, h[start]) + viscore[start][end][c]
-                        if newProb > self.max(viscore[start][end][p], filter):
-                            if viscore[start][end][p] == 0:
-                                tmp.append(p)
-                            viscore[start][end][p] = newProb
-                            bp[start][end][p] = (None, None, c)
-                            print "nonterminal ", p, " has prob ", newProb
-            cky[start][end] += tmp
-
-        tt3 = time.time()
-        if self.verbose == 'yes':
-            print "UNARY ", tt3-tt2, "---------------------------"
-
-        # viterbi algorithm
-        tt4 = time.time()
-        for width in xrange(2, length+1):
-            for start in xrange(0, length-width+1):
-                end = start + width
-                # binary rule
-                for mid in xrange(start+1, end):
-                    for l in cky[start][mid]:
-                        for r in cky[mid][end]:
-                            time1 = time.time()
-                            if (l, r) in self.brules:
-                                for p in self.brules[(l, r)]:
-                                    if viscore[start][end][p] == 0:
-                                        cky[start][end].append(p)
-                                    newProb = self.log_prob_binary(lsm, p, l, r, h[mid]) + viscore[start][mid][l] + viscore[mid][end][r]
-                                    if newProb > viscore[start][end][p]:
-                                        viscore[start][end][p] = newProb
-                                        bp[start][end][p] = (mid, l, r)
-                            print "binary takes ------ ", time.time() - time1, l, r, p
-                print "comes unary"
-                # unary rule
-                time1 = time.time()
-                tmp = []
-                for c in cky[start][end]:
-                    if c in self.urules:
-                        for p in self.urules[c]:
-                            print "inside unary ", "p = ", p, " c = ", c
-                            if p == c:
-                                continue
-                            if viscore[start][end][p] == 0:
-                                tmp.append(p)
-                            newProb = self.log_prob_unt(lsm, p, c, h[start]) + viscore[start][end][c]
-                            if newProb > viscore[start][end][p]:
-                                viscore[start][end][p] = newProb
-                                bp[start][end][p] = (None, None, c)
-                cky[start][end] += tmp
-                print "binary takes ------ ", time.time() - time1
-
-        tt5 = time.time()
-        if self.verbose == 'yes':
-            print "Finish inside algorithm ... ", tt5 - tt4
-
-        return bp
-
-    def unsupervised(self, sen):
-
-        emb_inp = self.encoder_t(sen)
-        output, hidden = self.LSTM(emb_inp, self.h0)
-        sen = sen.view(-1).data
-        length = len(sen)
+        n = len(sen)
+        output = output.narrow(1, 0, n)
+        h1 = output.repeat(self.nnt, 1, 1)
+        h2 = output.unsqueeze(0).repeat(self.nnt, self.nnt, 1, 1)
         lsm = nn.LogSoftmax()
 
         ## pre-compute all probabilities
 
+        # without context probabilities
+        padding = Variable(torch.zeros(self.nnt, self.dhid))
+        if self.cuda_flag:
+            padding = padding.cuda()
+
+        unt_cond0 = torch.cat((self.unt_pre, padding), 1)
+        p2l_cond0 = torch.cat((self.p2l_pre, padding), 1)
+        pl2r_cond0 = torch.cat((self.pl2r_pre, padding.unsqueeze(1).repeat(1, self.nnt, 1)), 2)
+
+        size = unt_cond0.size()
+        size2 = pl2r_cond0.size()
+
+        # parent to unary child
+        unt_pr0 = lsm(self.unt(unt_cond0.view(-1, size[1]))).view(size[0], -1)
+        # parent to left
+        p2l_pr0 = lsm(self.p2l(p2l_cond0.view(-1, size[1]))).view(size[0], -1)
+        # parent left to right
+        pl2r_pr0 = lsm(self.pl2r(pl2r_cond0.view(-1, size2[2]))).view(size2[0], size2[1], -1)
+
+        # with context probabilities
+        unt_i = self.unt_pre.unsqueeze(1).repeat(1, n, 1)
+        p2l_i = self.p2l_pre.unsqueeze(1).repeat(1, n, 1)
+        pl2r_i = self.pl2r_pre.unsqueeze(2).repeat(1, 1, n, 1)
+
+        unt_cond = torch.cat((unt_i, h1), 2)
+        p2l_cond = torch.cat((p2l_i, h1), 2)
+        pl2r_cond = torch.cat((pl2r_i, h2), 3)
+
+        size = unt_cond.size()
+        size2 = pl2r_cond.size()
+
+        # parent to unary child
+        unt_pr = lsm(self.unt(unt_cond.view(-1, size[2]))).view(size[0], size[1], -1)
+        # parent to left
+        p2l_pr = lsm(self.p2l(p2l_cond.view(-1, size[2]))).view(size[0], size[1], -1)
+        # parent left to right
+        pl2r_pr = lsm(self.pl2r(pl2r_cond.view(-1, size2[3]))).view(size2[0], size2[1], size2[2], -1)
+
+        # since for lexicon, Pr(x | P) = logsoftmax(A(Wx + b)). We
+        # precompute AW and Ab here to speed up the computation
+        w2v_w = self.word2vec.weight + self.word2vec_plus.weight
+        ut_w = w2v_w.mm(self.ut.weight).t()
+        ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
+
+        preterminal = [[0 for j in xrange(self.nnt)] for i in xrange(n)]
+        # append one level terminal symbols
+        for i in xrange(n):
+            c = sen[i]
+            for p in self.lexicon[c]:
+                preterminal[i][p] = self.log_prob_ut(lsm, ut_w, ut_b, p, c, output[0, i])
+
+        end = time.time()
+        if self.verbose == 'yes':
+            print "Precomputation takes " % round(end - start, 5)
+
+    def unsupervised(self, sen):
+        emb_inp = self.encoder_t(sen)
+        output, hidden = self.LSTM(emb_inp, self.h0)
+        sen = sen.view(-1).data[1:]
+        n = len(sen)
+        output = output.narrow(1, 0, n)
+        lsm = nn.LogSoftmax()
+
+        ## pre-compute all probabilities
         h1 = output.repeat(self.nnt, 1, 1)
         h2 = output.unsqueeze(0).repeat(self.nnt, self.nnt, 1, 1)
 
-        unt_i = self.unt_pre.repeat(1, length, 1)
-        p2l_i = self.p2l_pre.repeat(1, length, 1)
-        pl2r_i = self.pl2r_pre.repeat(1, 1, length, 1)
+        unt_i = self.unt_pre.unsqueeze(1).repeat(1, n, 1)
+        p2l_i = self.p2l_pre.unsqueeze(1).repeat(1, n, 1)
+        pl2r_i = self.pl2r_pre.unsqueeze(2).repeat(1, 1, n, 1)
 
         unt_cond = torch.cat((unt_i, h1), 2)
         p2l_cond = torch.cat((p2l_i, h1), 2)
@@ -256,100 +227,92 @@ class LCNPModel(nn.Module):
         size2 = pl2r_cond.size()
 
         # parent to unary child
-        t0 = time.time()
         unt_pr = lsm(self.unt(unt_cond.view(-1, size[2]))).view(size[0], size[1], -1)
-        t1 = time.time()
-        print "@@One ", t1 - t0
-
         # parent to left
-        t0 = time.time()
         p2l_pr = lsm(self.p2l(p2l_cond.view(-1, size[2]))).view(size[0], size[1], -1)
-        t1 = time.time()
-        print "@@Two ", t1 - t0
-
         # parent left to right
-        t0 = time.time()
         pl2r_pr = lsm(self.pl2r(pl2r_cond.view(-1, size2[3]))).view(size2[0], size2[1], size2[2], -1)
-        t1 = time.time()
-        print "@@Three ", t1 - t0
 
-        ## Inside Algorithm
-
-        cky = [[[] for j in xrange(length+1)] for i in xrange(length)]
-        viscore = [[[0 for k in xrange(self.nnt)] for j in xrange(length+1)] for i in xrange(length)]
-
+        # since for lexicon, Pr(x | P) = logsoftmax(A(Wx + b)). We
+        # precompute AW and Ab here to speed up the computation
         w2v_w = self.word2vec.weight + self.word2vec_plus.weight
         ut_w = w2v_w.mm(self.ut.weight).t()
         ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
 
+        ## Inside Algorithm
+        iscore = [[[0 for k in xrange(self.nnt)] for j in xrange(n+1)] for i in xrange(n)]
+
         # Initialize the chart
         tt0 = time.time()
-        for start in xrange(length):
-            end = start + 1
-            c = sen[start]
+        for i in xrange(n):
+            c = sen[i]
             for p in self.lexicon[c]:
-                cky[start][end].append(p)
-                iscore[start][end][p] = self.log_prob_ut(lsm, ut_w, ut_b, p, c, h[start])
+                iscore[i][i+1][p] = self.log_prob_ut(lsm, ut_w, ut_b, p, c, output[0, i])
 
         tt1 = time.time()
         if self.verbose == 'yes':
             print "LEXICON ", tt1-tt0, "---------------------------"
 
-        # Unary appending, deal with non_term -> non_term ... -> term chain
+        # Unary appending, deal with non_term -> non_term chain
         tt2 = time.time()
-        for start in xrange(length):
-            end = start + 1
-            tmp = []
-            for c in cky[start][end]:
-                if c in self.urules:
-                    for p in self.urules[c]:
-                        if iscore[start][end][p] == 0:
-                            tmp.append(p)
-                        iscore[start][end][p] += self.log_prob_unt(lsm, p, c, h[start]) + iscore[start][end][c]
-            cky[start][end] += tmp
+        for i in xrange(n):
+            for c in xrange(self.nnt):
+                if iscore[i][i+1][c] == 0:
+                    continue
+                if c not in self.urules:
+                    continue
+                for p in self.urules[c]:
+                    iscore[i][i+1][p] += unt_pr[p, i, c] + iscore[i][i+1][c]
 
         tt3 = time.time()
         if self.verbose == 'yes':
             print "UNARY ", tt3-tt2, "---------------------------"
 
-        # viterbi algorithm
+        for i in xrange(n):
+            for j in xrange(n+1):
+                for nt in xrange(self.nnt):
+                    if iscore[i][j][nt] == 0:
+                        continue
+                    print "(%d - %d): %d" % i, j, nt
+
         tt4 = time.time()
-        for width in xrange(2, length+1):
-            for start in xrange(0, length-width+1):
-                end = start + width
+        for w in xrange(2, n+1):
+            for i in xrange(0, n-w+1):
+                k = i + w
                 # binary rule
-                for mid in xrange(start+1, end):
-                    for l in cky[start][mid]:
-                        for r in cky[mid][end]:
-                            if (l, r) in self.brules:
-                                for p in self.brules[(l, r)]:
-                                    if iscore[start][end][p] == 0:
-                                        cky[start][end].append(p)
-                                    iscore[start][end][p] += \
-                                        self.log_prob_binary(lsm, p, l, r, h[mid]) + iscore[start][mid][l] + iscore[mid][end][r]
+                for j in xrange(i+1, k):
+                    for l in xrange(self.nnt):
+                        if iscore[i][j][l] == 0:
+                            continue
+                        for r in xrange(self.nnt):
+                            if iscore[j][k][r] == 0:
+                                continue
+                            if (l, r) not in self.brules:
+                                continue
+                            for p in self.brules[ (l, r) ]:
+                                iscore[i][k][p] += p2l_pr[p, i, l] + pl2r[p, l, i, r] \
+                                    + iscore[i][j][l] + iscore[j][k][r]
 
                 # unary rule
-                for c in cky[start][end]:
-                    tmp = []
-                    if c in self.urules:
-                        for p in self.urules[c]:
-                            if iscore[start][end][p] == 0:
-                                tmp.append(p)
-                            iscore[start][end][p] += \
-                                self.log_prob_unt(lsm, p, c, h[start]) + iscore[start][end][c]
-                    cky[start][end] += tmp
+                for c in xrange(self.nnt):
+                    if iscore[i][k][c] == 0:
+                        continue
+                    if c not in self.urules:
+                        continue
+                    for p in self.urules[c]:
+                        iscore[i][k][p] += unt_pr[p, i, c] + iscore[i][k][c]
 
         tt5 = time.time()
         if self.verbose == 'yes':
             print "Finish inside algorithm ... ", tt5 - tt4
 
-        if cky[0][length][2] == 0:
+
+        if iscore[0][n][2] == 0:
             if self.cuda_flag:
                 return Variable(torch.FloatTensor([-1])).cuda()
             return Variable(torch.FloatTensor([-1]))
         else:
-            return -iscore[0][length][2]
-
+            return -iscore[0][n][2]
 
     def log_prob_ut(self, lsm, ut_w, ut_b, p, c, h):
         pi = Variable(torch.LongTensor([p]))
