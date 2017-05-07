@@ -147,7 +147,7 @@ def uspv_train_LCNP(p, cmd_inp):
         'p2l_pre': p.p2l_pre,
         'pl2r_pre': p.pl2r_pre
     }
-    
+
     model = LCNPModel(inputs, cmd_inp['cuda'], cmd_inp['verbose'])
     if cmd_inp['cuda']:
         model.cuda()
@@ -257,21 +257,8 @@ def parse_LCNP(p, sen2parse, cmd_inp):
     var_inp = Variable(inp)
     if cmd_inp['cuda']:
         var_inp = var_inp.cuda()
-    bp = model.parse(var_inp)
-
-    #filename = './lbtest.tst'
-    #parse_f = open(filename, 'w')
-
-    if bp[0][length][2] == null:
-        if cmd_inp['verbose'] == 'yes':
-            print "No parses for the sentence."
-    else: 
-        # exist parse
-        parse = print_parse(p, sen2parse, bp, 0, length, 2)
-        print parse
-        #parse_f.write(parse)
-        #parse_f.write('\n')
-
+    model.parse(var_inp)
+    # TODO add print_parse
 
 def print_parse(p, sen, bp, start, end, node):
     next = bp[start][end][node]
