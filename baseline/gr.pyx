@@ -11,6 +11,32 @@ import os, sys
 import time
 import numpy as np
 
+from cython.operator cimport dereference as deref
+from libcpp.vector cimport vector
+from numpy cimport int_t, double_t, int16_t
+
+ctypedef int16_t    D_t
+ctypedef double_t   V_t
+ctypedef int_t      K_t
+
+# left-child indexed binary rule
+cdef packed struct BR:
+    D_t right
+    D_t parent
+    V_t weight
+
+# left-child indexed binary rule
+cdef packed struct UR:
+    D_t parent
+    V_t weight
+
+# new school
+ctypedef vector[BR]    BRvv
+ctypedef vector[UR]    URvv
+ctypedef BRvv    *BRv
+ctypedef URvv    *URv
+
+
 def check_files_exist(file_list):
     for file_name in file_list:
         if not os.path.exists(file_name):
@@ -29,10 +55,11 @@ cdef class GrammarObject(object):
     cdef object lexicons                    # (NP, time) -> 0.3
     cdef object lexicon_dict                # (time) -> Set([NP, ...])
     cdef object binary_rules                # (S, NP, VP) -> 0.5
-    cdef object binary_rule_dict            # (NP, VP) -> [S, ...]
+    cdef object DISGUISED_TOAST            # (NP, VP) -> [S, ...]
+    cdef vector[BRv] rule_y_xz              # [NP] -> [(S,VP,0.6), ...]
     cdef object binary_rule_forward_dict
     cdef object unary_rules                 # (ROOT, S) -> 0.6
-    cdef object unary_rule_backward_dict    # (S) -> [ROOT, ...]
+    cdef vector[URv] rule_y_x               # [S] -> [(ROOT,0.9), ...]
     cdef object unary_rule_forward_dict     # (ROOT) -> [S, ...]
     
     cdef object sum_unary_combo             # (A,B) -> sum of {A -> B, A -> C -> B}
@@ -60,18 +87,20 @@ cdef class GrammarObject(object):
         self.lexicons = None                    # (NP, time) -> 0.3
         self.lexicon_dict = {}                  # (time) -> Set([NP, ...])
         self.binary_rules = None                # (S, NP, VP) -> 0.5
-        self.binary_rule_dict = {}              # (NP, VP) -> [S, ...]
         self.binary_rule_forward_dict = {}
 
         self.unary_rules = None                 # (ROOT, S) -> 0.6
-        self.unary_rule_backward_dict = {}      # (S) -> [ROOT, ...]
-        self.unary_rule_forward_dict = {}        # (ROOT) -> [S, ...]
+        self.unary_rule_forward_dict = {}       # (ROOT) -> [S, ...]
         
         self.sum_unary_combo = None             # (A,B) -> sum of {A -> B, A -> C -> B}
         self.max_unary_combo = None             # (A,B) -> max of {A -> B, A -> C -> B}
         self.C_in_max_unary_combo = None        # (A,B) -> C \in max of {A -> B, A -> C -> B}
         
     def read_grammar(self, filename):
+        cdef int nonterminal
+        cdef UR ur
+        cdef BR br
+    
         nt_file = filename + ".nonterminals"
         word_file = filename + ".words"
         lex_file = filename + ".lexicon"
@@ -119,12 +148,13 @@ cdef class GrammarObject(object):
                     self.lexicon_dict[word] = set()
                 self.lexicon_dict[word].add(nt)
 
-        # Read binary/unary rule file
+        # Read binary/unary rule file    
         self.binary_rules = [[[0 for k in xrange(self.num_nt)] for j in xrange(self.num_nt)] for i in xrange(self.num_nt)]
         self.unary_rules = [[0 for k in xrange(self.num_nt)] for j in xrange(self.num_nt)]
         for nonterminal in xrange(self.num_nt):
             # Must initialize early, or KeyError can occur
-            self.unary_rule_backward_dict[nonterminal] = []
+            self.rule_y_x.push_back(new URvv())
+            self.rule_y_xz.push_back(new BRvv())
             self.unary_rule_forward_dict[nonterminal] = []
             self.binary_rule_forward_dict[nonterminal] = []
         with open(gr_file, 'r') as file:
@@ -135,14 +165,19 @@ cdef class GrammarObject(object):
                 if len(rule) == 5:  # binary rule
                     r = self.nt2idx[rule[3][:-2]]
                     self.binary_rules[parent][l][r] = float(rule[4])
-                    if (l, r) not in self.binary_rule_dict:
-                        self.binary_rule_dict[ (l, r) ] = []
                     self.binary_rule_forward_dict[parent].append((l, r))
-                    self.binary_rule_dict[ (l, r) ].append(parent)
+                    br.right = r
+                    br.parent = parent
+                    br.weight = float(rule[4])
+                    self.rule_y_xz[l].push_back(br)
+                    #TODO self.DISGUISED_TOAST[ (l, r) ].append(parent)
                 if len(rule) == 4:  # unary rule
                     if parent != l:    # Do not allow self-recurring X -> X rules
+                        #TODO redundant
                         self.unary_rules[parent][l] = float(rule[3])
-                        self.unary_rule_backward_dict[l].append(parent)
+                        ur.parent = parent
+                        ur.weight = float(rule[3])
+                        self.rule_y_x[l].push_back(ur)
                         self.unary_rule_forward_dict[parent].append(l)
  
     def compute_sum_and_max_of_unary_combos(self):
@@ -188,12 +223,15 @@ cdef class GrammarObject(object):
 
         # Prune binary rules
         for l in xrange(self.num_nt):
-            for r in xrange(self.num_nt):
-                if (l, r) not in self.binary_rule_dict:
-                    continue
-                for p in self.binary_rule_dict[ (l, r) ]:
-                    if self.binary_rules[p][l][r] < threshold:
-                        self.binary_rules[p][l][r] = 0
+            for br in deref(self.rule_y_xz[l]):
+                if br.weight < threshold:
+                    self.binary_rules[br.parent][l][br.right] = 0
+            #TODODO rm for r in xrange(self.num_nt):
+                # if (l, r) not in self.DISGUISED_TOAST:
+                    # continue
+                # for p in self.DISGUISED_TOAST[ (l, r) ]:
+                    # if self.binary_rules[p][l][r] < threshold:
+                        # self.binary_rules[p][l][r] = 0
 
         # Prune unary rules
         pass #TODO dunno what to do yet
@@ -205,6 +243,7 @@ cdef class GrammarObject(object):
         cdef int i, tag, w, j, l, r, p, c
         cdef double rule_prob, tag_prob
         cdef double[:,:,:] betas, alphas
+        cdef UR ur
 
         cdef int ri = self.nt2idx['ROOT']
 
@@ -225,7 +264,8 @@ cdef class GrammarObject(object):
                 betas[i,i+1,tag] += tag_prob
 
                 # Unary appending
-                for p in self.unary_rule_backward_dict[tag]:
+                for ur in deref(self.rule_y_x[tag]):
+                    p = ur.parent
                     betas[i,i+1,p] += self.sum_unary_combo[p][tag] * tag_prob
 
         for w in xrange(2, n+1):  # wider constituents
@@ -238,9 +278,9 @@ cdef class GrammarObject(object):
                         for r in xrange(self.num_nt):
                             if betas[j,k,r] == 0:
                                 continue
-                            if (l, r) not in self.binary_rule_dict:
+                            if (l, r) not in self.DISGUISED_TOAST:
                                 continue
-                            for p in self.binary_rule_dict[ (l, r) ]:
+                            for p in self.DISGUISED_TOAST[ (l, r) ]:
                                 rule_prob = self.binary_rules[p][l][r] * betas[i,j,l] * betas[j,k,r]
                                 if rule_prob > 0:
                                     betas[i,k,p] += rule_prob
@@ -249,7 +289,8 @@ cdef class GrammarObject(object):
                 for p in xrange(self.num_nt):
                     if betas[i,k,p] == 0:
                         continue
-                    for unary_p in self.unary_rule_backward_dict[p]:
+                    for ur in deref(self.rule_y_x[p]):
+                        unary_p = ur.parent
                         betas[i,k,unary_p] += self.sum_unary_combo[unary_p][p] * betas[i,k,p]
 
         t1 = time.time()
@@ -332,7 +373,8 @@ cdef class GrammarObject(object):
                 self.viterbi[i][i+1][tag] = tag_prob
 
                 # Unary appending 
-                for p in self.unary_rule_backward_dict[tag]:
+                for ur in deref(self.rule_y_x[tag]):
+                    p = ur.parent
                     if not self.prune_chart[i][i+1][p]:
                         continue
                     prob = self.max_unary_combo[p][tag] * tag_prob
@@ -354,9 +396,9 @@ cdef class GrammarObject(object):
                         for r in xrange(self.num_nt):
                             if self.viterbi[j][k][r] == 0:
                                 continue
-                            if (l, r) not in self.binary_rule_dict:
+                            if (l, r) not in self.DISGUISED_TOAST:
                                 continue
-                            for p in self.binary_rule_dict[ (l, r) ]:
+                            for p in self.DISGUISED_TOAST[ (l, r) ]:
                                 if not self.prune_chart[i][k][p]:
                                     continue
                                 rule_prob = self.binary_rules[p][l][r] * self.viterbi[i][j][l] * self.viterbi[j][k][r]
@@ -368,7 +410,8 @@ cdef class GrammarObject(object):
                 for p in xrange(self.num_nt):
                     if self.viterbi[i][k][p] == 0:
                         continue
-                    for unary_p in self.unary_rule_backward_dict[p]:
+                    for ur in deref(self.rule_y_x[p]):
+                        unary_p = ur.parent
                         if not self.prune_chart[i][k][unary_p]:
                             continue
                         u_prob = self.max_unary_combo[unary_p][p] * self.viterbi[i][k][p]

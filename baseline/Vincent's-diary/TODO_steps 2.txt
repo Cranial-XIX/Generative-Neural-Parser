@@ -1,6 +1,6 @@
-1. Make gr.pyx more cython-like
+1. Change the loop into left-child loop (r_y_xz, r_y_x)
 
-2. Change the loop into left-child loop (r_y_xz)
+2. Make gr.pyx more cython-like
 
 3. Change the viterbi parsing into log space
 
@@ -9,5 +9,6 @@
 
 
 Progress:
-Parsing takes 15.3395 secs
-Parsing takes 12.2315 secs
+initial:  	Parsing takes 15.3395 secs
+cdef int:	Parsing takes 12.3071 secs
+rule_y_x:	Parsing takes 12.3664 secs
