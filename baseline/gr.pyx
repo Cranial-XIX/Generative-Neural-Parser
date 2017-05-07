@@ -350,7 +350,7 @@ cdef class GrammarObject(object):
 
     def parse(self, sentence):
         cdef int i, tag, w, j, l, r, p, c
-    
+
         words_in_sent = sentence.strip().split()
         n = len(words_in_sent)
         #print "before aaaaa: ", betas[0][n][self.nt2idx['ROOT']]
@@ -482,7 +482,7 @@ cdef class GrammarObject(object):
 
     def debinarize(self, parse):
         cdef int i
-    
+
         if parse == None:
             return "NO_PARSE"
         stack = [1 for x in xrange(len(parse))]

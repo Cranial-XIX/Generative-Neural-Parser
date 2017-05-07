@@ -269,7 +269,7 @@ class LCNPModel(nn.Module):
 
         # parent left to right
         t0 = time.time()
-        pl2r_pr = lsm(self.pl2r(p2lr_cond.view(-1, size[3]))).view(size2[0], size2[1], size2[2], -1)
+        pl2r_pr = lsm(self.pl2r(pl2r_cond.view(-1, size2[3]))).view(size2[0], size2[1], size2[2], -1)
         t1 = time.time()
         print "@@Three ", t1 - t0
 
