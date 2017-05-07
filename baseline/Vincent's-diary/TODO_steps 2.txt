@@ -1,8 +1,8 @@
 1. Change the loop into left-child loop (r_y_xz, r_y_x)
 
-2. Make gr.pyx more cython-like
+2. Change the viterbi parsing into log space
 
-3. Change the viterbi parsing into log space
+3. Make gr.pyx more cython-like
 
 4. Use the evalb.py or some utils to calculate the F1 score
 
