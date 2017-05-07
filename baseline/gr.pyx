@@ -101,9 +101,9 @@ cdef class GrammarObject(object):
     
     cdef logsumexp(self, double a, double b):
         cdef double m
-        if a <= self.log_zero:
+        if a == self.log_zero:
             return b
-        if b <= self.log_zero:
+        if b == self.log_zero:
             return a
         m = a if a > b else b
         return m + log(exp(a-m) + exp(b-m))
@@ -211,7 +211,7 @@ cdef class GrammarObject(object):
         for p in xrange(self.num_nt):
             for c in xrange(self.num_nt):
                 rule_prob = self.unary_rules[p][c]  # C- > B
-                if rule_prob <= self.log_zero:
+                if rule_prob == self.log_zero:
                     continue
                 for ancestor in xrange(self.num_nt):         # A
                     if self.unary_rules[ancestor][p] > self.log_zero:
@@ -264,7 +264,7 @@ cdef class GrammarObject(object):
                 else:  # if word is OOV
                     word = 'OOV'
                 tag_prob = self.lexicons[tag][self.w2idx[word]]
-                if tag_prob <= self.log_zero:
+                if tag_prob == self.log_zero:
                     continue
                 betas[i,i+1,tag] = self.logsumexp(betas[i,i+1,tag], tag_prob)
 
@@ -278,7 +278,7 @@ cdef class GrammarObject(object):
                 k = i + w
                 for j in xrange(i+1, k):
                     for l in xrange(self.num_nt):
-                        if betas[i,j,l] <= self.log_zero:
+                        if betas[i,j,l] == self.log_zero:
                             continue
                         for br in deref(self.rule_y_xz[l]):
                             rule_prob = self.binary_rules[br.parent][l][br.right] + betas[i,j,l] + betas[j,k,br.right]
@@ -287,7 +287,7 @@ cdef class GrammarObject(object):
 
                 # Unary appending
                 for p in xrange(self.num_nt):
-                    if betas[i,k,p] <= self.log_zero:
+                    if betas[i,k,p] == self.log_zero:
                         continue
                     for ur in deref(self.rule_y_x[p]):
                         unary_p = ur.parent
@@ -307,11 +307,11 @@ cdef class GrammarObject(object):
                 k = i + w
                 for p in xrange(self.num_nt):
                     out_p = self.alphas[i,k,p]
-                    if out_p <= self.log_zero:
+                    if out_p == self.log_zero:
                         continue
                     # unary
                     for c in self.unary_rule_forward_dict[p]:
-                        if betas[i,k,c] <= self.log_zero:
+                        if betas[i,k,c] == self.log_zero:
                             continue
                         self.alphas[0,n,c] = self.logsumexp(self.alphas[0,n,c], (self.sum_unary_combo[p][c] + out_p))
 
@@ -321,7 +321,7 @@ cdef class GrammarObject(object):
                     # binary
                     for j in xrange(i + 1, k):
                         for (l, r) in self.binary_rule_forward_dict[p]:
-                            if betas[i,j,l] <= self.log_zero or betas[j,k,r] <= self.log_zero:
+                            if betas[i,j,l] == self.log_zero or betas[j,k,r] == self.log_zero:
                                 continue
                             out = self.binary_rules[p][l][r] + out_p
                             # Skipping \alphas[A -> BC]
@@ -347,7 +347,7 @@ cdef class GrammarObject(object):
         for i in xrange(n):
             for j in xrange(i+1, n+1):
                 for nonterminal in xrange(self.num_nt):
-                    if self.betas[i,j,nonterminal] <= self.log_zero or self.alphas[i,j,nonterminal] <= self.log_zero:
+                    if self.betas[i,j,nonterminal] == self.log_zero or self.alphas[i,j,nonterminal] == self.log_zero:
                         continue
                     #TODODO re if self.betas[i,j,nonterminal] + self.alphas[i,j,nonterminal] > log_unnormalized_threshold:
                     self.prune_chart[i,j,nonterminal] = 1
@@ -372,7 +372,7 @@ cdef class GrammarObject(object):
                     #print 'Found OOV word: ', words_in_sent[i]
                     word = 'OOV'
                 tag_prob = self.lexicons[tag][self.w2idx[word]]
-                if tag_prob <= self.log_zero:
+                if tag_prob == self.log_zero:
                     continue
                 self.viterbi[i][i+1][tag] = tag_prob
 
@@ -395,7 +395,7 @@ cdef class GrammarObject(object):
                 k = i + w
                 for j in xrange(i + 1, k):
                     for l in xrange(self.num_nt):
-                        if self.viterbi[i][j][l] <= self.log_zero:
+                        if self.viterbi[i][j][l] == self.log_zero:
                             continue
                         for br in deref(self.rule_y_xz[l]):
                             if not self.prune_chart[i,k,br.parent]:
@@ -407,7 +407,7 @@ cdef class GrammarObject(object):
 
                 # Unary appending
                 for p in xrange(self.num_nt):
-                    if self.viterbi[i][k][p] <= self.log_zero:
+                    if self.viterbi[i][k][p] == self.log_zero:
                         continue
                     for ur in deref(self.rule_y_x[p]):
                         unary_p = ur.parent
