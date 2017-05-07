@@ -1,0 +1,11 @@
+log of Pr(  sentence ) =  -47.7942757691
+( (S (INTJ (UH No)) (, ,) (NP (PRP it)) (VP  (VBD was (RB n't)) (NP (NNP Black) (NNP Monday))) (. .))
+log of Pr(  sentence ) =  -275.467035573
+( (S (CC But) (PP (IN while) (NP    (DT the) (NNP New) (NNP York) (NNP Stock) (NNP Exchange))) (VP  (VBD did (RB n't)) (VP  (VB fall (PRT (RP apart))) (S (NP (NP (NNP Friday)) (PP (IN as) (NP    (DT the (NNP Dow) (NNP Jones)) (NNP Industrial)) (NNP Average)))) (VP  (VBD plunged (NP (NP (CD 190.58) (NNS points)) (PRN N (: -- (NP (NP (NP (JJS most) (PP (IN of) (NP (PRP it)))) (PP (IN in) (NP  (DT the (JJ final)) (NN hour)))) (: --)))) (S (NP (PRP it)) (VP  (ADVP (RB barely) (VBN managed)) (VP (TO to) (VP  (VB stay (NP (DT this) (NN side))) (PP (IN of) (NP (NN chaos)))))))))))) (. .))
+log of Pr(  sentence ) =  -216.732092221
+( (S (NP   (DT Some) (`` ``) (NP (NN circuit) (NNS breakers)) ('' '')) (VP (VBN installed) (PP (IN after) (NP   (DT the (NNP October) (CD 1987)) (NN crash)) (VP    (VBD failed (NP  (NP  (PRP$ their (JJ first) (NN test) (, ,) (NNS traders))) (VBP say)) (, ,)) (ADJP (JJ unable)))) (VP (TO to) (VP  (VB cool (NP  (DT the (VBG selling)) (NN panic))) (PP (IN in) (NP  (NP (DT both) (NNS stocks) (CC and)) (NNS futures)))))) (. .))
+log of Pr(  sentence ) =  -236.08975405
+( (S (NP (NP (NP   (DT The) (ADJP (CD 49) (NN stock)) (NN specialist) (NNS firms)) (PP (IN on) (NP   (DT the (NNP Big) (NNP Board)) (NN floor))) (PRN N (: -- (NP (NP (NP  (NP (DT the) (NNS buyers) (CC and)) (NNS sellers)) (PP (IN of) (NP (JJ last) (NN resort)))) (SBAR (WHNP (WP who)) (S (VP (VBD were) (VP (VBN criticized) (PP (IN after) (NP  (DT the (CD 1987)) (NN crash)))))))) (: --))) (ADVP (RB once) (RB again))) (VP  (MD could (RB n't)) (VP (VB handle) (NP  (DT the (VBG selling)) (NN pressure))))) (. .))
+log of Pr(  sentence ) =  -173.825987454
+( (S (NP  (JJ Big) (NN investment) (NNS banks)) (VP (VBD refused) (VP (TO to) (VP  (VB step (PRT (RP up))) (PP (TO to) (NP (DT the) (NN plate))))) (VP (TO to) (VP  (VB support (NP   (DT the (JJ beleaguered) (NN floor)) (NNS traders)) (SBAR (IN by) (S (VP  (VBG buying (NP (JJ big) (NNS blocks))) (PP (IN of) (NP  (NP (NN stock) (, ,)) (NNS traders))))))))) (VP (VBP say))) (. .))
+Parsing takes 7.8989 secs

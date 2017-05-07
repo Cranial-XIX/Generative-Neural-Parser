@@ -26,12 +26,12 @@ def run(GrammarObject):
             if i == 5:
                 break
             i += 1
-            prob_sentence = grammer_obj.do_inside_outside(sentence)
+            log_prob_sentence = grammer_obj.do_inside_outside(sentence)
             #t4 = time.time()
             #print "Inside-outside takes %.4f secs" % round(t4 - t3, 5)
 
             posterior_threshold = 0
-            grammer_obj.prune_the_chart(sentence, prob_sentence, posterior_threshold)
+            grammer_obj.prune_the_chart(sentence, log_prob_sentence, posterior_threshold)
             #t5 = time.time()
             #print "Pruning takes %.4f secs" % round(t5 - t4, 5)
 
@@ -39,7 +39,7 @@ def run(GrammarObject):
             #t6 = time.time()
             #print "Parsing takes %.4f secs\n" % round(t6 - t5, 5)
 
-            #print "Pr( ", sentence, ") = ", prob_sentence
+            print "log of Pr( ", "sentence", ") = ", log_prob_sentence
             print grammer_obj.debinarize(str)
 
     end = time.time()
