@@ -5,8 +5,8 @@ output/*
 corpus_info.tar
 EVALB/evalb
 baseline/output.txt
-*.so
-*.html
-*.cpp
-*.c
-
+*/*.so
+*/*.html
+*/*.cpp
+*/*.c
+*/Vincent*
