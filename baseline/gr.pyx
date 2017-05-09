@@ -358,14 +358,14 @@ cdef class GrammarObject(object):
                     #TODODO re if self.betas[i,j,nonterminal] + self.alphas[i,j,nonterminal] > log_unnormalized_threshold:
                     self.prune_chart[i,j,nonterminal] = 1
 
-    def parse(self, sentence):
-        cdef int i, tag, w, j, l, r, p, c
+    cdef parse(self, str sentence):
+        cdef int n, i, tag, w, j, l, r, p, c
     
         words_in_sent = sentence.strip().split()
         n = len(words_in_sent)
         #print "before aaaaa: ", betas[0][n][self.nt2idx['ROOT']]
         # Do inside algorithm
-        self.viterbi = [[[self.log_zero for k in xrange(self.num_nt)] for j in xrange(n+1)] for i in xrange(n)]
+        self.viterbi = np.full((n,n+1,self.num_nt), self.log_zero)
         self.bp = [[[None for k in xrange(self.num_nt)] for j in xrange(n+1)] for i in xrange(n)]
 
         for i in xrange(n):  # w-1 constituents
