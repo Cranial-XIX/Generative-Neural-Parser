@@ -112,7 +112,7 @@ cdef class GrammarObject(object):
         m = a if a > b else b
         return m + log(exp(a-m) + exp(b-m))
 
-    def _index(self):
+    def _initialize(self):
         cdef:
             int nt, t
 
@@ -160,10 +160,9 @@ cdef class GrammarObject(object):
                 i += 1
         self.num_words = i
 
-        self._index()
+        self._initialize()
 
         # Read lexicon file        
-        self.lexicon = [[self.log_zero for x in xrange(self.num_words+1)] for y in xrange(self.num_nt)] # index 0 in 2nd dimension is OOV
         with open(lex_file, 'r') as file:
             for line in file:
                 lexicon = line.strip().split()
@@ -172,15 +171,11 @@ cdef class GrammarObject(object):
                     word = self.w2idx[lexicon[1]]
                 else:  # if word is OOV
                     word = 0
-                self.lexicon[nt][word] = self.logsumexp(self.lexicon[nt][word], log(float(lexicon[2].strip('[]'))))
-                if word not in self.lexicon_dict:
-                    self.lexicon_dict[word] = set()
-                self.lexicon_dict[word].add(nt)
+                ur.parent = nt
+                ur.weight = log(float(lexicon[2].strip('[]')))
+                self.lexicon[word].push_back(ur)
 
-        # Read binary/unary rule file    
-        self.binary_rules = [[[self.log_zero for k in xrange(self.num_nt)] for j in xrange(self.num_nt)] for i in xrange(self.num_nt)]
-        self.unary_rules = [[self.log_zero for k in xrange(self.num_nt)] for j in xrange(self.num_nt)]
-
+        # Read binary/unary rule file
         with open(gr_file, 'r') as file:
             for line in file:
                 rule = line.strip().split()
@@ -188,8 +183,6 @@ cdef class GrammarObject(object):
                 l = self.nt2idx[rule[2][:-2]]
                 if len(rule) == 5:  # binary rule
                     r = self.nt2idx[rule[3][:-2]]
-                    self.binary_rules[parent][l][r] = log(float(rule[4]))
-                    self.binary_rule_forward_dict[parent].append((l, r))
                     br.right = r
                     br.parent = parent
                     br.weight = log(float(rule[4]))
@@ -197,27 +190,28 @@ cdef class GrammarObject(object):
                 if len(rule) == 4:  # unary rule
                     if parent != l:    # Do not allow self-recurring X -> X rules
                         #TODO redundant
-                        self.unary_rules[parent][l] = log(float(rule[3]))
                         ur.parent = parent
                         ur.weight = log(float(rule[3]))
                         self.rule_y_x[l].push_back(ur)
-                        self.unary_rule_forward_dict[parent].append(l)
 
     def compute_sum_and_max_of_unary_combos(self):
-        cdef int p, c
+        cdef:
+            int p, c
+            UR ur
 
         self.sum_unary_combo = np.full((self.num_nt, self.num_nt), self.log_zero)
         self.max_unary_combo = np.full((self.num_nt, self.num_nt), self.log_zero)
         self.C_in_max_unary_combo = np.zeros(self.num_nt, self.num_nt)
 
         # p = parent, c = child
-        for p in xrange(self.num_nt):
-            for c in xrange(self.num_nt):
-                rule_prob = self.unary_rules[p][c]
-                if rule_prob > self.log_zero:
-                    self.sum_unary_combo[p][c] = self.logsumexp(self.sum_unary_combo[p][c], rule_prob)
-                    self.max_unary_combo[p][c] = rule_prob
-                    self.C_in_max_unary_combo[p][c] = -1                
+        for c in xrange(self.num_nt):
+            for ur in deref(self.lexicon[c]):
+                weight = ur.weight
+                if weight > self.log_zero:
+                    self.sum_unary_combo[p, c] = self.logsumexp(self.sum_unary_combo[p, c], weight)
+                    if weigth > self.max_unary_combo[p, c]:
+                        self.max_unary_combo[p, c] = weight
+                        self.C_in_max_unary_combo[p, c] = -1
 
         # Handle sum and max unary combos, i.e. {A -> B, A -> C -> B}
         for p in xrange(self.num_nt):
