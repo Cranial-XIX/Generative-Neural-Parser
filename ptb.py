@@ -35,10 +35,10 @@ from path import path
 from nltk import Tree
 #from arsenal.terminal import yellow
 #from arsenal.misc import open_diff
-from argoparse.util import remove_trace, binarize, collapse_self_transition
+from util import remove_trace, binarize, collapse_self_transition
 
 
-PTB_ROOT = path('~/projects/ldp/data/LDC99T42/treebank_3/parsed/mrg/wsj/').expanduser()
+PTB_ROOT = path('../wsj').expanduser()
 
 
 class PTB(object):
