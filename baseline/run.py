@@ -41,10 +41,13 @@ def run(GrammarObject):
 
             print "log of Pr( ", "sentence", ") = ", log_prob_sentence
             print grammer_obj.debinarize(str)
+            
+            # Debug
+            # grammer_obj.validate_read_grammar()
 
     end = time.time()
     print "Parsing takes %.4f secs\n" % round(end - begin, 5)
 if __name__=="__main__":
     run(gr.GrammarObject)
-
+    
     #run(grammar.GrammarObject)

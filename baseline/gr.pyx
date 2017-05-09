@@ -55,7 +55,6 @@ cdef class GrammarObject(object):
     cdef int num_words
     cdef double log_zero
 
-    cdef object lexicon                    # (NP, time) -> log(0.3)
     cdef object lexicon_dict                # (time) -> Set([NP, ...])
     cdef object binary_rules                # (S, NP, VP) -> log(0.5)
 
@@ -72,7 +71,7 @@ cdef class GrammarObject(object):
 
     cdef vector[BRv] rule_y_xz              # [NP] -> [(S,VP,log(0.5)), ...]
     cdef vector[URv] rule_y_x               # [S] -> [(ROOT,log(0.9)), ...]
-    cdef vector[URv] lexicon                # [N] -> [(word,log(0.9)), ...]
+    cdef vector[URv] lexicon                # [word] -> [(N,log(0.3)), ...]
 
     cdef double[:,:,:] betas
     cdef double[:,:,:] alphas
@@ -91,7 +90,6 @@ cdef class GrammarObject(object):
         self.num_words = 0
         self.log_zero = -100000
 
-        self.lexicon = None
         self.lexicon_dict = {}
         self.binary_rules = None
         self.binary_rule_forward_dict = {}
@@ -119,6 +117,8 @@ cdef class GrammarObject(object):
         for nt in xrange(self.num_nt):
             self.rule_y_x.push_back(new URvv())
             self.rule_y_xz.push_back(new BRvv())
+            self.unary_rule_forward_dict[nt] = []
+            self.binary_rule_forward_dict[nt] = []
 
         for t in xrange(self.num_words):
             self.lexicon.push_back(new URvv())
@@ -176,6 +176,7 @@ cdef class GrammarObject(object):
                 self.lexicon[word].push_back(ur)
 
         # Read binary/unary rule file
+        self.binary_rules = [[[0 for k in xrange(self.num_nt)] for j in xrange(self.num_nt)] for i in xrange(self.num_nt)]
         with open(gr_file, 'r') as file:
             for line in file:
                 rule = line.strip().split()
@@ -183,6 +184,8 @@ cdef class GrammarObject(object):
                 l = self.nt2idx[rule[2][:-2]]
                 if len(rule) == 5:  # binary rule
                     r = self.nt2idx[rule[3][:-2]]
+                    self.binary_rules[parent][l][r] = float(rule[4])
+                    self.binary_rule_forward_dict[parent].append((l, r))
                     br.right = r
                     br.parent = parent
                     br.weight = log(float(rule[4]))
@@ -193,6 +196,7 @@ cdef class GrammarObject(object):
                         ur.parent = parent
                         ur.weight = log(float(rule[3]))
                         self.rule_y_x[l].push_back(ur)
+                        self.unary_rule_forward_dict[parent].append(l)
 
     def compute_sum_and_max_of_unary_combos(self):
         cdef:
@@ -201,28 +205,35 @@ cdef class GrammarObject(object):
 
         self.sum_unary_combo = np.full((self.num_nt, self.num_nt), self.log_zero)
         self.max_unary_combo = np.full((self.num_nt, self.num_nt), self.log_zero)
-        self.C_in_max_unary_combo = np.zeros(self.num_nt, self.num_nt)
+        self.C_in_max_unary_combo = np.zeros((self.num_nt, self.num_nt))
 
         # p = parent, c = child
         for c in xrange(self.num_nt):
             for ur in deref(self.lexicon[c]):
+                p = ur.parent
                 weight = ur.weight
                 if weight > self.log_zero:
                     self.sum_unary_combo[p, c] = self.logsumexp(self.sum_unary_combo[p, c], weight)
-                    if weigth > self.max_unary_combo[p, c]:
+                    if weight > self.max_unary_combo[p, c]:
                         self.max_unary_combo[p, c] = weight
                         self.C_in_max_unary_combo[p, c] = -1
 
         # Handle sum and max unary combos, i.e. {A -> B, A -> C -> B}
-        for p in xrange(self.num_nt):
-            for c in xrange(self.num_nt):
-                rule_prob = self.unary_rules[p][c]  # C- > B
+        for c in xrange(self.num_nt):
+            for ur in deref(self.rule_y_x[c]):
+                p = ur.parent
+                rule_prob = ur.weight  # C -> B
                 if rule_prob == self.log_zero:
                     continue
-                for ancestor in xrange(self.num_nt):         # A
-                    if self.unary_rules[ancestor][p] > self.log_zero:
+                for ancestor_ur in deref(self.rule_y_x[p]):  # A
+                    ancestor = ancestor_ur.parent
+                    if ancestor_ur.weight > self.log_zero:
                         # prob of A -> C -> B
-                        combo_rule_prob = self.unary_rules[ancestor][p] + self.unary_rules[p][c]
+                        combo_rule_prob = ancestor_ur.weight + ur.weight
+                #TODODO rm for ancestor in xrange(self.num_nt):         # A
+                    # if self.unary_rules[ancestor][p] > self.log_zero:
+                        # # prob of A -> C -> B
+                        # combo_rule_prob = self.unary_rules[ancestor][p] + self.unary_rules[p][c]
                         self.sum_unary_combo[ancestor][c] = self.logsumexp(self.sum_unary_combo[ancestor][c], combo_rule_prob)
                         if combo_rule_prob > self.max_unary_combo[ancestor][c]:
                             self.max_unary_combo[ancestor][c] = combo_rule_prob
@@ -230,13 +241,15 @@ cdef class GrammarObject(object):
 
 
     def prune_unlikely_rules_and_lexicon(self, threshold):
+        #TODO prune immediately when reading grammar file
+    
         cdef int l, r
     
         # Prune lexicon
-        for word in self.lexicon_dict:
-            for tag in self.lexicon_dict[word]:
-                if self.lexicon[tag][word] < log(threshold):
-                    self.lexicon[tag][word] = self.log_zero
+        for word in xrange(self.num_words):
+            for ur in deref(self.lexicon[word]):
+                if ur.weight < log(threshold):
+                    ur.weight = self.log_zero
 
         # Prune binary rules
         for l in xrange(self.num_nt):
@@ -264,12 +277,13 @@ cdef class GrammarObject(object):
         self.betas = betas
         # initialization
         for i in xrange(n):  # w-1 constituents
-            for tag in xrange(self.num_nt):
-                if words_in_sent[i] in self.w2idx:
-                    word = words_in_sent[i]
-                else:  # if word is OOV
-                    word = 'OOV'
-                tag_prob = self.lexicon[tag][self.w2idx[word]]
+            if words_in_sent[i] in self.w2idx:
+                word = words_in_sent[i]
+            else:  # if word is OOV
+                word = 'OOV'
+            for ur in deref(self.lexicon[self.w2idx[word]]):
+                tag = ur.parent
+                tag_prob = ur.weight
                 if tag_prob == self.log_zero:
                     continue
                 betas[i,i+1,tag] = self.logsumexp(betas[i,i+1,tag], tag_prob)
@@ -287,7 +301,7 @@ cdef class GrammarObject(object):
                         if betas[i,j,l] == self.log_zero:
                             continue
                         for br in deref(self.rule_y_xz[l]):
-                            rule_prob = self.binary_rules[br.parent][l][br.right] + betas[i,j,l] + betas[j,k,br.right]
+                            rule_prob = br.weight + betas[i,j,l] + betas[j,k,br.right]
                             if rule_prob > self.log_zero:
                                 betas[i,k,br.parent] = self.logsumexp(betas[i,k,br.parent], rule_prob)
 
@@ -358,7 +372,7 @@ cdef class GrammarObject(object):
                     #TODODO re if self.betas[i,j,nonterminal] + self.alphas[i,j,nonterminal] > log_unnormalized_threshold:
                     self.prune_chart[i,j,nonterminal] = 1
 
-    cdef parse(self, str sentence):
+    cpdef str parse(self, str sentence):
         cdef int n, i, tag, w, j, l, r, p, c
     
         words_in_sent = sentence.strip().split()
@@ -369,15 +383,20 @@ cdef class GrammarObject(object):
         self.bp = [[[None for k in xrange(self.num_nt)] for j in xrange(n+1)] for i in xrange(n)]
 
         for i in xrange(n):  # w-1 constituents
-            for tag in xrange(self.num_nt):
+            if words_in_sent[i] in self.w2idx:
+                word = words_in_sent[i]
+            else:  # if word is OOV
+                #print 'Found OOV word: ', words_in_sent[i]
+                word = 'OOV'
+            for ur in deref(self.lexicon[self.w2idx[word]]):
+                tag = ur.parent
                 if not self.prune_chart[i,i+1,tag]:
-                    continue
-                if words_in_sent[i] in self.w2idx:
-                    word = words_in_sent[i]
-                else:  # if word is OOV
-                    #print 'Found OOV word: ', words_in_sent[i]
-                    word = 'OOV'
-                tag_prob = self.lexicon[tag][self.w2idx[word]]
+                    continue 
+                tag_prob = ur.weight
+            # for tag in xrange(self.num_nt):
+                # if not self.prune_chart[i,i+1,tag]:
+                    # continue               
+                # tag_prob = self.lexicon[tag][self.w2idx[word]]
                 if tag_prob == self.log_zero:
                     continue
                 self.viterbi[i][i+1][tag] = tag_prob
@@ -424,26 +443,26 @@ cdef class GrammarObject(object):
                             self.viterbi[i][k][unary_p] = u_prob
                             self.bp[i][k][unary_p] = (None, None, p)
 
-        def print_parse(i, j, node):
-            next = self.bp[i][j][node]
-            if next == None:
-                # is terminal rule
-                return "(" + self.idx2nt[node] + " " + words_in_sent[i] + ")"
-            elif next[0] == None:
-                # unary rule
-                return  "(" + self.idx2nt[node] + " "  \
-                    + print_parse(i, j, next[2]) + ")" 
-            else:
-                # binary rule
-                return  "(" + self.idx2nt[node] + " " \
-                    + print_parse(i, next[0], next[1]) + " " \
-                    + print_parse(next[0], j, next[2]) + ")"
-
         if not self.bp[0][n][self.nt2idx['ROOT']] == None:
-            return print_parse(0, n, self.nt2idx['ROOT'])
+            return self.print_parse(0, n, self.nt2idx['ROOT'], words_in_sent)
         else:
-            return None
+            return ""
 
+    def print_parse(self, i, j, node, words_in_sent):
+        next = self.bp[i][j][node]
+        if next == None:
+            # is terminal rule
+            return "(" + self.idx2nt[node] + " " + words_in_sent[i] + ")"
+        elif next[0] == None:
+            # unary rule
+            return  "(" + self.idx2nt[node] + " "  \
+                + self.print_parse(i, j, next[2], words_in_sent) + ")" 
+        else:
+            # binary rule
+            return  "(" + self.idx2nt[node] + " " \
+                + self.print_parse(i, next[0], next[1], words_in_sent) + " " \
+                + self.print_parse(next[0], j, next[2], words_in_sent) + ")"
+            
     def validate_read_grammar(self):
         cdef int key, i, j, k
     
@@ -459,10 +478,10 @@ cdef class GrammarObject(object):
         for i in xrange(self.num_words):
             print i, self.idx2w[i]
 
-        for i in xrange(self.num_nt):
-            for j in xrange(self.num_words):
-                if self.lexicon[i][j] > self.log_zero:
-                    print self.idx2nt[i], self.idx2w[j], self.lexicon[i][j]
+        for word in xrange(self.num_words):
+            for ur in deref(self.lexicon[word]):          
+                if ur.weight > self.log_zero:
+                    print self.idx2nt[ur.parent], self.idx2w[word], ur.weight
 
         for i in xrange(self.num_nt):
             for j in xrange(self.num_nt):
@@ -514,4 +533,3 @@ cdef class GrammarObject(object):
 
     #for i in xrange(len(grammer_obj.sum_unary_combo[0])):
     #    print "Pr Root -> ", grammer_obj.idx2nt[i], " is ", grammer_obj.sum_unary_combo[0][i]
-    # grammer_obj.validate_read_grammar()
