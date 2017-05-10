@@ -5,7 +5,6 @@
 #cython: infertypes=True
 #cython: cdivision=True
 #distutils: language=c++
-#distutils: libraries=['stdc++']
 
 import os, sys
 import time
@@ -13,18 +12,36 @@ import numpy as np
 cimport numpy as np
 
 from cython.operator cimport dereference as deref
+from libcpp cimport bool
 from libcpp.vector cimport vector
 from libc.math cimport log, exp
 from numpy cimport int_t, double_t, int16_t
 
+Vt = np.double
+Dt = np.int16
+
+ctypedef int_t      K_t
 ctypedef int16_t    D_t
 ctypedef double_t   V_t
-ctypedef int_t      K_t
+ctypedef vector[short int] intvec
+
+cdef packed struct Cell:
+    V_t score
+    D_t y
+    D_t z
+    D_t j
+Cell_dt = np.dtype([('score', Vt), ('y', Dt), ('z', Dt), ('j', Dt)])
 
 # left-child indexed binary rule
 cdef packed struct BR:
     D_t right
     D_t parent
+    V_t weight
+
+# parent forward indexed binary rule
+cdef packed struct BRF:
+    D_t left
+    D_t right
     V_t weight
 
 # left-child indexed binary rule
@@ -35,80 +52,63 @@ cdef packed struct UR:
 # new school
 ctypedef vector[BR]    BRvv
 ctypedef vector[UR]    URvv
+ctypedef vector[BRF]   BRFvv
 ctypedef BRvv    *BRv
 ctypedef URvv    *URv
+ctypedef BRFvv   *BRFv
 
-
-def check_files_exist(file_list):
-    for file_name in file_list:
-        if not os.path.exists(file_name):
-            print 'Error! The file ', file_name, ' does not exist.'
-            sys.exit()
+cdef double log_zero = -100000
+'''
+cdef double logsumexp(double a, double b):
+    cdef double m
+    if a == log_zero:
+        return b
+    if b == log_zero:
+        return a
+    m = a if a > b else b
+    return m + log(exp(a-m) + exp(b-m))
+'''
+cdef inline int tri(int i, int j) nogil:
+    return j*(j-1)/2 + i
 
 cdef class GrammarObject(object):
 
     cdef object nt2idx    # nonterminal to index
     cdef object idx2nt    # index to nonterminal
-    cdef int num_nt
     cdef object w2idx     # word to index
     cdef object idx2w     # index to word
-    cdef int num_words
-    cdef double log_zero
-
-    cdef object lexicon_dict                # (time) -> Set([NP, ...])
-    cdef object binary_rules                # (S, NP, VP) -> log(0.5)
-
-    cdef object binary_rule_forward_dict
-    cdef object unary_rules                 # (ROOT, S) -> log(0.9)
-
-    cdef object unary_rule_forward_dict     # (ROOT) -> [S, ...]
-
-    cdef object sum_unary_combo             # (A,B) -> sum of {A -> B, A -> C -> B}
-    cdef object max_unary_combo             # (A,B) -> max of {A -> B, A -> C -> B}
-    cdef object C_in_max_unary_combo        # (A,B) -> C \in max of {A -> B, A -> C -> B}
     cdef object viterbi
     cdef object bp
+    cdef object prune_chart
+    cdef object sen
+
+    cdef int num_nt, num_words, N
+
+    cdef double log_zero
 
     cdef vector[BRv] rule_y_xz              # [NP] -> [(S,VP,log(0.5)), ...]
+    cdef vector[BRFv] rule_x_yz
     cdef vector[URv] rule_y_x               # [S] -> [(ROOT,log(0.9)), ...]
     cdef vector[URv] lexicon                # [word] -> [(N,log(0.3)), ...]
+    cdef vector[intvec*] spandex
 
-    cdef double[:,:,:] betas
-    cdef double[:,:,:] alphas
-    cdef double[:,:,:] prune_chart
+    cdef double[:,:,:,:] betas
+    cdef double[:,:,:,:] alphas
 
     def __init__(self):
         """
 		grammar
 		"""
-
         self.nt2idx = {}    # nonterminal to index
         self.idx2nt = []    # index to nonterminal
-        self.num_nt = 0
         self.w2idx = {}     # word to index
         self.idx2w = []     # index to word
-        self.num_words = 0
-        self.log_zero = -100000
 
-        self.lexicon_dict = {}
-        self.binary_rules = None
-        self.binary_rule_forward_dict = {}
-
-        self.unary_rules = None
-        self.unary_rule_forward_dict = {}
-
-        self.sum_unary_combo = None
-        self.max_unary_combo = None
-        self.C_in_max_unary_combo = None
-
-    cdef double logsumexp(self, double a, double b):
-        cdef double m
-        if a == self.log_zero:
-            return b
-        if b == self.log_zero:
-            return a
-        m = a if a > b else b
-        return m + log(exp(a-m) + exp(b-m))
+    def check_files_exist(self, file_list):
+        for file_name in file_list:
+            if not os.path.exists(file_name):
+                print 'Error! The file ', file_name, ' does not exist.'
+                sys.exit()
 
     def _initialize(self):
         cdef:
@@ -117,23 +117,23 @@ cdef class GrammarObject(object):
         for nt in xrange(self.num_nt):
             self.rule_y_x.push_back(new URvv())
             self.rule_y_xz.push_back(new BRvv())
-            self.unary_rule_forward_dict[nt] = []
-            self.binary_rule_forward_dict[nt] = []
+            self.rule_x_yz.push_back(new BRFvv())
 
         for t in xrange(self.num_words):
             self.lexicon.push_back(new URvv())
 
-    def read_grammar(self, filename):
+    def read_grammar(self, filename, threshold=1e-7):
         cdef:
             UR ur
             BR br
+            BRF brf
 
         nt_file = filename + ".nonterminals"
         word_file = filename + ".words"
         lex_file = filename + ".lexicon"
         gr_file = filename + ".grammar"
 
-        check_files_exist([nt_file, word_file, lex_file, gr_file])
+        self.check_files_exist([nt_file, word_file, lex_file, gr_file])
 
         # Read nonterminal file
         with open(nt_file, 'r') as file:
@@ -158,8 +158,8 @@ cdef class GrammarObject(object):
                 self.w2idx[w] = i
                 self.idx2w.append(w)
                 i += 1
-        self.num_words = i
 
+        self.num_words = i
         self._initialize()
 
         # Read lexicon file        
@@ -169,367 +169,329 @@ cdef class GrammarObject(object):
                 nt = self.nt2idx[lexicon[0]]
                 if lexicon[1] in self.w2idx:
                     word = self.w2idx[lexicon[1]]
-                else:  # if word is OOV
+                else: # if word is OOV
                     word = 0
                 ur.parent = nt
-                ur.weight = log(float(lexicon[2].strip('[]')))
-                self.lexicon[word].push_back(ur)
+                ur.weight = float(lexicon[2].strip('[]'))
+                if ur.weight >= threshold:
+                    self.lexicon[word].push_back(ur)
 
         # Read binary/unary rule file
-        self.binary_rules = [[[0 for k in xrange(self.num_nt)] for j in xrange(self.num_nt)] for i in xrange(self.num_nt)]
         with open(gr_file, 'r') as file:
             for line in file:
                 rule = line.strip().split()
-                parent = self.nt2idx[rule[0][:-2]]    # [:-2] is to remove "_0" from "NP_0" to form "NP"
+                p = self.nt2idx[rule[0][:-2]]       # [:-2] is to remove "_0" from "NP_0" to form "NP"
                 l = self.nt2idx[rule[2][:-2]]
-                if len(rule) == 5:  # binary rule
+                if len(rule) == 5:                  # binary rule
                     r = self.nt2idx[rule[3][:-2]]
-                    self.binary_rules[parent][l][r] = float(rule[4])
-                    self.binary_rule_forward_dict[parent].append((l, r))
                     br.right = r
-                    br.parent = parent
-                    br.weight = log(float(rule[4]))
+                    br.parent = p
+                    br.weight = float(rule[4])
                     self.rule_y_xz[l].push_back(br)
-                if len(rule) == 4:  # unary rule
-                    if parent != l:    # Do not allow self-recurring X -> X rules
-                        #TODO redundant
-                        ur.parent = parent
-                        ur.weight = log(float(rule[3]))
-                        self.rule_y_x[l].push_back(ur)
-                        self.unary_rule_forward_dict[parent].append(l)
+                    brf.left = l
+                    brf.right = r
+                    brf.weight = float(rule[4])
+                    self.rule_x_yz[p].push_back(brf)
+                if len(rule) == 4:                  # unary rule
+                    if p != l:                      # Do not allow self-recurring X -> X rules
+                        ur.parent = p
+                        ur.weight = float(rule[3])
+                        if ur.weight >= threshold:
+                            self.rule_y_x[l].push_back(ur)
 
-    def compute_sum_and_max_of_unary_combos(self):
+    def __dealloc__(self):
+        for x in self.spandex:
+            del x
+
+    cdef inline void inside_unary(self, int i, int k) nogil:
         cdef:
-            int p, c
+            int c, p
+            intvec tmp
+            intvec* cell
             UR ur
+        cell = self.spandex[tri(i,k)]
 
-        self.sum_unary_combo = np.full((self.num_nt, self.num_nt), self.log_zero)
-        self.max_unary_combo = np.full((self.num_nt, self.num_nt), self.log_zero)
-        self.C_in_max_unary_combo = np.zeros((self.num_nt, self.num_nt))
+        # free unary rule X->X
+        for c in deref(cell):
+            self.betas[i,k,c,1] += self.betas[i,k,c,0]
 
-        # p = parent, c = child
-        for c in xrange(self.num_nt):
-            for ur in deref(self.lexicon[c]):
-                p = ur.parent
-                weight = ur.weight
-                if weight > self.log_zero:
-                    self.sum_unary_combo[p, c] = self.logsumexp(self.sum_unary_combo[p, c], weight)
-                    if weight > self.max_unary_combo[p, c]:
-                        self.max_unary_combo[p, c] = weight
-                        self.C_in_max_unary_combo[p, c] = -1
-
-        # Handle sum and max unary combos, i.e. {A -> B, A -> C -> B}
-        for c in xrange(self.num_nt):
+        for c in deref(cell):
             for ur in deref(self.rule_y_x[c]):
                 p = ur.parent
-                rule_prob = ur.weight  # C -> B
-                if rule_prob == self.log_zero:
-                    continue
-                for ancestor_ur in deref(self.rule_y_x[p]):  # A
-                    ancestor = ancestor_ur.parent
-                    if ancestor_ur.weight > self.log_zero:
-                        # prob of A -> C -> B
-                        combo_rule_prob = ancestor_ur.weight + ur.weight
-                #TODODO rm for ancestor in xrange(self.num_nt):         # A
-                    # if self.unary_rules[ancestor][p] > self.log_zero:
-                        # # prob of A -> C -> B
-                        # combo_rule_prob = self.unary_rules[ancestor][p] + self.unary_rules[p][c]
-                        self.sum_unary_combo[ancestor][c] = self.logsumexp(self.sum_unary_combo[ancestor][c], combo_rule_prob)
-                        if combo_rule_prob > self.max_unary_combo[ancestor][c]:
-                            self.max_unary_combo[ancestor][c] = combo_rule_prob
-                            self.C_in_max_unary_combo[ancestor][c] = p
+                if self.betas[i,k,p,1] == 0:
+                    tmp.push_back(p)
+                self.betas[i,k,p,1] += self.betas[i,k,c,0] * ur.weight
 
+        for c in tmp:
+            cell.push_back(c)
 
-    def prune_unlikely_rules_and_lexicon(self, threshold):
-        #TODO prune immediately when reading grammar file
-    
-        cdef int l, r
-    
-        # Prune lexicon
-        for word in xrange(self.num_words):
-            for ur in deref(self.lexicon[word]):
-                if ur.weight < log(threshold):
-                    ur.weight = self.log_zero
+    cpdef do_inside_outside(self, sentence):
+        cdef:
+            int i, j, k, tag, w, l, r, p, c, n, ri, pp, ik
+            str word
+            double parent, left, right, child
+            double d, d_times_left, d_times_right
+            UR ur
+            BR br
+            intvec tmp
+            intvec* cell
 
-        # Prune binary rules
-        for l in xrange(self.num_nt):
-            for br in deref(self.rule_y_xz[l]):
-                if br.weight < log(threshold):
-                    self.binary_rules[br.parent][l][br.right] = self.log_zero
+        sen = []
+        sentence = sentence.strip().split()
+        n = len(sentence)
+        self.N = n
+        for i in xrange(n):
+            word = sentence[i]
+            sen.append(self.w2idx[word]) if word in self.w2idx else 0
 
-        # Prune unary rules
-        pass #TODO dunno what to do yet
-    
-    
-    def do_inside_outside(self, sentence):   
-        words_in_sent = sentence.strip().split()
-        cdef int n = len(words_in_sent)
-        cdef int i, tag, w, j, l, r, p, c
-        cdef double rule_prob, tag_prob
-        cdef double[:,:,:] betas
-        cdef UR ur
+        self.sen = sen
+        ri = self.nt2idx['ROOT']
 
-        cdef int ri = self.nt2idx['ROOT']
+        for ik in xrange(n*(n+1)//2):
+            self.spandex.push_back(new intvec())
 
-        t0 = time.time()
         # Do inside algorithm
-        betas = np.full((n, n+1, self.num_nt), self.log_zero) #[[[0 for k in xrange(self.num_nt)] for j in xrange(n+1)] for i in xrange(n)]
-        self.betas = betas
+        self.betas = np.zeros((n, n+1, self.num_nt, 2))
+        t0 = time.time()
         # initialization
         for i in xrange(n):  # w-1 constituents
-            if words_in_sent[i] in self.w2idx:
-                word = words_in_sent[i]
-            else:  # if word is OOV
-                word = 'OOV'
-            for ur in deref(self.lexicon[self.w2idx[word]]):
+            w = sen[i]
+            k = i+1
+            cell = self.spandex[tri(i, k)]
+            for ur in deref(self.lexicon[w]):
                 tag = ur.parent
-                tag_prob = ur.weight
-                if tag_prob == self.log_zero:
-                    continue
-                betas[i,i+1,tag] = self.logsumexp(betas[i,i+1,tag], tag_prob)
+                if self.betas[i,k,tag,0] == 0:
+                    cell.push_back(tag)
+                self.betas[i,k,tag,0] = ur.weight
+            # unary appending
+            for c in deref(cell):
+                self.betas[i,k,c,1] += self.betas[i,k,c,0]
 
-                # Unary appending
-                for ur in deref(self.rule_y_x[tag]):
+            for c in deref(cell):
+                for ur in deref(self.rule_y_x[c]):
                     p = ur.parent
-                    betas[i,i+1,p] = self.logsumexp(betas[i,i+1,p], (self.sum_unary_combo[p][tag] + tag_prob))
+                    if self.betas[i,k,p,1] == 0:
+                        tmp.push_back(p)
+                    self.betas[i,k,p,1] += self.betas[i,k,c,0] * ur.weight
+
+            for c in tmp:
+                cell.push_back(c)
+            tmp.clear()
 
         for w in xrange(2, n+1):  # wider constituents
             for i in xrange(n-w+1):
                 k = i + w
+                cell = self.spandex[tri(i, k)]
                 for j in xrange(i+1, k):
-                    for l in xrange(self.num_nt):
-                        if betas[i,j,l] == self.log_zero:
-                            continue
+                    for l in deref(self.spandex[tri(i, j)]):
+                        left = self.betas[i,j,l,1]
                         for br in deref(self.rule_y_xz[l]):
-                            rule_prob = br.weight + betas[i,j,l] + betas[j,k,br.right]
-                            if rule_prob > self.log_zero:
-                                betas[i,k,br.parent] = self.logsumexp(betas[i,k,br.parent], rule_prob)
+                            r = br.right
+                            right = self.betas[j,k,r,1]
+                            if right == 0:
+                                continue
+                            p = br.parent
+                            if self.betas[i,k,p,0] == 0:
+                                cell.push_back(p)
+                            self.betas[i,k,p,0] += br.weight * left * right
+                # unary appending
+                for c in deref(cell):
+                    self.betas[i,k,c,1] += self.betas[i,k,c,0]
 
-                # Unary appending
-                for p in xrange(self.num_nt):
-                    if betas[i,k,p] == self.log_zero:
-                        continue
-                    for ur in deref(self.rule_y_x[p]):
-                        unary_p = ur.parent
-                        betas[i,k,unary_p] = self.logsumexp(betas[i,k,unary_p], (self.sum_unary_combo[unary_p][p] + betas[i,k,p]))
+                for c in deref(cell):
+                    for ur in deref(self.rule_y_x[c]):
+                        p = ur.parent
+                        if self.betas[i,k,p,1] == 0:
+                            tmp.push_back(p)
+                        self.betas[i,k,p,1] += self.betas[i,k,c,0] * ur.weight
+
+                for c in tmp:
+                    cell.push_back(c)
+                tmp.clear()
 
         t1 = time.time()
-        #print "inside takes ", t1 - t0
+        print "inside ",t1 - t0
 
         # Do outside algorithm
-        self.alphas = np.full((n, n+1, self.num_nt), self.log_zero)
-        self.alphas[0,n,ri] = 0
+        self.alphas = np.zeros((n, n+1, self.num_nt, 2))
+        self.alphas[0,n,ri,1] = 1.0
 
-        cdef double out
-
-        for w in reversed(xrange(1, n+1)): # wide to narrow
-            for i in xrange(n - w + 1):
+        for w in reversed(xrange(2, n+1)): # wide to narrow
+            for i in xrange(n-w+1):
                 k = i + w
-                for p in xrange(self.num_nt):
-                    out_p = self.alphas[i,k,p]
-                    if out_p == self.log_zero:
-                        continue
-                    # unary
-                    for c in self.unary_rule_forward_dict[p]:
-                        if betas[i,k,c] == self.log_zero:
+
+                # unary
+                for c in deref(self.spandex[tri(i, k)]):
+                    for ur in deref(self.rule_y_x[c]):
+                        p = ur.parent
+                        if self.alphas[i,k,p,1] == 0:
                             continue
-                        self.alphas[0,n,c] = self.logsumexp(self.alphas[0,n,c], (self.sum_unary_combo[p][c] + out_p))
+                        self.alphas[i,k,c,0] += self.alphas[i,k,p,1] * ur.weight
+                for c in deref(self.spandex[tri(i, k)]):
+                    self.alphas[i,k,c,0] += self.alphas[i,k,c,1]
 
-                    if w == 1:
+                # binary
+                for p in deref(self.spandex[tri(i, k)]):
+                    parent = self.alphas[i,k,p,0]
+                    if parent == 0:
                         continue
-
-                    # binary
-                    for j in xrange(i + 1, k):
-                        for (l, r) in self.binary_rule_forward_dict[p]:
-                            if betas[i,j,l] == self.log_zero or betas[j,k,r] == self.log_zero:
+                    for j in xrange(i+1, k):
+                        for brf in deref(self.rule_x_yz[p]):
+                            l = brf.left
+                            r = brf.right
+                            left = self.betas[i,j,l,1]
+                            if left == 0:
                                 continue
-                            out = self.binary_rules[p][l][r] + out_p
-                            # Skipping \alphas[A -> BC]
-                            self.alphas[i,j,l] = self.logsumexp(self.alphas[i,j,l], (out + betas[j,k,r]))            
-                            self.alphas[j,k,r] = self.logsumexp(self.alphas[j,k,r], (out + betas[i,j,l]))
+                            right = self.betas[j,k,r,1]
+                            if right == 0:
+                                continue
+                            d = parent * brf.weight
+                            d_times_left = d * left
+                            d_times_right = d * right
+                            self.alphas[j,k,r,1] += d_times_left
+                            self.alphas[i,j,l,1] += d_times_right
 
-        #print "outside takes ", time.time() - t1
-        return betas[0,n,ri]
-
-    def prune_the_chart(self, sentence, log_prob_sentence, posterior_threshold):
-        cdef int n, i, j
-    
-        words_in_sent = sentence.strip().split()
-        n = len(words_in_sent)
-        if posterior_threshold == 0:
-            log_posterior_threshold = float("-inf")
-        else:
-            log_posterior_threshold = log(posterior_threshold)
-        log_unnormalized_threshold = log_posterior_threshold + log_prob_sentence
-
-        # TODO use BooleanTensor instead of LongTensor
-        self.prune_chart = np.zeros((n, n+1, self.num_nt))
         for i in xrange(n):
-            for j in xrange(i+1, n+1):
-                for nonterminal in xrange(self.num_nt):
-                    if self.betas[i,j,nonterminal] == self.log_zero or self.alphas[i,j,nonterminal] == self.log_zero:
+            k = i+1
+            for c in deref(self.spandex[tri(i, k)]):
+                for ur in deref(self.rule_y_x[c]):
+                    p = ur.parent
+                    if self.alphas[i,k,p,1] == 0:
                         continue
-                    #TODODO re if self.betas[i,j,nonterminal] + self.alphas[i,j,nonterminal] > log_unnormalized_threshold:
-                    self.prune_chart[i,j,nonterminal] = 1
+                    self.alphas[i,k,c,0] += self.alphas[i,k,p,1] * ur.weight
+            for c in deref(self.spandex[tri(i, k)]):
+                self.alphas[i,k,c,0] += self.alphas[i,k,c,1]
+
+        print "outside ", time.time() - t1
+        self.spandex.clear()
+
+        return self.betas[0,n,ri,1]
+
+    cpdef prune_the_chart(self, prob_sen, posterior_threshold):
+        cdef:
+            int i, j, nt, deleted=0
+            double threshold, a, b
+
+        threshold = prob_sen * posterior_threshold
+
+        self.prune_chart = np.full((self.N, self.N+1, self.num_nt), False)
+        for i in xrange(self.N):
+            for j in xrange(i+1, self.N+1):
+                for nt in xrange(self.num_nt):
+                    a = self.alphas[i,j,nt,0]
+                    b = self.betas[i,j,nt,1]
+                    if b == 0 or a == 0:
+                        continue
+                    if a * b > threshold:
+                        self.prune_chart[i,j,nt] = True
+                    else:
+                        deleted += 1
+        print "Pruned ", deleted, " number of rules"
 
     cpdef str parse(self, str sentence):
-        cdef int n, i, tag, w, j, l, r, p, c
-    
-        words_in_sent = sentence.strip().split()
-        n = len(words_in_sent)
-        #print "before aaaaa: ", betas[0][n][self.nt2idx['ROOT']]
+        cdef:
+            int i, j, k, tag, w, l, r, p, c, n, ri, pp, ik
+            str word
+            double parent, left, right, child, newscore
+            double d, d_times_left, d_times_right
+            UR ur
+            BR br
+            intvec tmp
+            intvec* cell
+
+            Cell[:,:,:] chart
+
+        n = self.N
+        sen = self.sen
+        chart = np.empty((n,n+1,self.num_nt), dtype=Cell_dt)
+
+        for ik in xrange(n*(n+1)//2):
+            self.spandex.push_back(new intvec())
+
         # Do inside algorithm
-        self.viterbi = np.full((n,n+1,self.num_nt), self.log_zero)
-        self.bp = [[[None for k in xrange(self.num_nt)] for j in xrange(n+1)] for i in xrange(n)]
+        t0 = time.time()
 
+        # initialization
         for i in xrange(n):  # w-1 constituents
-            if words_in_sent[i] in self.w2idx:
-                word = words_in_sent[i]
-            else:  # if word is OOV
-                #print 'Found OOV word: ', words_in_sent[i]
-                word = 'OOV'
-            for ur in deref(self.lexicon[self.w2idx[word]]):
-                tag = ur.parent
-                if not self.prune_chart[i,i+1,tag]:
-                    continue 
-                tag_prob = ur.weight
-            # for tag in xrange(self.num_nt):
-                # if not self.prune_chart[i,i+1,tag]:
-                    # continue               
-                # tag_prob = self.lexicon[tag][self.w2idx[word]]
-                if tag_prob == self.log_zero:
-                    continue
-                self.viterbi[i][i+1][tag] = tag_prob
+            w = sen[i]
+            k = i+1
+            cell = self.spandex[tri(i, k)]
 
-                # Unary appending 
-                for ur in deref(self.rule_y_x[tag]):
+            for ur in deref(self.lexicon[w]):
+                tag = ur.parent
+                if self.prune_chart[i,k,tag]:
+                    if chart[i,k,tag].score == 0:
+                        cell.push_back(tag)
+                    chart[i,k,tag].score = ur.weight
+                    chart[i,k,tag].y = -1
+            # unary appending
+            for c in deref(cell):
+                for ur in deref(self.rule_y_x[c]):
                     p = ur.parent
-                    if not self.prune_chart[i,i+1,p]:
-                        continue
-                    prob = self.max_unary_combo[p][tag] + tag_prob
-                    if prob > self.viterbi[i][i+1][p]:
-                        self.viterbi[i][i+1][p] = prob
-                        c = self.C_in_max_unary_combo[p][tag]
-                        if c == -1:
-                            self.bp[i][i+1][p] = (None, None, tag)
-                        else:
-                            self.bp[i][i+1][p] = (None, None, c)
+                    if self.prune_chart[i,k,p]:
+                        newscore = chart[i,k,c].score * ur.weight
+                        if newscore > chart[i,k,p].score:
+                            if chart[i,k,p].score == 0:
+                                tmp.push_back(p)
+                            chart[i,k,p].score = newscore
+                            chart[i,k,p].y = c
+                            chart[i,k,p].z = -1
+            for c in tmp:
+                cell.push_back(c)
+            tmp.clear()
 
         for w in xrange(2, n+1):  # wider constituents
-            for i in xrange(n - w + 1):
+            for i in xrange(n-w+1):
                 k = i + w
-                for j in xrange(i + 1, k):
-                    for l in xrange(self.num_nt):
-                        if self.viterbi[i][j][l] == self.log_zero:
-                            continue
+                cell = self.spandex[tri(i, k)]
+                for j in xrange(i+1, k):
+                    for l in deref(self.spandex[tri(i, j)]):
+                        left = chart[i,j,l].score
                         for br in deref(self.rule_y_xz[l]):
-                            if not self.prune_chart[i,k,br.parent]:
+                            r = br.right
+                            right = chart[j,k,r].score
+                            if right == 0:
                                 continue
-                            rule_prob = self.binary_rules[br.parent][l][br.right] + self.viterbi[i][j][l] + self.viterbi[j][k][br.right]
-                            if rule_prob > self.viterbi[i][k][br.parent]:
-                                self.viterbi[i][k][br.parent] = rule_prob
-                                self.bp[i][k][br.parent] = (j, l, br.right)
+                            p = br.parent
+                            if self.prune_chart[i,k,p]:
+                                newscore = br.weight * left * right
+                                if newscore > chart[i,k,p].score:
+                                    if self.betas[i,k,p,0] == 0:
+                                        cell.push_back(p)
+                                    chart[i,k,p].score = newscore
+                                    chart[i,k,p].y = l
+                                    chart[i,k,p].z = r
+                                    chart[i,k,p].j = j
+                # unary appending
+                for c in deref(cell):
+                    for ur in deref(self.rule_y_x[c]):
+                        p = ur.parent
+                        if self.prune_chart[i,k,p]:
+                            newscore = chart[i,k,c].score * ur.weight
+                            if newscore > chart[i,k,p].score:
+                                if chart[i,k,p].score == 0:
+                                    tmp.push_back(p) 
+                                chart[i,k,p].score = newscore
+                                chart[i,k,p].y = c
+                                chart[i,k,p].z = -1
+                for c in tmp:
+                    cell.push_back(c)
+                tmp.clear()
+        t1 = time.time()
+        self.spandex.clear()
+        print "parsing takes ",t1 - t0
 
-                # Unary appending
-                for p in xrange(self.num_nt):
-                    if self.viterbi[i][k][p] == self.log_zero:
-                        continue
-                    for ur in deref(self.rule_y_x[p]):
-                        unary_p = ur.parent
-                        if not self.prune_chart[i,k,unary_p]:
-                            continue
-                        u_prob = self.max_unary_combo[unary_p][p] + self.viterbi[i][k][p]
-                        if u_prob > self.viterbi[i][k][unary_p]:
-                            self.viterbi[i][k][unary_p] = u_prob
-                            self.bp[i][k][unary_p] = (None, None, p)
-
-        if not self.bp[0][n][self.nt2idx['ROOT']] == None:
-            return self.print_parse(0, n, self.nt2idx['ROOT'], words_in_sent)
-        else:
-            return ""
-
-    def print_parse(self, i, j, node, words_in_sent):
+    def print_parse(self, i, j, node, sen):
         next = self.bp[i][j][node]
         if next == None:
             # is terminal rule
-            return "(" + self.idx2nt[node] + " " + words_in_sent[i] + ")"
+            return "(" + self.idx2nt[node] + " " + sen[i] + ")"
         elif next[0] == None:
             # unary rule
             return  "(" + self.idx2nt[node] + " "  \
-                + self.print_parse(i, j, next[2], words_in_sent) + ")" 
+                + self.print_parse(i, j, next[2], sen) + ")" 
         else:
             # binary rule
             return  "(" + self.idx2nt[node] + " " \
-                + self.print_parse(i, next[0], next[1], words_in_sent) + " " \
-                + self.print_parse(next[0], j, next[2], words_in_sent) + ")"
-            
-    def validate_read_grammar(self):
-        cdef int key, i, j, k
-    
-        for key in self.nt2idx:
-            print key, self.nt2idx[key]
-
-        for i in xrange(self.num_nt):
-            print i, self.idx2nt[i]
-
-        for key in self.w2idx:
-            print key, self.w2idx[key]
-
-        for i in xrange(self.num_words):
-            print i, self.idx2w[i]
-
-        for word in xrange(self.num_words):
-            for ur in deref(self.lexicon[word]):          
-                if ur.weight > self.log_zero:
-                    print self.idx2nt[ur.parent], self.idx2w[word], ur.weight
-
-        for i in xrange(self.num_nt):
-            for j in xrange(self.num_nt):
-                for k in xrange(self.num_nt):
-                    if self.binary_rules[i][j][k] > self.log_zero:
-                        print self.idx2nt[i], self.idx2nt[j], self.idx2nt[k], self.binary_rules[i][j][k]
-
-        for i in xrange(self.num_nt):
-            for j in xrange(self.num_nt):
-                if self.unary_rules[i][j] > self.log_zero:
-                    print self.idx2nt[i], self.idx2nt[j], self.unary_rules[i][j]
-                
-        for i in xrange(self.num_nt):
-            for j in xrange(self.num_nt):
-                if self.sum_unary_combo[i][j] > self.log_zero:
-                    print self.idx2nt[i], self.idx2nt[j], self.sum_unary_combo[i][j]
-
-        for i in xrange(self.num_nt):
-            for j in xrange(self.num_nt):
-                if self.max_unary_combo[i][j] > self.log_zero:
-                    print self.idx2nt[i], self.idx2nt[j], self.max_unary_combo[i][j]
-
-    def debinarize(self, parse):
-        cdef int i
-    
-        if parse == None:
-            return "NO_PARSE"
-        stack = [1 for x in xrange(len(parse))]
-        newparse = []
-        pointer = -1
-        flag = -1
-        for i in xrange(len(parse)-1):
-            if parse[i] == '(' and parse[i+1] == '@':
-                pointer += 1
-                flag = i+3
-                continue
-            if parse[i] == '(':
-                stack[pointer] += 1
-            if parse[i] == ')' and pointer >= 0:
-                stack[pointer] -= 1
-                if stack[pointer] == 0:
-                    pointer -= 1
-                    continue
-            if flag == -1:
-                newparse.append(parse[i])
-            elif flag == i:
-                flag = -1
-        return "("+"".join(newparse[5:])
-
-    #for i in xrange(len(grammer_obj.sum_unary_combo[0])):
-    #    print "Pr Root -> ", grammer_obj.idx2nt[i], " is ", grammer_obj.sum_unary_combo[0][i]
+                + self.print_parse(i, next[0], next[1], sen) + " " \
+                + self.print_parse(next[0], j, next[2], sen) + ")"
