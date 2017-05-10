@@ -89,6 +89,7 @@ def evalb_unofficial(want, got):
     got_and_want, got, _ = _recall_tree(want, got)
     return got_and_want, got, len(want)
 
+
 def evalb(expect, got, verbose=0, executable='../EVALB/evalb'):
     """Compute evalb score by running the official script.
 
@@ -130,6 +131,7 @@ def evalb(expect, got, verbose=0, executable='../EVALB/evalb'):
     f = float(f) / 100.0
     return 0.0 if np.isnan(f) else f
 
+
 def evalb_many(expect, got, executable='../EVALB/evalb'):
 
     if len(got) == 0:
@@ -163,13 +165,12 @@ def evalb_many(expect, got, executable='../EVALB/evalb'):
 
     return float(f) / 100.0
 
+
 if __name__ == '__main__':
     unofficial = lambda a,b: fpr(*evalb_unofficial(a, b))[0]
-
     assert abs(1.0 -
                evalb('(A (B b) (C c))',
                      Tree.fromstring('(A (B b) (C c))'))) <= 0.0
-
     assert abs(0.6667 -
                evalb('(A (B (B b)) (C (C c)))',
                      Tree.fromstring('(A0 (B (B b)) (C (C c)))'))) <= 0.0001
@@ -177,35 +178,7 @@ if __name__ == '__main__':
     assert abs(1.0 -
                unofficial('(A (B b) (C c))',
                           Tree.fromstring('(A (B b) (C c))'))) <= 0.0
-
     assert abs(0.6667 -
                unofficial('(A (B (B b)) (C (C c)))',
                           Tree.fromstring('(A0 (B (B b)) (C (C c)))'))) <= 0.0001
 
-    print evalb('(A (B (B b)) (C (C c)))',
-                     Tree.fromstring('(A0 (B (B b)) (C (C c)))'))
-
-    print evalb('(S (INTJ (UH No)) (, ,) (NP (PRP it)) (VP (VBD was (RB n\'t)) (NP (NNP Black) (NNP Monday))) (. .))',
-                Tree.fromstring('(S (INTJ (UH No)) (, ,) (NP (PRP it)) (VP (VBD was (RB n\'t)) (NP (NNP Black) (NNP Monday))) (. .))'))
-               #Tree.fromstring('( (S (INTJ (RB No)) (, ,) (NP (PRP it)) (VP (VBD was) (RB n\'t) (NP (NNP Black) (NNP Monday))) (. .))'))
-    '''
-    gold = "test.txt"
-    got = "output.txt"
-    score = 0
-    deno = 0
-    idx = 0
-    with open(gold, 'r') as gold_f, open(got, 'r') as got_f:
-        gold_lines = gold_f.readlines()
-        got_lines = got_f.readlines()
-
-        for i in xrange(2):
-            gd = gold_lines[i]
-            gt = got_lines[i]
-            if gt == "NO_PARSE":
-                continue
-            deno += 1
-            score += evalb(gt, Tree.fromstring(gd))
-
-        print score / deno
-    '''
-    #test_evalb_unofficial()

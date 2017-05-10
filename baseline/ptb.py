@@ -38,7 +38,7 @@ from nltk import Tree
 from util import remove_trace, binarize, collapse_self_transition
 
 
-PTB_ROOT = path('~/Desktop/research/wsj/').expanduser()
+PTB_ROOT = path('../../wsj').expanduser()
 
 
 class PTB(object):
@@ -135,7 +135,6 @@ def preprocess(t0):
 #                print yellow % '-----'
 
     return t
-
 
 def ptb(names='train', n=None, maxlength=None, minlength=None):
     """

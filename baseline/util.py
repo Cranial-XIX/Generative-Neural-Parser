@@ -6,7 +6,6 @@ from __future__ import division
 
 from nltk import Tree
 
-
 def oneline(t):
     "Write tree to a single line."
     return t._pformat_flat(nodesep='', parens='()', quotes=False)
