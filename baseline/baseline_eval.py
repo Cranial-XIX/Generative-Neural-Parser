@@ -14,13 +14,9 @@ def run(GrammarObject):
     t1 = time.time()
     #print "Reading grammar takes %.4f secs" % round(t1 - t0, 5)
 
-    grammer_obj.compute_sum_and_max_of_unary_combos()
-    t2 = time.time()
-    #print "Unary combos take %.4f secs" % round(t2 - t1, 5)
-    
     threshold = 1e-7
     grammer_obj.prune_unlikely_rules_and_lexicon(threshold)
-    t3 = time.time()
+    t2 = time.time()
     #print "Pruning rules and lexicon takes %.4f secs" % round(t3 - t2, 5)
 
     begin = time.time()
