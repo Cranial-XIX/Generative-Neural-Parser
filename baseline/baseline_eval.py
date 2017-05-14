@@ -14,11 +14,6 @@ def run(GrammarObject):
     t1 = time.time()
     #print "Reading grammar takes %.4f secs" % round(t1 - t0, 5)
 
-    threshold = 1e-7
-    grammer_obj.prune_unlikely_rules_and_lexicon(threshold)
-    t2 = time.time()
-    #print "Pruning rules and lexicon takes %.4f secs" % round(t3 - t2, 5)
-
     begin = time.time()
     examples = ptb("test", minlength=3, maxlength=20, n=10)
     test = list(examples)
@@ -30,7 +25,7 @@ def run(GrammarObject):
         #print "Inside-outside takes %.4f secs" % round(t4 - t3, 5)
 
         posterior_threshold = 0
-        grammer_obj.prune_the_chart(sentence, log_prob_sentence, posterior_threshold)
+        grammer_obj.prune_the_chart(log_prob_sentence, posterior_threshold)
         #t5 = time.time()
         #print "Pruning takes %.4f secs" % round(t5 - t4, 5)
 
@@ -39,7 +34,7 @@ def run(GrammarObject):
         #print "Parsing takes %.4f secs\n" % round(t6 - t5, 5)
 
         print "log of Pr( ", "sentence", ") = ", log_prob_sentence
-        print grammer_obj.debinarize(str)
+        print str
         
         tree = oneline(unbinarize(gold_tree))
         if str != "":
