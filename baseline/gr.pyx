@@ -79,6 +79,7 @@ cdef class GrammarObject(object):
     cdef object idx2w     # index to word
     cdef object prune_chart
     cdef object sen
+    cdef object sentence
 
     cdef int num_nt, num_words, N
 
@@ -283,7 +284,7 @@ cdef class GrammarObject(object):
                 cell = self.spandex[tri(i, k)]
                 for j in xrange(i+1, k):
                     for l in deref(self.spandex[tri(i, j)]):
-                        left = self.betas[i,j,l,1]
+                        left = self.betas[i,j,l,1] 
                         for br in deref(self.rule_y_xz[l]):
                             r = br.right
                             right = self.betas[j,k,r,1]
@@ -401,6 +402,7 @@ cdef class GrammarObject(object):
 
         n = self.N
         sen = self.sen
+        self.sentence = sentence.strip().split()
         chart = np.zeros((n,n+1,self.num_nt), dtype=Cell_dt)
 
         for ik in xrange(n*(n+1)//2):
@@ -454,7 +456,7 @@ cdef class GrammarObject(object):
                             if self.prune_chart[i,k,p]:
                                 newscore = br.weight * left * right
                                 if newscore > chart[i,k,p].score:
-                                    if self.betas[i,k,p,0] == 0:
+                                    if chart[i,k,p].score == 0:
                                         cell.push_back(p)
                                     chart[i,k,p].score = newscore
                                     chart[i,k,p].y = l
@@ -487,8 +489,8 @@ cdef class GrammarObject(object):
                     if chart[i,j,nt].score > 0:
                         print (i,j,self.idx2nt[nt])
         '''
-        print "root has proba", chart[0,n,0]
-        #return self.print_parse(0, n, ri)
+        #print "root has proba", chart[0,n,0]
+        return self.print_parse(0, n, ri)
 
     cpdef print_parse(self, int i, int k, int nt):
         cdef:
@@ -499,10 +501,9 @@ cdef class GrammarObject(object):
         z = self.chart[i,k,nt].z
         score = self.chart[i,k,nt].score
         j = self.chart[i,k,nt].j
-        print (y,z,score,j)
         if y == -1:
             # is terminal rule
-            return "(" + self.idx2nt[nt] + " " + self.sen[i] + ")"
+            return "(" + self.idx2nt[nt] + " " + self.sentence[i] + ")"
         elif z == -1:
             # unary rule
             return  "(" + self.idx2nt[nt] + " "  \

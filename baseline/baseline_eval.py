@@ -24,7 +24,7 @@ def run(GrammarObject):
         #t4 = time.time()
         #print "Inside-outside takes %.4f secs" % round(t4 - t3, 5)
 
-        posterior_threshold = 0
+        posterior_threshold = 1e-12
         grammer_obj.prune_the_chart(log_prob_sentence, posterior_threshold)
         #t5 = time.time()
         #print "Pruning takes %.4f secs" % round(t5 - t4, 5)
