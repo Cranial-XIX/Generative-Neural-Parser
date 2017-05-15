@@ -77,8 +77,6 @@ cdef class GrammarObject(object):
     cdef object idx2nt    # index to nonterminal
     cdef object w2idx     # word to index
     cdef object idx2w     # index to word
-    cdef object viterbi
-    cdef object bp
     cdef object prune_chart
     cdef object sen
 
@@ -94,6 +92,7 @@ cdef class GrammarObject(object):
 
     cdef double[:,:,:,:] betas
     cdef double[:,:,:,:] alphas
+    cdef Cell[:,:,:] chart
 
     def __init__(self):
         """
@@ -386,14 +385,13 @@ cdef class GrammarObject(object):
                         self.prune_chart[i,j,nt] = True
                     else:
                         deleted += 1
-        print "Pruned ", deleted, " number of rules"
+        print "Pruned ", deleted, " nonterminals"
 
     cpdef str parse(self, str sentence):
         cdef:
             int i, j, k, tag, w, l, r, p, c, n, ri, pp, ik
             str word
             double parent, left, right, child, newscore
-            double d, d_times_left, d_times_right
             UR ur
             BR br
             intvec tmp
@@ -403,11 +401,12 @@ cdef class GrammarObject(object):
 
         n = self.N
         sen = self.sen
-        chart = np.empty((n,n+1,self.num_nt), dtype=Cell_dt)
+        chart = np.zeros((n,n+1,self.num_nt), dtype=Cell_dt)
 
         for ik in xrange(n*(n+1)//2):
             self.spandex.push_back(new intvec())
 
+        ri = self.nt2idx['ROOT']
         # Do inside algorithm
         t0 = time.time()
 
@@ -416,7 +415,6 @@ cdef class GrammarObject(object):
             w = sen[i]
             k = i+1
             cell = self.spandex[tri(i, k)]
-
             for ur in deref(self.lexicon[w]):
                 tag = ur.parent
                 if self.prune_chart[i,k,tag]:
@@ -479,19 +477,38 @@ cdef class GrammarObject(object):
                 tmp.clear()
         t1 = time.time()
         self.spandex.clear()
+        self.chart = chart
         print "parsing takes ",t1 - t0
 
-    def print_parse(self, i, j, node, sen):
-        next = self.bp[i][j][node]
-        if next == None:
+        '''
+        for i in xrange(n):
+            for j in xrange(n+1):
+                for nt in xrange(self.num_nt):
+                    if chart[i,j,nt].score > 0:
+                        print (i,j,self.idx2nt[nt])
+        '''
+        print "root has proba", chart[0,n,0]
+        #return self.print_parse(0, n, ri)
+
+    cpdef print_parse(self, int i, int k, int nt):
+        cdef:
+            int y, z, j
+            double score
+
+        y = self.chart[i,k,nt].y
+        z = self.chart[i,k,nt].z
+        score = self.chart[i,k,nt].score
+        j = self.chart[i,k,nt].j
+        print (y,z,score,j)
+        if y == -1:
             # is terminal rule
-            return "(" + self.idx2nt[node] + " " + sen[i] + ")"
-        elif next[0] == None:
+            return "(" + self.idx2nt[nt] + " " + self.sen[i] + ")"
+        elif z == -1:
             # unary rule
-            return  "(" + self.idx2nt[node] + " "  \
-                + self.print_parse(i, j, next[2], sen) + ")" 
+            return  "(" + self.idx2nt[nt] + " "  \
+                + self.print_parse(i, k, y) + ")" 
         else:
             # binary rule
-            return  "(" + self.idx2nt[node] + " " \
-                + self.print_parse(i, next[0], next[1], sen) + " " \
-                + self.print_parse(next[0], j, next[2], sen) + ")"
+            return  "(" + self.idx2nt[nt] + " " \
+                + self.print_parse(i, j, y) + " " \
+                + self.print_parse(j, k, z) + ")"

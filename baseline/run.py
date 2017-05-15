@@ -16,7 +16,7 @@ def run(GrammarObject):
     with open(test, 'r') as file:
         i = 0
         for sentence in file:
-            if i == 10:
+            if i == 1:
                 break
             i += 1
             prob_sen = grammer_obj.do_inside_outside(sentence)
@@ -28,7 +28,7 @@ def run(GrammarObject):
             #t5 = time.time()
             #print "Pruning takes %.4f secs" % round(t5 - t4, 5)
 
-            grammer_obj.parse(sentence)
+            print grammer_obj.parse(sentence)
             #t6 = time.time()
             #print "Parsing takes %.4f secs\n" % round(t6 - t5, 5)
 

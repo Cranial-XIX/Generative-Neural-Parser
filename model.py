@@ -212,6 +212,7 @@ class LCNPModel(nn.Module):
         output = output.narrow(1, 0, n)
         lsm = nn.LogSoftmax()
 
+        start = time.time()
         ## pre-compute all probabilities
         h1 = output.repeat(self.nnt, 1, 1)
         h2 = output.unsqueeze(0).repeat(self.nnt, self.nnt, 1, 1)
@@ -232,12 +233,15 @@ class LCNPModel(nn.Module):
         p2l_pr = lsm(self.p2l(p2l_cond.view(-1, size[2]))).view(size[0], size[1], -1)
         # parent left to right
         pl2r_pr = lsm(self.pl2r(pl2r_cond.view(-1, size2[3]))).view(size2[0], size2[1], size2[2], -1)
-
+        end = time.time()
+        print "taks ", end - start
         # since for lexicon, Pr(x | P) = logsoftmax(A(Wx + b)). We
         # precompute AW and Ab here to speed up the computation
         w2v_w = self.word2vec.weight + self.word2vec_plus.weight
         ut_w = w2v_w.mm(self.ut.weight).t()
         ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
+
+
 
         ## Inside Algorithm
         iscore = [[[0 for k in xrange(self.nnt)] for j in xrange(n+1)] for i in xrange(n)]
