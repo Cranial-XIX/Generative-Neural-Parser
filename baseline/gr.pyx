@@ -238,11 +238,12 @@ cdef class GrammarObject(object):
 
         sen = []
         sentence = sentence.strip().split()
+
         n = len(sentence)
         self.N = n
         for i in xrange(n):
             word = sentence[i]
-            sen.append(self.w2idx[word]) if word in self.w2idx else 0
+            sen.append(self.w2idx[word] if word in self.w2idx else 0)
 
         self.sen = sen
         ri = self.nt2idx['ROOT']
@@ -489,7 +490,9 @@ cdef class GrammarObject(object):
                     if chart[i,j,nt].score > 0:
                         print (i,j,self.idx2nt[nt])
         '''
-        #print "root has proba", chart[0,n,0]
+        #print "root has proba", chart[0,n,ri]
+        if self.chart[0,n,ri].score == 0:
+            return ""   # No parse found
         return self.print_parse(0, n, ri)
 
     cpdef print_parse(self, int i, int k, int nt):
@@ -501,6 +504,7 @@ cdef class GrammarObject(object):
         z = self.chart[i,k,nt].z
         score = self.chart[i,k,nt].score
         j = self.chart[i,k,nt].j
+
         if y == -1:
             # is terminal rule
             return "(" + self.idx2nt[nt] + " " + self.sentence[i] + ")"
