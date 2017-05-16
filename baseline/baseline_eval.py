@@ -38,7 +38,7 @@ def run(GrammarObject):
         
         tree = oneline(unbinarize(gold_tree))
         if str != "":
-            tree_accruacy = evalb.evalb(tree, Tree.fromstring(str))
+            tree_accruacy = evalb.evalb(tree, unbinarize(Tree.fromstring(str)))
             cumul_accuracy += tree_accruacy
             num_trees_with_parse += 1
             print tree_accruacy
