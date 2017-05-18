@@ -10,6 +10,7 @@ import torch
 import constants
 import controller
 import data_processor
+import gr
 
 def main():
 
@@ -169,6 +170,7 @@ def main():
 
     p = data_processor.Processor(cmd_inp)
     p.read_and_process()
+    gr_Obj = gr.GrammarObject(p)
 
     if args.Mode == 'spv_train':
         # supervised training
@@ -193,7 +195,7 @@ def main():
                     break
             except (EOFError):
                 break
-            controller.parse_LCNP(p, sen2parse, cmd_inp)
+            controller.parse_LCNP(p, sen2parse, cmd_inp, gr_Obj)
     else:
         print "Cannot recognize the mode, should be chosen from " \
             "{spv_train, uspv_train, parse}"
