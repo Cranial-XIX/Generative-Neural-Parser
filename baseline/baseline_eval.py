@@ -1,5 +1,4 @@
 import gr
-import grammar
 import time
 
 import evalb
