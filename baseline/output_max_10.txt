@@ -1,0 +1,1840 @@
+inside  0.000971078872681
+outside  0.00155401229858
+Pruned  135  nonterminals
+parsing takes  0.00386619567871
+log of Pr(  sentence ) =  1.72926901172e-21
+(ROOT (S (@S (@S (@S (INTJ (UH No)) (, ,)) (NP (PRP it))) (VP (@VP (VBD was) (RB n't)) (NP (NNP Black) (NNP Monday)))) (. .)))
+1.0
+inside  0.000513076782227
+outside  0.00069785118103
+Pruned  57  nonterminals
+parsing takes  0.00230097770691
+log of Pr(  sentence ) =  9.38796687429e-20
+(ROOT (S (@S (NP (DT The) (JJ finger-pointing)) (VP (VBZ has) (ADJP (RB already) (VBN begun)))) (. .)))
+0.7273
+inside  0.000792026519775
+outside  0.00100302696228
+Pruned  71  nonterminals
+parsing takes  0.00281500816345
+log of Pr(  sentence ) =  7.8663866104e-20
+(ROOT (SINV (@SINV (`` ``) (S (NP (@NP (DT The) (NN equity)) (NN market)) (VP (VBD was) (ADJP (JJ illiquid))))) (. .)))
+0.7273
+inside  0.000660181045532
+outside  6.29425048828e-05
+Pruned  0  nonterminals
+parsing takes  5.00679016113e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00163006782532
+outside  0.00224804878235
+Pruned  169  nonterminals
+parsing takes  0.00710606575012
+log of Pr(  sentence ) =  2.09251369911e-27
+(ROOT (S (@S (NP (DT The) (NNP Dow)) (VP (@VP (VBD fell) (NP (CD 22.6) (NN %))) (PP (IN on) (NP (NNP Black) (NNP Monday))))) (. .)))
+1.0
+inside  0.000146150588989
+outside  0.000192880630493
+Pruned  23  nonterminals
+parsing takes  0.000448226928711
+log of Pr(  sentence ) =  8.95705309574e-12
+(ROOT (S (@S (NP (DT The) (NN market)) (VP (VBD crumbled))) (. .)))
+1.0
+inside  0.000294208526611
+outside  0.000392913818359
+Pruned  27  nonterminals
+parsing takes  0.000979900360107
+log of Pr(  sentence ) =  1.08286455691e-17
+(ROOT (S (@S (NP (DT These) (NNS stocks)) (VP (ADVP (RB eventually)) (VBN reopened))) (. .)))
+0.8
+inside  0.000236034393311
+outside  0.000355958938599
+Pruned  39  nonterminals
+parsing takes  0.00101709365845
+log of Pr(  sentence ) =  2.8594437596e-17
+(ROOT (S (@S (@S (CC But) (NP (NNS stocks))) (VP (VBD kept) (VP (VBG falling)))) (. .)))
+0.9091
+inside  0.00120997428894
+outside  0.00150990486145
+Pruned  133  nonterminals
+parsing takes  0.00743079185486
+log of Pr(  sentence ) =  1.53241407214e-25
+(ROOT (S (@S (NP (NNS Buyers)) (VP (@VP (VBD stepped) (PRT (RP in))) (PP (TO to) (NP (@NP (DT the) (NNS futures)) (NN pit))))) (. .)))
+0.8571
+inside  0.000479936599731
+outside  0.000653982162476
+Pruned  59  nonterminals
+parsing takes  0.00192999839783
+log of Pr(  sentence ) =  1.08343215805e-16
+(ROOT (S (@S (@S (CC But) (NP (EX there))) (VP (VBD were) (NP (DT no) (NNS buyers)))) (. .)))
+1.0
+inside  0.00113987922668
+outside  0.00149703025818
+Pruned  121  nonterminals
+parsing takes  0.00531697273254
+log of Pr(  sentence ) =  3.30929426779e-26
+(ROOT (S (ADVP (RB Just)) (VP (VBD thought) (S (@S (NP (PRP you)) (VP (MD 'd) (VP (VB like) (VP (TO to) (VP (VB know)))))) (. .)))))
+0.7273
+inside  0.00156092643738
+outside  0.00216007232666
+Pruned  244  nonterminals
+parsing takes  0.00631809234619
+log of Pr(  sentence ) =  1.15582777045e-26
+(ROOT (S (@S (NP (NP (NNP Hooker) (POS 's)) (NN philosophy)) (VP (VBD was) (VP (TO to) (VP (@VP (VB build) (CC and)) (VP (VB sell)))))) (. .)))
+0.875
+inside  0.000932931900024
+outside  0.00137400627136
+Pruned  173  nonterminals
+parsing takes  0.00499582290649
+log of Pr(  sentence ) =  1.48238475255e-21
+(ROOT (S (@S (NP (PRP We)) (VP (VBP want) (VP (TO to) (VP (VB build) (S (@S (CC and) (NP (NN hold))) (. .)))))) ('' '')))
+0.4
+inside  0.00162196159363
+outside  0.00212407112122
+Pruned  136  nonterminals
+parsing takes  0.00664091110229
+log of Pr(  sentence ) =  6.50848702825e-28
+(ROOT (SINV (@SINV (`` ``) (S (NP (DT This)) (VP (@VP (VBZ feels) (ADVP (RBR more))) (PP (IN like) (NP (@NP (DT a) (JJ one-shot)) (NN deal)))))) (. .)))
+0.6667
+inside  0.000349044799805
+outside  0.000565052032471
+Pruned  63  nonterminals
+parsing takes  0.00144505500793
+log of Pr(  sentence ) =  3.00148457418e-19
+(ROOT (S (@S (@S (NP (NNS People)) (VP (VBP are) (ADJP (RB n't) (VBG panicking)))) (. .)) ('' '')))
+0.8
+inside  0.000431060791016
+outside  0.000591039657593
+Pruned  101  nonterminals
+parsing takes  0.00150394439697
+log of Pr(  sentence ) =  4.37256193527e-17
+(ROOT (S (@S (NP (DT The) (NN test)) (VP (MD may) (VP (VB come) (NP (NN today))))) (. .)))
+1.0
+inside  0.00128722190857
+outside  0.00154185295105
+Pruned  141  nonterminals
+parsing takes  0.00446200370789
+log of Pr(  sentence ) =  3.14845797965e-25
+(ROOT (S (@S (@S (@S (CC But) (NP (NN fund) (NNS managers))) (VP (VBP say) (NP (PRP they)))) (VP (VBP 're) (ADJP (JJ ready)))) (. .)))
+0.75
+inside  0.00190305709839
+outside  0.00291395187378
+Pruned  112  nonterminals
+parsing takes  0.00977683067322
+log of Pr(  sentence ) =  1.48661021116e-30
+(ROOT (S (@S (NP (NN Trading) (NN volume)) (VP (VBD was) (ADJP (@ADJP (RB only) (RB modestly)) (ADJP (@ADJP (JJR higher) (IN than)) (JJ normal))))) (. .)))
+0.6667
+inside  0.00210785865784
+outside  0.00284194946289
+Pruned  299  nonterminals
+parsing takes  0.00826191902161
+log of Pr(  sentence ) =  3.15878190317e-29
+(ROOT (S (@S (@S (@S (ADVP (RB Still)) (, ,)) (NP (NN fund) (NNS groups))) (VP (@VP (VBP are) (RB n't)) (VP (VBG taking) (NP (DT any) (NNS chances))))) (. .)))
+1.0
+inside  0.00174117088318
+outside  0.00215983390808
+Pruned  227  nonterminals
+parsing takes  0.00855994224548
+log of Pr(  sentence ) =  3.48652389149e-25
+(ROOT (S (@S (@S (NP (DT The) (NNS centers)) (ADVP (RB normally))) (VP (VBP are) (VP (VBN closed) (PP (IN through) (NP (DT the) (NN weekend)))))) (. .)))
+0.875
+inside  0.00116896629333
+outside  9.29832458496e-05
+Pruned  0  nonterminals
+parsing takes  7.86781311035e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000247001647949
+outside  0.000341892242432
+Pruned  24  nonterminals
+parsing takes  0.00100302696228
+log of Pr(  sentence ) =  6.5838384161e-16
+(ROOT (S (@S (NP (DT The) (NN accord)) (VP (VBD expired) (NP (NN yesterday)))) (. .)))
+1.0
+inside  0.000446081161499
+outside  5.3882598877e-05
+Pruned  0  nonterminals
+parsing takes  5.96046447754e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000241994857788
+outside  2.00271606445e-05
+Pruned  0  nonterminals
+parsing takes  2.86102294922e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000373840332031
+outside  0.000555038452148
+Pruned  68  nonterminals
+parsing takes  0.00147199630737
+log of Pr(  sentence ) =  1.84560334484e-14
+(ROOT (SINV (@SINV (`` ``) (S (NP (DT The) (NNS projects)) (VP (VBP are) (ADJP (JJ big))))) (. .)))
+0.7273
+inside  0.00218105316162
+outside  0.00300002098083
+Pruned  197  nonterminals
+parsing takes  0.00838494300842
+log of Pr(  sentence ) =  4.35621476359e-28
+(ROOT (S (@S (`` ``) (S (@S (NP (PRP We)) (VP (@VP (ADVP (RB usually)) (VB operate)) (PP (IN in) (NP (@NP (DT that) (JJ conservative)) (NN manner))))) (. .))) ('' '')))
+0.8
+inside  0.00112509727478
+outside  0.00142693519592
+Pruned  56  nonterminals
+parsing takes  0.00513505935669
+log of Pr(  sentence ) =  5.44090509916e-29
+(ROOT (S (@S (@S (@S (ADVP (RB Now)) (NP (NNS producers))) (NP (NN hope) (NNS prices))) (VP (VBP have) (VP (VBD hit) (ADJP (JJ bottom))))) (. .)))
+0.6316
+inside  0.000134944915771
+outside  0.000184059143066
+Pruned  9  nonterminals
+parsing takes  0.000486850738525
+log of Pr(  sentence ) =  6.28146753986e-14
+(ROOT (S (@S (NP (DT Some)) (VP (VBP say) (NP (NNP November)))) (. .)))
+1.0
+inside  0.000195026397705
+outside  0.000303030014038
+Pruned  43  nonterminals
+parsing takes  0.000633955001831
+log of Pr(  sentence ) =  1.63533596102e-14
+(ROOT (S (@S (@S (NP (PRP I)) (VP (VBP say) (NP (CD 1992)))) (. .)) ('' '')))
+1.0
+inside  0.000453948974609
+outside  0.000635147094727
+Pruned  34  nonterminals
+parsing takes  0.00202608108521
+log of Pr(  sentence ) =  1.50598298472e-20
+(ROOT (S (@S (@S (ADVP (RB Then)) (NP (@NP (DT a) (JJ second)) (NN explosion))) (VP (VBD occurred))) (. .)))
+0.8889
+inside  0.00225210189819
+outside  0.00300788879395
+Pruned  264  nonterminals
+parsing takes  0.00946116447449
+log of Pr(  sentence ) =  9.47908633188e-30
+(ROOT (S (NP (CD Two) (NNS workers)) (VP (VBD died) (S (@S (@S (CC and) (NP (CD six))) (VP (VB remain) (PP (IN in) (NP (DT the) (NN hospital))))) (. .)))))
+0.7368
+inside  0.00192999839783
+outside  0.00399589538574
+Pruned  218  nonterminals
+parsing takes  0.0101161003113
+log of Pr(  sentence ) =  2.54429177265e-27
+(ROOT (S (@S (`` ``) (S (@S (@S (CC And) (ADVP (@ADVP (RB then) (NP (PRP you))) (RB still))) (VP (VBP have) (VP (TO to) (VP (VB negotiate))))) (. .))) ('' '')))
+0.75
+inside  0.00080394744873
+outside  0.00107312202454
+Pruned  71  nonterminals
+parsing takes  0.00326704978943
+log of Pr(  sentence ) =  3.69041178511e-27
+(ROOT (S (@S (NP (RB Not) (NN everything)) (VP (VBZ looks) (ADJP (JJ grim) (PP (IN for) (NP (NNP Quantum)))))) (. .)))
+0.8571
+inside  0.00266098976135
+outside  0.00333309173584
+Pruned  233  nonterminals
+parsing takes  0.0104320049286
+log of Pr(  sentence ) =  2.12719433832e-30
+(ROOT (S (@S (NP (NNP Petrolane)) (VP (VBZ is) (NP (NP (@NP (@NP (DT the) (JJ second-largest)) (NN propane)) (NN distributor)) (PP (IN in) (NP (DT the) (NNP U.S.)))))) (. .)))
+1.0
+inside  0.00032377243042
+outside  0.000501155853271
+Pruned  101  nonterminals
+parsing takes  0.00162196159363
+log of Pr(  sentence ) =  1.55042724603e-15
+(ROOT (S (@S (NP (NN Revenue)) (VP (VBD totaled) (NP (QP (@QP ($ $) (CD 5)) (CD million))))) (. .)))
+1.0
+inside  0.000743865966797
+outside  6.41345977783e-05
+Pruned  0  nonterminals
+parsing takes  4.05311584473e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000469923019409
+outside  7.10487365723e-05
+Pruned  0  nonterminals
+parsing takes  5.00679016113e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00174999237061
+outside  0.00235605239868
+Pruned  103  nonterminals
+parsing takes  0.00715804100037
+log of Pr(  sentence ) =  6.76035900781e-29
+(ROOT (S (@S (@S (NP (@NP (JJ Many) (VBN called)) (NP (PRP it))) (ADVP (RB simply))) (NP (NP (DT a) (NN contrast)) (PP (IN in) (NP (NNS styles))))) (. .)))
+0.7
+inside  0.00238513946533
+outside  0.00317001342773
+Pruned  135  nonterminals
+parsing takes  0.0101668834686
+log of Pr(  sentence ) =  5.32453543321e-32
+(ROOT (S (@S (@S (CC But) (NP (DT some) (NN saw))) (NP (NP (PRP it)) (PP (IN as) (NP (@NP (@NP (DT a) (JJ classic)) (VBG negotiating)) (NN tactic))))) (. .)))
+0.7143
+inside  0.000761032104492
+outside  0.000946044921875
+Pruned  95  nonterminals
+parsing takes  0.0031681060791
+log of Pr(  sentence ) =  1.52842206098e-21
+(ROOT (S (@S (NP (PRP I)) (VP (@VP (VBP do) (RB n't)) (VP (VBP feel) (ADJP (RB very) (JJ ferocious))))) (. .)))
+1.0
+inside  0.00169897079468
+outside  0.00228190422058
+Pruned  195  nonterminals
+parsing takes  0.00717115402222
+log of Pr(  sentence ) =  1.67168327712e-26
+(ROOT (S (@S (NP (PRP I)) (VP (@VP (VBP do) (RB n't)) (VP (VBP feel) (ADJP (@ADJP (@ADJP (RB either) (JJ hard)) (CC or)) (JJ soft))))) (. .)))
+1.0
+inside  0.00249481201172
+outside  0.00353312492371
+Pruned  301  nonterminals
+parsing takes  0.00980281829834
+log of Pr(  sentence ) =  9.70339492267e-27
+(ROOT (S (@S (NP (DT The) (NN company)) (VP (@VP (VBD did) (RB n't)) (VP (@VP (VB break) (PRT (RP out))) (NP (@NP (PRP$ its) (JJ fourth-quarter)) (NNS results))))) (. .)))
+1.0
+inside  0.000262022018433
+outside  0.000350952148438
+Pruned  35  nonterminals
+parsing takes  0.00116991996765
+log of Pr(  sentence ) =  9.2970259121e-15
+(ROOT (S (@S (NP (NNS Terms)) (VP (VBD were) (ADJP (RB n't) (VBN disclosed)))) (. .)))
+0.8
+inside  0.0018458366394
+outside  0.000105142593384
+Pruned  0  nonterminals
+parsing takes  7.86781311035e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.0011670589447
+outside  0.00148510932922
+Pruned  111  nonterminals
+parsing takes  0.00475311279297
+log of Pr(  sentence ) =  9.55270431745e-24
+(ROOT (S (@S (@S (@S (NP (PRP He)) (VP (VBD did) (ADJP (RB n't) (VBN forecast)))) (NP (NNP Phillips) (POS 's))) (NP (NNS results))) (. .)))
+0.5714
+inside  0.000261068344116
+outside  0.000335931777954
+Pruned  18  nonterminals
+parsing takes  0.00101804733276
+log of Pr(  sentence ) =  2.04761930925e-20
+(ROOT (S (@S (NP (NNS Companies)) (VP (@VP (VBD added) (NP (NN capacity))) (ADVP (RB furiously)))) (. .)))
+1.0
+inside  0.00082802772522
+outside  0.00106596946716
+Pruned  75  nonterminals
+parsing takes  0.00306987762451
+log of Pr(  sentence ) =  4.26326845612e-24
+(ROOT (S (@S (NP (NP (JJ Third-quarter) (NNS profits)) (PP (IN from) (NP (NN gasoline)))) (VP (VBD were) (ADJP (JJR weaker)))) (. .)))
+1.0
+inside  0.000508069992065
+outside  0.00121784210205
+Pruned  58  nonterminals
+parsing takes  0.00192213058472
+log of Pr(  sentence ) =  1.5859701538e-19
+(ROOT (S (@S (NP (@NP (DT The) (JJ main)) (NN reason)) (VP (VBZ remains) (NP (NN weather)))) (. .)))
+1.0
+inside  0.00167798995972
+outside  0.0023820400238
+Pruned  158  nonterminals
+parsing takes  0.00927686691284
+log of Pr(  sentence ) =  2.73814373582e-33
+(ROOT (S (@S (@S (NP (NNP Olivetti)) (ADVP (RB reportedly))) (VP (VBD began) (VP (@VP (VBG shipping) (NP (DT these) (NNS tools))) (PP (IN in) (NP (CD 1984)))))) (. .)))
+0.8421
+inside  0.000443935394287
+outside  5.69820404053e-05
+Pruned  0  nonterminals
+parsing takes  5.96046447754e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00237822532654
+outside  0.00317692756653
+Pruned  349  nonterminals
+parsing takes  0.00969195365906
+log of Pr(  sentence ) =  2.36942790834e-26
+(ROOT (S (@S (@S (@S (ADVP (RB However)) (, ,)) (NP (DT the) (NN agreement))) (VP (VBD was) (VP (VBN canceled) (PP (IN in) (NP (NNP June) (CD 1984)))))) (. .)))
+1.0
+inside  0.001708984375
+outside  0.00210499763489
+Pruned  116  nonterminals
+parsing takes  0.00806713104248
+log of Pr(  sentence ) =  3.81763722638e-31
+(ROOT (VP (@VP (@VP (VBG Looking) (ADVP (RB ahead))) (PP (TO to) (NP (@NP (JJ other) (NN commodity)) (NNS markets)))) (NP (@NP (DT this) (NN week)) (: :))))
+0.2857
+inside  8.29696655273e-05
+outside  0.000149011611938
+Pruned  6  nonterminals
+parsing takes  0.000236988067627
+log of Pr(  sentence ) =  2.13389829587e-15
+(ROOT (S (@S (NP (NN Ad) (NNS Notes)) (: ...)) (. .)))
+0.4
+inside  6.50882720947e-05
+outside  8.60691070557e-05
+Pruned  0  nonterminals
+parsing takes  0.000203132629395
+log of Pr(  sentence ) =  1.15198796296e-15
+(ROOT (NP (@NP (JJ NEW) (NN ACCOUNT)) (: :)))
+1.0
+inside  5.48362731934e-05
+outside  7.5101852417e-05
+Pruned  0  nonterminals
+parsing takes  0.000144004821777
+log of Pr(  sentence ) =  5.85682908622e-17
+(ROOT (NP (@NP (NNP ACCOUNT) (NNP REVIEW)) (: :)))
+1.0
+inside  1.90734863281e-06
+outside  1.71661376953e-05
+Pruned  0  nonterminals
+parsing takes  1.90734863281e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  9.53674316406e-07
+outside  5.96046447754e-06
+Pruned  0  nonterminals
+parsing takes  9.53674316406e-07
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000998020172119
+outside  0.00147986412048
+Pruned  152  nonterminals
+parsing takes  0.00358104705811
+log of Pr(  sentence ) =  5.07103705156e-22
+(ROOT (S (@S (`` ``) (S (@S (NP (NNS Retailers)) (VP (@VP (VBP are) (RB just)) (PP (IN in) (NP (NN disarray))))) (. .))) ('' '')))
+0.8571
+inside  0.000771045684814
+outside  0.00101089477539
+Pruned  100  nonterminals
+parsing takes  0.00340795516968
+log of Pr(  sentence ) =  6.74627724526e-20
+(ROOT (S (@S (NP (NP (@NP (DT The) (NN government)) (POS 's)) (NN action)) (VP (VBD was) (ADJP (JJ unusual)))) (. .)))
+1.0
+inside  0.00213289260864
+outside  0.00283408164978
+Pruned  195  nonterminals
+parsing takes  0.0130290985107
+log of Pr(  sentence ) =  3.40763261579e-36
+(ROOT (S (@S (NP (@NP (@NP (JJ French) (JJ state-owned)) (NNP Rhone-Poulenc)) (NNP S.A.)) (VP (@VP (VBZ holds) (ADJP (CD 51) (NN %))) (PP (IN of) (NP (NNP Merieux))))) (. .)))
+0.75
+inside  0.000847101211548
+outside  0.00121998786926
+Pruned  89  nonterminals
+parsing takes  0.00341296195984
+log of Pr(  sentence ) =  9.62468079672e-21
+(ROOT (S (@S (NP (@NP (DT The) (NN exchange)) (NN ratio)) (VP (VBD was) (ADJP (RB never) (VBN established)))) (. .)))
+0.7273
+inside  0.00162601470947
+outside  9.79900360107e-05
+Pruned  0  nonterminals
+parsing takes  5.96046447754e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000638008117676
+outside  0.000928163528442
+Pruned  68  nonterminals
+parsing takes  0.00295615196228
+log of Pr(  sentence ) =  1.48630141041e-23
+(ROOT (S (@S (@S (@S (PP (IN In) (NP (NNP Indianapolis))) (, ,)) (NP (NNP Lilly))) (VP (VBD declined) (VP (VB comment)))) (. .)))
+0.8571
+inside  0.000273942947388
+outside  0.000387907028198
+Pruned  36  nonterminals
+parsing takes  0.000920057296753
+log of Pr(  sentence ) =  4.61459321467e-16
+(ROOT (S (@S (NP (NNP Bristol-Myers)) (VP (VBD declined) (VP (TO to) (VP (VB comment))))) (. .)))
+0.9231
+inside  0.00156903266907
+outside  0.00241208076477
+Pruned  221  nonterminals
+parsing takes  0.00751209259033
+log of Pr(  sentence ) =  7.29071868081e-22
+(ROOT (S (@S (@S (@S (PP (IN In) (NP (NNP New) (NNP York))) (, ,)) (NP (DT the) (NN company))) (VP (VBD declined) (VP (VB comment)))) (. .)))
+0.8571
+inside  0.00144696235657
+outside  0.00191116333008
+Pruned  181  nonterminals
+parsing takes  0.00536394119263
+log of Pr(  sentence ) =  1.27730544449e-30
+(ROOT (S (@S (@S (@S (PP (IN In) (NP (NNP Kalamazoo))) (, ,)) (NP (@NP (NP (NNP Mich.)) (, ,)) (NNP Upjohn))) (VP (VBD declined) (VP (VB comment)))) (. .)))
+0.5882
+inside  0.00106382369995
+outside  0.00141406059265
+Pruned  136  nonterminals
+parsing takes  0.004478931427
+log of Pr(  sentence ) =  2.42382288194e-29
+(ROOT (S (@S (NP (PRP She)) (VP (@VP (VBD analyzed) (NP (NNS families))) (PP (IN by) (NP (@NP (PRP$ their) (VBG sleeping)) (NNS arrangements))))) (. .)))
+1.0
+inside  0.000234127044678
+outside  4.88758087158e-05
+Pruned  0  nonterminals
+parsing takes  5.00679016113e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00167918205261
+outside  0.00268983840942
+Pruned  291  nonterminals
+parsing takes  0.00599098205566
+log of Pr(  sentence ) =  3.5050737529e-31
+(ROOT (S (@S (@S (@S (@S (`` ``) (NP (@NP (DT An) (NNP L.A.)) (NN solution))) (, ,)) ('' '')) (VP (VBZ explains) (NP (NNP Mr.) (NNP Friedman)))) (. .)))
+0.5455
+inside  0.000285863876343
+outside  0.000414133071899
+Pruned  50  nonterminals
+parsing takes  0.000985860824585
+log of Pr(  sentence ) =  1.0376487044e-15
+(ROOT (S (@S (@S (NP (PRP He)) (VP (VBZ 's) (NP (DT a)))) (VP (VBD bore))) (. .)))
+0.5455
+inside  0.000459909439087
+outside  0.000626087188721
+Pruned  101  nonterminals
+parsing takes  0.0015811920166
+log of Pr(  sentence ) =  4.73659847878e-17
+(ROOT (SBARQ (@SBARQ (@SBARQ (`` ``) (WHADVP (WRB Where))) (SQ (VBZ 's) (NP (DT the) (NN leadership)))) (. ?)))
+0.9091
+inside  0.000434875488281
+outside  8.41617584229e-05
+Pruned  0  nonterminals
+parsing takes  6.19888305664e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00270891189575
+outside  0.00352811813354
+Pruned  215  nonterminals
+parsing takes  0.0141370296478
+log of Pr(  sentence ) =  2.22367379166e-30
+(ROOT (S (VP (VBZ Is) (SBAR (DT this) (S (@S (NP (@NP (DT the) (JJ wrong)) (NN time)) (VP (TO to) (VP (VB open) (NP (DT a) (NN store))))) (. ?))))))
+0.5263
+inside  0.000412940979004
+outside  6.48498535156e-05
+Pruned  0  nonterminals
+parsing takes  5.00679016113e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00227308273315
+outside  0.0049901008606
+Pruned  145  nonterminals
+parsing takes  0.0124130249023
+log of Pr(  sentence ) =  2.07033302048e-27
+(ROOT (S (@S (NP (@NP (@NP (DT The) (JJ American)) (NNP Stock)) (NNP Exchange)) (VP (@VP (VBN listed) (NP (NNS shares))) (PP (IN of) (NP (CD two) (NNS companies))))) (. .)))
+0.9333
+inside  0.000239133834839
+outside  0.000320911407471
+Pruned  30  nonterminals
+parsing takes  0.000927925109863
+log of Pr(  sentence ) =  1.7065857617e-15
+(ROOT (S (@S (NP (PRP It)) (VP (VBD had) (VP (VBD traded) (ADJP (JJ over-the-counter))))) (. .)))
+0.9231
+inside  0.000793933868408
+outside  0.00102806091309
+Pruned  77  nonterminals
+parsing takes  0.00316715240479
+log of Pr(  sentence ) =  9.5869500134e-24
+(ROOT (S (@S (NP (@NP (DT The) (NNS pharmaceuticals)) (NN maker)) (VP (VBD had) (VP (VBD traded) (ADJP (JJ over-the-counter))))) (. .)))
+0.9231
+inside  0.00171184539795
+outside  0.00218915939331
+Pruned  203  nonterminals
+parsing takes  0.00527405738831
+log of Pr(  sentence ) =  2.48852635036e-23
+(ROOT (S (@S (`` ``) (S (@S (NP (PRP You)) (VP (MD ca) (VP (@VP (ADVP (RB n't)) (VB live)) (PP (IN on) (NP (DT that)))))) (. .))) ('' '')))
+0.75
+inside  0.000711917877197
+outside  0.000978946685791
+Pruned  113  nonterminals
+parsing takes  0.00369191169739
+log of Pr(  sentence ) =  1.34623968196e-18
+(ROOT (S (@S (CC But) (SBAR (WHNP (WDT that)) (S (VP (@VP (MD wo) (RB n't)) (VP (VB be) (ADJP (JJ easy))))))) (. .)))
+0.7143
+inside  0.00143599510193
+outside  0.00223588943481
+Pruned  224  nonterminals
+parsing takes  0.00537705421448
+log of Pr(  sentence ) =  1.98079593109e-31
+(ROOT (S (@S (@S (@S (NP (NNP CNN)) (VP (VBZ wants) (VP (TO to) (VP (VB change) (NP (PRP$ its) (NNS viewers)))))) ('' ')) (NP (NNS habits))) (. .)))
+0.3529
+inside  0.00125598907471
+outside  9.98973846436e-05
+Pruned  0  nonterminals
+parsing takes  9.05990600586e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00079083442688
+outside  0.00104999542236
+Pruned  90  nonterminals
+parsing takes  0.00354480743408
+log of Pr(  sentence ) =  4.77024558576e-19
+(ROOT (S (@S (NP (NP (DT Some)) (PP (IN in) (NP (DT the) (NN industry)))) (VP (VBP are) (ADJP (JJ skeptical)))) (. .)))
+1.0
+inside  3.88622283936e-05
+outside  2.21729278564e-05
+Pruned  0  nonterminals
+parsing takes  1.90734863281e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000277996063232
+outside  3.88622283936e-05
+Pruned  0  nonterminals
+parsing takes  3.09944152832e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000729084014893
+outside  0.00106191635132
+Pruned  112  nonterminals
+parsing takes  0.00309109687805
+log of Pr(  sentence ) =  3.29228280205e-17
+(ROOT (S (@S (NP (@NP (DT A) (JJ new)) (NN president)) (VP (VBD was) (ADJP (RB n't) (VBN named)))) (. .)))
+0.8
+inside  0.00026798248291
+outside  0.000406980514526
+Pruned  52  nonterminals
+parsing takes  0.000895023345947
+log of Pr(  sentence ) =  7.33232110611e-15
+(ROOT (S (@S (NP (DT The) (NN device)) (VP (VBD was) (VP (VBD replaced)))) (. .)))
+1.0
+inside  0.00243806838989
+outside  0.00293612480164
+Pruned  285  nonterminals
+parsing takes  0.012818813324
+log of Pr(  sentence ) =  6.93208106779e-30
+(ROOT (S (@S (@S (NP (NNP DWG)) (VP (VBZ is) (NP (@NP (DT a) (VBG holding)) (NN company)))) (VP (VBN controlled) (PP (IN by) (NP (NNP Mr.) (NNP Posner))))) (. .)))
+0.8235
+inside  0.00052285194397
+outside  0.000669002532959
+Pruned  69  nonterminals
+parsing takes  0.00214791297913
+log of Pr(  sentence ) =  1.99383709148e-16
+(ROOT (S (@S (NP (DT The) (NN woman)) (VP (VBD won) (NP (DT the) (NN bet)))) (. .)))
+1.0
+inside  0.00346398353577
+outside  0.00425601005554
+Pruned  211  nonterminals
+parsing takes  0.0104811191559
+log of Pr(  sentence ) =  1.6986743801e-30
+(ROOT (S (@S (NP (@NP (JJS Most) (JJ British)) (NN programming)) (VP (@VP (VBZ is) (ADVP (RBR more))) (PP (IN of) (NP (@NP (DT an) (VBN acquired)) (NN taste))))) (. .)))
+0.8
+inside  0.00119495391846
+outside  0.00144386291504
+Pruned  79  nonterminals
+parsing takes  0.00510406494141
+log of Pr(  sentence ) =  1.04797581595e-23
+(ROOT (S (@S (@S (CC But) (ADVP (RB frequently) (RB there))) (VP (@VP (VBZ is) (RB n't)) (NP (JJ much) (NN choice)))) (. .)))
+0.7273
+inside  0.00269508361816
+outside  0.00314688682556
+Pruned  174  nonterminals
+parsing takes  0.0102369785309
+log of Pr(  sentence ) =  4.6342243862e-28
+(ROOT (S (@S (NP (DT The) (NNS companies)) (VP (VBP hope) (PP (IN for) (NP (NP (@NP (DT a) (JJ final)) (NN agreement)) (PP (IN by) (NP (NN year-end))))))) (. .)))
+1.0
+inside  0.00177311897278
+outside  0.00253987312317
+Pruned  136  nonterminals
+parsing takes  0.00724101066589
+log of Pr(  sentence ) =  2.15353481796e-27
+(ROOT (S (@S (NP (NP (NP (@NP (DT The) (NN venture)) (POS 's)) (NN importance)) (PP (IN for) (NP (NNP Thomson)))) (VP (VBZ is) (ADJP (JJ great)))) (. .)))
+1.0
+inside  0.00174403190613
+outside  0.00217199325562
+Pruned  128  nonterminals
+parsing takes  0.00665092468262
+log of Pr(  sentence ) =  4.34818151678e-23
+(ROOT (SINV (@SINV (@SINV (`` ``) (S (NP (PRP It)) (VP (VBZ 's) (ADJP (RB very) (JJ much))))) (NP (@NP (DT a) (VBG growing)) (NN concern))) (. .)))
+0.4615
+inside  0.00169205665588
+outside  0.00214099884033
+Pruned  131  nonterminals
+parsing takes  0.00735902786255
+log of Pr(  sentence ) =  6.93854587169e-23
+(ROOT (S (@S (@S (CC But) (SBAR (WHNP (WDT that)) (S (VP (@VP (VBD was) (RB all)) (PP (IN of) (NP (CD three) (NNS months))))))) (ADVP (RB ago))) (. .)))
+0.25
+inside  0.000164031982422
+outside  5.19752502441e-05
+Pruned  0  nonterminals
+parsing takes  5.00679016113e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00122499465942
+outside  0.00168204307556
+Pruned  172  nonterminals
+parsing takes  0.00480890274048
+log of Pr(  sentence ) =  4.2326151777e-25
+(ROOT (S (@S (NP (NNS Companies)) (VP (MD will) (VP (VB continue) (PP (TO to) (NP (NP (NN war)) (PP (IN over) (NP (NNS standards)))))))) (. .)))
+0.7
+inside  0.00177097320557
+outside  0.00291895866394
+Pruned  232  nonterminals
+parsing takes  0.00629901885986
+log of Pr(  sentence ) =  1.46281357314e-27
+(ROOT (S (@S (NP (NNP Aldus) (NNS officials)) (VP (@VP (MD could) (RB n't)) (VP (VB be) (VP (VBN reached) (PP (IN for) (NP (NN comment))))))) (. .)))
+1.0
+inside  0.0023980140686
+outside  0.00301003456116
+Pruned  286  nonterminals
+parsing takes  0.00940608978271
+log of Pr(  sentence ) =  6.43951668145e-28
+(ROOT (S (@S (NP (DT A) (NN bus)) (VP (VBZ is) (NP (NP (@NP (DT the) (NN data)) (NN highway)) (PP (IN within) (NP (DT a) (NN computer)))))) (. .)))
+1.0
+inside  0.000627994537354
+outside  7.79628753662e-05
+Pruned  0  nonterminals
+parsing takes  6.91413879395e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00108003616333
+outside  0.00151610374451
+Pruned  219  nonterminals
+parsing takes  0.00409197807312
+log of Pr(  sentence ) =  3.73086298439e-20
+(ROOT (S (@S (@S (CC But) (NP (PRP they))) (VP (MD will) (VP (VBP have) (VP (TO to) (VP (VB act) (ADVP (RB quickly))))))) (. .)))
+0.9412
+inside  0.000174999237061
+outside  3.69548797607e-05
+Pruned  0  nonterminals
+parsing takes  4.05311584473e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  5.10215759277e-05
+outside  1.19209289551e-05
+Pruned  0  nonterminals
+parsing takes  1.90734863281e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00100612640381
+outside  0.001384973526
+Pruned  121  nonterminals
+parsing takes  0.00429892539978
+log of Pr(  sentence ) =  1.38450999928e-25
+(ROOT (SINV (@SINV (ADVP (RB So)) (VP (VBP are) (NP (@NP (@NP (@NP (NP (NNP Indiana)) (, ,)) (NNP Ohio)) (CC and)) (NNP Michigan)))) (. .)))
+0.7273
+inside  3.09944152832e-05
+outside  3.2901763916e-05
+Pruned  0  nonterminals
+parsing takes  2.86102294922e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00218200683594
+outside  0.00300216674805
+Pruned  168  nonterminals
+parsing takes  0.00889992713928
+log of Pr(  sentence ) =  7.12183944191e-34
+(ROOT (SINV (@SINV (@SINV (PP (IN As) (NP (NNS people))) (VP (VB get) (ADJP (@ADJP (ADJP (RB even) (JJR older)) (, ,)) (JJ many)))) (VP (VB become) (VP (VBN widowed)))) (. .)))
+0.4211
+inside  0.000121116638184
+outside  4.60147857666e-05
+Pruned  0  nonterminals
+parsing takes  5.00679016113e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  7.00950622559e-05
+outside  9.29832458496e-05
+Pruned  17  nonterminals
+parsing takes  0.000272035598755
+log of Pr(  sentence ) =  5.15978334686e-14
+(ROOT (NP (@NP (NNS Odds) (CC and)) (NNS Ends)))
+1.0
+inside  0.00122499465942
+outside  0.00161910057068
+Pruned  158  nonterminals
+parsing takes  0.00497388839722
+log of Pr(  sentence ) =  2.71842819786e-27
+(ROOT (S (@S (NP (@NP (@NP (@NP (DT This) (JJ small)) (NNP Dallas)) (NN suburb)) (POS 's)) (VP (VBD got) (NP (NN trouble)))) (. .)))
+0.7273
+inside  0.00152206420898
+outside  0.00214099884033
+Pruned  215  nonterminals
+parsing takes  0.00573205947876
+log of Pr(  sentence ) =  1.70601133884e-26
+(ROOT (S (@S (@S (NP (PRP It)) (VP (MD would) (VP (@VP (VB open) (NP (DT a) (NN can))) (PP (IN of) (NP (NNS worms)))))) (. .)) ('' '')))
+0.9412
+inside  0.000447988510132
+outside  0.000661134719849
+Pruned  56  nonterminals
+parsing takes  0.00196599960327
+log of Pr(  sentence ) =  3.33641533231e-21
+(ROOT (SINV (@SINV (ADVP (RB Now)) (VP (VBZ comes) (NP (@NP (DT the) (NN pool)) (NN flap)))) (. .)))
+0.8
+inside  4.31537628174e-05
+outside  7.29560852051e-05
+Pruned  3  nonterminals
+parsing takes  0.000119924545288
+log of Pr(  sentence ) =  8.23217576015e-16
+(ROOT (SBARQ (WHNP (WRB Why) (JJ constructive)) (. ?)))
+0.5
+inside  0.00248289108276
+outside  0.00300693511963
+Pruned  156  nonterminals
+parsing takes  0.010509967804
+log of Pr(  sentence ) =  1.58454607959e-30
+(ROOT (S (@S (@S (CC But) (NP (DT these))) (VP (@VP (@VP (VBP are) (RB not)) (NP (DT the) (NNS differences))) (SBAR (WHNP (WDT that)) (S (VP (VB make) (NP (NNS headlines))))))) (. .)))
+0.9524
+inside  5.3882598877e-05
+outside  7.79628753662e-05
+Pruned  1  nonterminals
+parsing takes  0.0001540184021
+log of Pr(  sentence ) =  3.2485272977e-15
+(ROOT (S (@S (NP (NNP Sound)) (ADJP (JJ familiar))) (. ?)))
+0.75
+inside  0.000158071517944
+outside  0.000200033187866
+Pruned  3  nonterminals
+parsing takes  0.000548124313354
+log of Pr(  sentence ) =  5.99071485141e-17
+(ROOT (VP (VBN Heard) (PP (@PP (IN that) (IN before)) (. ?))))
+0.25
+inside  0.00120806694031
+outside  0.0016348361969
+Pruned  122  nonterminals
+parsing takes  0.00529193878174
+log of Pr(  sentence ) =  1.72760566498e-26
+(ROOT (S (@S (NP (NP (NNS Opponents)) (PP (IN of) (NP (DT the) (NN cut)))) (VP (VBP are) (VP (VBG playing) (NP (NN hardball))))) (. .)))
+1.0
+inside  0.00164699554443
+outside  0.00232100486755
+Pruned  233  nonterminals
+parsing takes  0.00647401809692
+log of Pr(  sentence ) =  9.49717283373e-27
+(ROOT (S (@S (@S (NP (DT The) (NNP House)) (VP (VBZ appears) (ADJP (JJ reluctant)))) (VP (TO to) (VP (VB join) (NP (DT the) (NNS senators))))) (. .)))
+0.7059
+inside  0.00109887123108
+outside  0.00170707702637
+Pruned  91  nonterminals
+parsing takes  0.00463700294495
+log of Pr(  sentence ) =  1.42626566717e-25
+(ROOT (S (@S (@S (NP (NNS Things)) (VP (@VP (VBD had) (ADJP (RB just) (VBN gone))) (ADVP (RB too) (RB far)))) (. .)) ('' '')))
+0.7692
+inside  0.000108957290649
+outside  0.000161170959473
+Pruned  12  nonterminals
+parsing takes  0.000366926193237
+log of Pr(  sentence ) =  4.17636002124e-16
+(ROOT (S (@S (IN Among) (NP (PRP$ its) (NNS provisions))) (: :)))
+0.5714
+inside  0.00166893005371
+outside  0.00250911712646
+Pruned  231  nonterminals
+parsing takes  0.00730514526367
+log of Pr(  sentence ) =  2.28035926296e-23
+(ROOT (S (@S (NP (@NP (DT A) (JJ similar)) (NN provision)) (VP (VBZ is) (PP (IN in) (NP (@NP (DT the) (NNP House)) (NN version))))) (. .)))
+1.0
+inside  0.00104689598083
+outside  0.00142312049866
+Pruned  177  nonterminals
+parsing takes  0.00431489944458
+log of Pr(  sentence ) =  3.12950695678e-26
+(ROOT (S (@S (NP (@NP (NNP John) (NNP E.)) (NNP Yang)) (VP (VBN contributed) (PP (TO to) (NP (DT this) (NN article))))) (. .)))
+1.0
+inside  4.91142272949e-05
+outside  2.59876251221e-05
+Pruned  0  nonterminals
+parsing takes  3.09944152832e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00103998184204
+outside  0.001384973526
+Pruned  190  nonterminals
+parsing takes  0.00636792182922
+log of Pr(  sentence ) =  2.32601582839e-27
+(ROOT (S (@S (NP (PRP$ Your) (NN paper)) (VP (VBZ needs) (NP (@NP (@NP (DT a) (JJ serious)) (NN reality)) (NN check)))) (. .)))
+1.0
+inside  8.9168548584e-05
+outside  0.000152826309204
+Pruned  12  nonterminals
+parsing takes  0.00026798248291
+log of Pr(  sentence ) =  2.71597627465e-14
+(ROOT (S (@S (@S (NP (NNP Cambridge)) (, ,)) (NP (NNP Mass))) (. .)))
+0.5
+inside  0.00103998184204
+outside  0.00165390968323
+Pruned  192  nonterminals
+parsing takes  0.00326108932495
+log of Pr(  sentence ) =  8.04837794077e-37
+(ROOT (S (@S (NP (@NP (NNP FRANKLIN) (NNPS SAVINGS)) (NNP ASSOCIATION)) (PRN (@PRN (-LRB- -LRB-) (NP (@NP (NP (NNP Ottawa)) (, ,)) (NNP Kan.))) (-RRB- -RRB-))) (: --)))
+0.7692
+inside  0.00188899040222
+outside  0.00248193740845
+Pruned  100  nonterminals
+parsing takes  0.00838685035706
+log of Pr(  sentence ) =  2.21524354307e-34
+(ROOT (VP (@VP (VBZ Does) (NP (DT this) (NN signal))) (S (@S (NP (@NP (DT another) (NNP Black)) (NNP Monday)) (VP (VBZ is) (VP (VBG coming)))) (. ?))))
+0.5
+inside  5.19752502441e-05
+outside  9.89437103271e-05
+Pruned  1  nonterminals
+parsing takes  0.000148057937622
+log of Pr(  sentence ) =  1.32617922222e-13
+(ROOT (NP (@NP (NNP Joseph) (NNP Granville)) (. .)))
+1.0
+inside  0.0011990070343
+outside  0.00171613693237
+Pruned  124  nonterminals
+parsing takes  0.00496792793274
+log of Pr(  sentence ) =  7.67422838009e-26
+(ROOT (S (@S (NP (PRP I)) (VP (@VP (VB see) (NP (@NP (DT no) (JJ major)) (NN support))) (PP (IN until) (NP (CD 2200))))) (. .)))
+0.9333
+inside  1.31130218506e-05
+outside  1.90734863281e-05
+Pruned  0  nonterminals
+parsing takes  1.90734863281e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000603199005127
+outside  0.000893831253052
+Pruned  162  nonterminals
+parsing takes  0.00203800201416
+log of Pr(  sentence ) =  2.36202135754e-19
+(ROOT (S (@S (@S (NP (PRP$ My) (NN advice)) (VP (VBZ is) (VP (TO to) (VP (VB buy))))) (. .)) ('' '')))
+0.9231
+inside  4.6968460083e-05
+outside  6.98566436768e-05
+Pruned  1  nonterminals
+parsing takes  0.000126838684082
+log of Pr(  sentence ) =  1.36780883338e-13
+(ROOT (NP (@NP (NNP Ned) (NNP Davis)) (. .)))
+1.0
+inside  0.00159001350403
+outside  0.00215315818787
+Pruned  114  nonterminals
+parsing takes  0.00709414482117
+log of Pr(  sentence ) =  1.06762887157e-25
+(ROOT (SINV (@SINV (`` ``) (S (NP (NN Margin) (NN debt)) (VP (@VP (VBD was) (PP (IN at) (NP (DT a) (NN record)))) (ADVP (RB high))))) (. .)))
+0.5333
+inside  0.00220513343811
+outside  0.00402402877808
+Pruned  132  nonterminals
+parsing takes  0.0101208686829
+log of Pr(  sentence ) =  2.49412251217e-32
+(ROOT (S (@S (@S (NP (EX There)) (VP (@VP (VBD was) (NP (@NP (JJ tremendous) (JJ public)) (NN enthusiasm))) (PP (IN for) (NP (NN stock))))) (NP (JJ mutual) (NNS funds))) (. .)))
+0.5
+inside  0.00072717666626
+outside  7.29560852051e-05
+Pruned  0  nonterminals
+parsing takes  8.10623168945e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00142216682434
+outside  0.00309491157532
+Pruned  210  nonterminals
+parsing takes  0.00621795654297
+log of Pr(  sentence ) =  1.92547354096e-24
+(ROOT (S (@S (`` ``) (S (@S (NP (PRP I)) (VP (VBP guess) (SBAR (WHNP (WDT that)) (S (VP (VBZ 's) (NP (PRP$ my) (NN forecast))))))) (. .))) ('' '')))
+0.7368
+inside  5.79357147217e-05
+outside  2.90870666504e-05
+Pruned  0  nonterminals
+parsing takes  2.86102294922e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00158882141113
+outside  0.00217819213867
+Pruned  220  nonterminals
+parsing takes  0.00608801841736
+log of Pr(  sentence ) =  6.46126116585e-25
+(ROOT (S (@S (@S (@S (PP (IN Unlike) (NP (CD 1987))) (, ,)) (NP (DT the) (NN dollar))) (VP (VBZ has) (VP (VBN been) (ADJP (JJ strong))))) (. .)))
+1.0
+inside  0.00251793861389
+outside  0.00330591201782
+Pruned  187  nonterminals
+parsing takes  0.00851321220398
+log of Pr(  sentence ) =  1.07586702977e-27
+(ROOT (S (@S (`` ``) (SBAR (IN So) (S (@S (NP (PRP it)) (VP (VBZ 's) (NP (@NP (DT a) (ADJP (RB very) (JJ mixed))) (NN bag)))) (. .)))) ('' '')))
+0.8571
+inside  5.41210174561e-05
+outside  3.09944152832e-05
+Pruned  0  nonterminals
+parsing takes  3.09944152832e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  4.48226928711e-05
+outside  7.60555267334e-05
+Pruned  1  nonterminals
+parsing takes  0.000152111053467
+log of Pr(  sentence ) =  2.79260997359e-14
+(ROOT (NP (@NP (NNP Mario) (NNP Gabelli)) (. .)))
+1.0
+inside  5.79357147217e-05
+outside  8.70227813721e-05
+Pruned  1  nonterminals
+parsing takes  0.000148057937622
+log of Pr(  sentence ) =  1.89464190937e-13
+(ROOT (NP (@NP (NNP Jim) (NNP Rogers)) (. .)))
+1.0
+inside  1.71661376953e-05
+outside  1.8835067749e-05
+Pruned  0  nonterminals
+parsing takes  3.09944152832e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000107049942017
+outside  0.000171899795532
+Pruned  14  nonterminals
+parsing takes  0.000460863113403
+log of Pr(  sentence ) =  6.64356405894e-17
+(ROOT (S (@S (NP (NNP Frank)) (NP (NNP W.) (NNP Terrizzi))) (. .)))
+0.3333
+inside  0.000192880630493
+outside  0.000306129455566
+Pruned  53  nonterminals
+parsing takes  0.000607967376709
+log of Pr(  sentence ) =  4.03550863886e-13
+(ROOT (S (@S (@S (@S (INTJ (UH Yes)) (, ,)) (NP (PRP he))) (VP (VBD did))) (. .)))
+1.0
+inside  2.38418579102e-05
+outside  1.90734863281e-05
+Pruned  0  nonterminals
+parsing takes  2.86102294922e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000643968582153
+outside  0.00105690956116
+Pruned  139  nonterminals
+parsing takes  0.00247097015381
+log of Pr(  sentence ) =  4.41589798693e-20
+(ROOT (S (@S (@S (@S (ADVP (RB Apparently)) (, ,)) (NP (PRP$ their) (NN verdict))) (VP (VBZ is) (PRT (RP in)))) (. .)))
+0.8333
+inside  0.000761985778809
+outside  0.000988960266113
+Pruned  70  nonterminals
+parsing takes  0.00336813926697
+log of Pr(  sentence ) =  7.41774394275e-25
+(ROOT (S (@S (@S (ADVP (RB Right) (RB now)) (NP (PRP they))) (VP (VBP 're) (VP (VBG pursuing) (NP (NN evidence))))) (. .)))
+1.0
+inside  0.00197386741638
+outside  0.00283408164978
+Pruned  421  nonterminals
+parsing takes  0.00687217712402
+log of Pr(  sentence ) =  2.35349498264e-30
+(ROOT (S (@S (@S (@S (INTJ (@INTJ (UH Ah) (, ,)) (INTJ (UH yes))) (, ,)) (NP (NN something))) (VP (VBD called) (NP (@NP (DT a) (NNP Star)) (NNP Chamber)))) (. .)))
+0.625
+inside  0.000908851623535
+outside  0.00117802619934
+Pruned  36  nonterminals
+parsing takes  0.00421905517578
+log of Pr(  sentence ) =  2.52427776219e-24
+(ROOT (S (@S (NP (DT No)) (VP (VBP doubt) (SBAR (WHNP (WDT that)) (S (VP (VBZ 's) (ADJP (RB partially) (JJ true))))))) (. .)))
+0.4706
+inside  0.00217795372009
+outside  0.00290489196777
+Pruned  206  nonterminals
+parsing takes  0.00939893722534
+log of Pr(  sentence ) =  3.3601202464e-36
+(ROOT (S (@S (@S (@S (NP (PRP it)) (VP (VBD defended) (NP (@NP (JJ appropriate) (JJ constitutional)) (NNS safeguards)))) (CC and)) (NP (@NP (JJ practical) (JJ common)) (NN sense))) (. .)))
+0.7692
+inside  0.00109696388245
+outside  0.00142407417297
+Pruned  203  nonterminals
+parsing takes  0.00633192062378
+log of Pr(  sentence ) =  9.64665474861e-28
+(ROOT (S (@S (@S (NP (NNS Individuals)) (VP (@VP (MD can) (RB always)) (VP (VB have) (NP (PRP$ their) (NNS hands))))) (VP (VBD slapped))) (. .)))
+0.625
+inside  0.002601146698
+outside  0.00318789482117
+Pruned  207  nonterminals
+parsing takes  0.00980305671692
+log of Pr(  sentence ) =  3.39950012833e-31
+(ROOT (S (@S (@S (NP (PRP I)) (VP (@VP (VBP do) (RB not)) (PP (IN by) (NP (DT any) (NNS means))))) (VP (VB defend) (NP (NNP HUD) (NN management)))) (. .)))
+0.875
+inside  2.8133392334e-05
+outside  2.78949737549e-05
+Pruned  0  nonterminals
+parsing takes  2.86102294922e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  5.48362731934e-05
+outside  2.59876251221e-05
+Pruned  0  nonterminals
+parsing takes  1.90734863281e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  7.41481781006e-05
+outside  1.28746032715e-05
+Pruned  0  nonterminals
+parsing takes  9.53674316406e-07
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000123977661133
+outside  0.00017786026001
+Pruned  19  nonterminals
+parsing takes  0.000491857528687
+log of Pr(  sentence ) =  1.23546758815e-14
+(ROOT (S (@S (ADVP (RB Just)) (NP (DT a) (NN coincidence))) (. ?)))
+0.2857
+inside  0.000251054763794
+outside  0.000342130661011
+Pruned  60  nonterminals
+parsing takes  0.000921964645386
+log of Pr(  sentence ) =  1.18488145727e-13
+(ROOT (S (@S (@S (CC But) (NP (PRP they))) (VP (VBP are) (VP (VBN worried)))) (. .)))
+0.8
+inside  0.000962018966675
+outside  0.00118803977966
+Pruned  123  nonterminals
+parsing takes  0.00307011604309
+log of Pr(  sentence ) =  1.6196458194e-22
+(ROOT (S (@S (NP (@NP (NP (NNP Nasdaq) (POS 's)) (JJS biggest)) (NNS stocks)) (VP (VBD were) (VP (VBN hammered)))) (. .)))
+1.0
+inside  0.000282049179077
+outside  0.000381946563721
+Pruned  46  nonterminals
+parsing takes  0.00101590156555
+log of Pr(  sentence ) =  5.03437486656e-14
+(ROOT (S (@S (@S (CC But) (NP (PRP they))) (VP (VBD fell) (ADVP (RB sharply)))) (. .)))
+1.0
+inside  0.00183701515198
+outside  0.00347304344177
+Pruned  168  nonterminals
+parsing takes  0.00733995437622
+log of Pr(  sentence ) =  8.64625026711e-26
+(ROOT (S (@S (NP (NP (DT The) (NN turnover)) (PP (IN in) (NP (DT both) (NNS issues)))) (VP (VBD was) (ADJP (RB roughly) (JJ normal)))) (. .)))
+1.0
+inside  0.000242948532104
+outside  4.91142272949e-05
+Pruned  0  nonterminals
+parsing takes  2.86102294922e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000328779220581
+outside  0.000524044036865
+Pruned  65  nonterminals
+parsing takes  0.00134897232056
+log of Pr(  sentence ) =  1.27747805682e-20
+(ROOT (NP (NAC (@NAC (@NAC (@NAC (NNP Friday) (, ,)) (NNP October)) (CD 13)) (, ,)) (NNP 1989)))
+0.8
+inside  6.19888305664e-05
+outside  7.79628753662e-05
+Pruned  1  nonterminals
+parsing takes  0.000163793563843
+log of Pr(  sentence ) =  8.35914984012e-15
+(ROOT (NP (@NP (JJ PRIME) (NN RATE)) (: :)))
+1.0
+inside  0.000118017196655
+outside  0.000173091888428
+Pruned  6  nonterminals
+parsing takes  0.000438928604126
+log of Pr(  sentence ) =  3.25394831613e-12
+(ROOT (S (@S (NP (CD 10)) (ADJP (CD 1\/2) (NN %))) (. .)))
+0.2857
+inside  6.19888305664e-05
+outside  7.89165496826e-05
+Pruned  0  nonterminals
+parsing takes  0.000157117843628
+log of Pr(  sentence ) =  7.10221153466e-15
+(ROOT (X (@X (JJ FEDERAL) (NNS FUNDS)) (: :)))
+0.5
+inside  0.00115489959717
+outside  0.00230622291565
+Pruned  169  nonterminals
+parsing takes  0.00373816490173
+log of Pr(  sentence ) =  1.94435969284e-34
+(ROOT (S (@S (@S (NP (@NP (@NP (NP (NN Source)) (: :)) (NNP Fulton)) (NNP Prebon)) (PRN (@PRN (-LRB- -LRB-) (NP (NNP U.S.A) (. .))) (-RRB- -RRB-))) (NP (NNP Inc))) (. .)))
+0.5
+inside  0.000204086303711
+outside  0.000252962112427
+Pruned  0  nonterminals
+parsing takes  0.000211954116821
+log of Pr(  sentence ) =  2.30860020936e-15
+(ROOT (NP (@NP (JJ DISCOUNT) (NN RATE)) (: :)))
+1.0
+inside  5.00679016113e-05
+outside  7.39097595215e-05
+Pruned  1  nonterminals
+parsing takes  0.000141143798828
+log of Pr(  sentence ) =  5.98260314917e-10
+(ROOT (FRAG (ADJP (CD 7) (NN %)) (. .)))
+0.4
+inside  5.81741333008e-05
+outside  8.08238983154e-05
+Pruned  0  nonterminals
+parsing takes  0.000174045562744
+log of Pr(  sentence ) =  1.8636873445e-15
+(ROOT (NP (@NP (JJ CALL) (NN MONEY)) (: :)))
+1.0
+inside  0.000811100006104
+outside  0.00105905532837
+Pruned  48  nonterminals
+parsing takes  0.00347900390625
+log of Pr(  sentence ) =  3.23498119089e-19
+(ROOT (S (@S (NP (QP (CD 9) (CD 3\/4)) (NN %)) (PP (TO to) (NP (CD 10) (NN %)))) (. .)))
+0.2222
+inside  0.00233602523804
+outside  0.00335478782654
+Pruned  173  nonterminals
+parsing takes  0.0146811008453
+log of Pr(  sentence ) =  7.3215866645e-38
+(ROOT (S (NP (JJ COMMERCIAL) (NN PAPER)) (VP (@VP (VBN placed) (ADVP (RB directly))) (PP (IN by) (NP (@NP (@NP (@NP (NNP General) (NNPS Motors)) (NNP Acceptance)) (NNP Corp.)) (: :))))))
+0.4286
+inside  6.00814819336e-05
+outside  8.48770141602e-05
+Pruned  0  nonterminals
+parsing takes  0.000185012817383
+log of Pr(  sentence ) =  7.19300771814e-15
+(ROOT (NP (@NP (JJ COMMERCIAL) (NN PAPER)) (: :)))
+1.0
+inside  0.000139951705933
+outside  0.000187873840332
+Pruned  4  nonterminals
+parsing takes  0.000480175018311
+log of Pr(  sentence ) =  8.58068691276e-21
+(ROOT (NP (NP (NNS CERTIFICATES)) (PP (IN OF) (NP (NNP DEPOSIT) (: :)))))
+0.6
+inside  0.000523090362549
+outside  0.000720024108887
+Pruned  101  nonterminals
+parsing takes  0.00207018852234
+log of Pr(  sentence ) =  3.14783417352e-17
+(ROOT (S (@S (NP (@NP (DT The) (JJ minimum)) (NN unit)) (VP (VBZ is) (NP ($ $) (CD 100,000)))) (. .)))
+1.0
+inside  0.000811815261841
+outside  0.00101518630981
+Pruned  62  nonterminals
+parsing takes  0.00356101989746
+log of Pr(  sentence ) =  5.30125760103e-22
+(ROOT (NP (NP (JJ Typical) (NNS rates)) (PP (IN in) (NP (@NP (@NP (DT the) (JJ secondary)) (NN market)) (: :)))))
+0.6
+inside  5.29289245605e-05
+outside  7.39097595215e-05
+Pruned  0  nonterminals
+parsing takes  0.000133991241455
+log of Pr(  sentence ) =  2.27655002108e-16
+(ROOT (NP (@NP (NNPS BANKERS) (NNPS ACCEPTANCES)) (: :)))
+1.0
+inside  0.000150918960571
+outside  0.000180006027222
+Pruned  3  nonterminals
+parsing takes  0.000488042831421
+log of Pr(  sentence ) =  8.54466975486e-21
+(ROOT (S (@S (@S (NP (NNP LONDON)) (ADVP (RB LATE))) (NP (NNS EURODOLLARS))) (: :)))
+0.2857
+inside  0.000753164291382
+outside  0.00115084648132
+Pruned  88  nonterminals
+parsing takes  0.00260400772095
+log of Pr(  sentence ) =  3.03837627659e-32
+(ROOT (S (@S (NP (@NP (@NP (NNP LONDON) (NNP INTERBANK)) (NNP OFFERED)) (NNS RATES)) (PRN (@PRN (-LRB- -LRB-) (NP (NNP LIBOR))) (-RRB- -RRB-))) (: :)))
+0.8
+inside  0.000159978866577
+outside  0.000223875045776
+Pruned  3  nonterminals
+parsing takes  0.000571966171265
+log of Pr(  sentence ) =  7.30786295071e-20
+(ROOT (NP (@NP (@NP (JJ FOREIGN) (JJ PRIME)) (NNPS RATES)) (: :)))
+1.0
+inside  6.103515625e-05
+outside  9.48905944824e-05
+Pruned  0  nonterminals
+parsing takes  0.000144004821777
+log of Pr(  sentence ) =  1.02624419463e-15
+(ROOT (NP (@NP (NNP TREASURY) (NNPS BILLS)) (: :)))
+1.0
+inside  0.00240683555603
+outside  0.00317907333374
+Pruned  180  nonterminals
+parsing takes  0.00913286209106
+log of Pr(  sentence ) =  9.80302774775e-36
+(ROOT (S (@S (@S (NP (QP (@QP (CD 7.63) (NN %)) (CD 13)) (NNS weeks)) (: ;)) (NP (QP (@QP (CD 7.60) (NN %)) (CD 26)) (NNS weeks))) (. .)))
+0.4286
+inside  0.000375032424927
+outside  0.000550031661987
+Pruned  47  nonterminals
+parsing takes  0.00137996673584
+log of Pr(  sentence ) =  3.89567067346e-22
+(ROOT (S (@S (@S (NP (NN Source)) (: :)) (NP (@NP (NNP Telerate) (NNPS Systems)) (NNP Inc))) (. .)))
+0.75
+inside  0.00116896629333
+outside  0.00165104866028
+Pruned  201  nonterminals
+parsing takes  0.00356101989746
+log of Pr(  sentence ) =  9.54220006219e-35
+(ROOT (S (@S (NP (@NP (@NP (NNP FEDERAL) (NNP NATIONAL)) (NNP MORTGAGE)) (NNP ASSOCIATION)) (PRN (@PRN (-LRB- -LRB-) (NP (NNP Fannie) (NNP Mae))) (-RRB- -RRB-))) (: :)))
+0.8
+inside  0.000388860702515
+outside  0.000572204589844
+Pruned  47  nonterminals
+parsing takes  0.0014111995697
+log of Pr(  sentence ) =  3.89567067346e-22
+(ROOT (S (@S (@S (NP (NN Source)) (: :)) (NP (@NP (NNP Telerate) (NNPS Systems)) (NNP Inc))) (. .)))
+0.75
+inside  0.000484943389893
+outside  0.000617980957031
+Pruned  38  nonterminals
+parsing takes  0.001877784729
+log of Pr(  sentence ) =  1.12856889647e-29
+(ROOT (NP (@NP (@NP (@NP (@NP (NNP MERRILL) (NNP LYNCH)) (NNP READY)) (NNPS ASSETS)) (NNP TRUST)) (: :)))
+1.0
+inside  4.50611114502e-05
+outside  7.29560852051e-05
+Pruned  1  nonterminals
+parsing takes  0.000144958496094
+log of Pr(  sentence ) =  2.70156684103e-11
+(ROOT (FRAG (ADJP (CD 8.33) (NN %)) (. .)))
+0.4
+inside  0.0010941028595
+outside  0.00142002105713
+Pruned  117  nonterminals
+parsing takes  0.00621008872986
+log of Pr(  sentence ) =  1.23653324995e-21
+(ROOT (S (@S (@S (CC And) (NP (PRP they))) (VP (VBP plan) (VP (TO to) (VP (VB buy) (NP (JJR more) (NN today)))))) (. .)))
+0.75
+inside  0.000732898712158
+outside  0.000988006591797
+Pruned  72  nonterminals
+parsing takes  0.00322699546814
+log of Pr(  sentence ) =  1.24891621527e-21
+(ROOT (S (@S (@S (ADVP (RB Then)) (NP (PRP he))) (VP (VBD jumped) (PP (IN into) (NP (DT the) (NN market))))) (: :)))
+0.9231
+inside  0.00105500221252
+outside  0.00146007537842
+Pruned  129  nonterminals
+parsing takes  0.00430107116699
+log of Pr(  sentence ) =  1.59112706486e-27
+(ROOT (S (@S (@S (NP (@NP (JJ Other) (NN money)) (NNS managers)) (ADVP (RB also))) (VP (VBD opened) (NP (PRP$ their) (NNS wallets)))) (. .)))
+1.0
+inside  0.00217008590698
+outside  0.00318789482117
+Pruned  347  nonterminals
+parsing takes  0.00800514221191
+log of Pr(  sentence ) =  8.23875406343e-29
+(ROOT (S (@S (NP (PRP It)) (VP (MD can) (VP (VB happen) (SBAR (IN before) (S (@S (NP (PRP you)) (VP (MD can) (VP (VB turn) (PRT (RP around))))) (. .)))))) ('' '')))
+0.5455
+inside  0.000524997711182
+outside  0.000645875930786
+Pruned  35  nonterminals
+parsing takes  0.00206708908081
+log of Pr(  sentence ) =  2.43071162038e-18
+(ROOT (S (@S (NP (@NP (PDT All) (DT that)) (ADVP (RB now))) (VP (VBZ has) (VP (VBN changed)))) (. .)))
+0.8333
+inside  5.50746917725e-05
+outside  7.08103179932e-05
+Pruned  4  nonterminals
+parsing takes  0.000127077102661
+log of Pr(  sentence ) =  1.45247658895e-13
+(ROOT (S (VP (VB Consider) (NP (DT this))) (: :)))
+1.0
+inside  0.000385999679565
+outside  0.000554084777832
+Pruned  38  nonterminals
+parsing takes  0.00147700309753
+log of Pr(  sentence ) =  7.51513577477e-18
+(ROOT (SBARQ (@SBARQ (@SBARQ (`` ``) (WHNP (WDT That))) (SQ (@SQ (VBD did) (RB not)) (VP (VB happen)))) (. .)))
+0.4
+inside  0.00236487388611
+outside  0.00359511375427
+Pruned  286  nonterminals
+parsing takes  0.0094211101532
+log of Pr(  sentence ) =  3.08931928751e-29
+(ROOT (S (@S (@S (@S (CC But) (NP (DT some) (NNS players))) (VP (VBD were) (ADJP (JJ quick)))) (VP (TO to) (VP (VB seize) (NP (DT the) (NN moment))))) (. .)))
+0.7059
+inside  0.00155901908875
+outside  0.00161981582642
+Pruned  194  nonterminals
+parsing takes  0.00514388084412
+log of Pr(  sentence ) =  3.39214063707e-26
+(ROOT (S (@S (NP (QP (@QP ($ $) (CD 15.2)) (CD billion))) (PP (IN of) (NP (ADJP (@ADJP (JJ three-month) (CC and)) (JJ six-month)) (NNS bills)))) (. .)))
+0.8571
+inside  0.000646114349365
+outside  0.000669002532959
+Pruned  81  nonterminals
+parsing takes  0.00197911262512
+log of Pr(  sentence ) =  3.51496727471e-20
+(ROOT (S (@S (NP (QP (@QP ($ $) (CD 9.75)) (CD billion))) (PP (IN of) (NP (JJ 52-week) (NNS bills)))) (. .)))
+0.8333
+inside  0.000498056411743
+outside  0.000607013702393
+Pruned  36  nonterminals
+parsing takes  0.00177097320557
+log of Pr(  sentence ) =  1.16680308032e-24
+(ROOT (NP (@NP (@NP (@NP (@NP (NNP Connecticut) (NNP Light)) (CC &)) (NNP Power)) (NNP Co.)) (: --)))
+1.0
+inside  0.0001380443573
+outside  3.2901763916e-05
+Pruned  0  nonterminals
+parsing takes  4.05311584473e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00208783149719
+outside  0.00295901298523
+Pruned  157  nonterminals
+parsing takes  0.012974023819
+log of Pr(  sentence ) =  9.02659931937e-32
+(ROOT (S (@S (@S (NP (@NP (QP (CD Four) (CD million)) (JJ common)) (NNS shares)) (, ,)) (PP (IN via) (NP (@NP (NNP Salomon) (NNPS Brothers)) (NNP Inc)))) (. .)))
+0.8333
+inside  0.000124931335449
+outside  0.000169992446899
+Pruned  11  nonterminals
+parsing takes  0.000427007675171
+log of Pr(  sentence ) =  1.27270218019e-17
+(ROOT (NP (@NP (@NP (NNP Baldwin) (NNP Technology)) (NNP Co.)) (: --)))
+1.0
+inside  0.000118970870972
+outside  0.000160932540894
+Pruned  11  nonterminals
+parsing takes  0.000458002090454
+log of Pr(  sentence ) =  2.61549768547e-17
+(ROOT (NP (@NP (@NP (NNP Blockbuster) (NNP Entertainment)) (NNP Corp.)) (: --)))
+1.0
+inside  0.000130176544189
+outside  0.000178813934326
+Pruned  9  nonterminals
+parsing takes  0.000418901443481
+log of Pr(  sentence ) =  2.48837217378e-16
+(ROOT (NP (@NP (@NP (NNP Chase) (NNP Manhattan)) (NNP Corp.)) (: --)))
+1.0
+inside  5.79357147217e-05
+outside  8.41617584229e-05
+Pruned  2  nonterminals
+parsing takes  0.000162839889526
+log of Pr(  sentence ) =  9.50053403852e-14
+(ROOT (NP (@NP (NNP Comcast) (NNP Corp.)) (: --)))
+1.0
+inside  0.00220918655396
+outside  0.00280094146729
+Pruned  260  nonterminals
+parsing takes  0.00668907165527
+log of Pr(  sentence ) =  1.09099903373e-28
+(ROOT (S (@S (@S (NP (@NP (QP (@QP ($ $) (CD 150)) (CD million)) (JJ convertible)) (NNS debentures)) (, ,)) (PP (IN via) (NP (NNP Merrill) (NNP Lynch)))) (. .)))
+0.7692
+inside  1.81198120117e-05
+outside  2.47955322266e-05
+Pruned  0  nonterminals
+parsing takes  2.14576721191e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00150680541992
+outside  0.00202012062073
+Pruned  138  nonterminals
+parsing takes  0.0064651966095
+log of Pr(  sentence ) =  1.8032446757e-27
+(ROOT (S (@S (@S (NP (@NP (QP (CD 1.3) (CD million)) (JJ common)) (NNS shares)) (, ,)) (PP (IN via) (NP (NNP Merrill) (NNP Lynch)))) (. .)))
+0.8333
+inside  0.000133991241455
+outside  0.00018310546875
+Pruned  12  nonterminals
+parsing takes  0.000498056411743
+log of Pr(  sentence ) =  1.18933313622e-17
+(ROOT (NP (@NP (@NP (NNP Eastern) (NNPS Utilities)) (NNPS Associates)) (: --)))
+1.0
+inside  0.00148010253906
+outside  0.00201082229614
+Pruned  135  nonterminals
+parsing takes  0.00633001327515
+log of Pr(  sentence ) =  2.69095199736e-27
+(ROOT (S (@S (@S (NP (@NP (QP (CD 1.5) (CD million)) (JJ common)) (NNS shares)) (, ,)) (PP (IN via) (NP (NNP PaineWebber) (NNP Inc)))) (. .)))
+0.8333
+inside  0.000261068344116
+outside  0.000356912612915
+Pruned  12  nonterminals
+parsing takes  0.00108003616333
+log of Pr(  sentence ) =  2.37928189166e-23
+(ROOT (S (NP (NNP Employee) (NNP Benefit)) (VP (VBZ Plans) (NP (NNP Inc.) (: --)))))
+0.2857
+inside  5.48362731934e-05
+outside  7.5101852417e-05
+Pruned  2  nonterminals
+parsing takes  0.000130891799927
+log of Pr(  sentence ) =  2.98386279726e-13
+(ROOT (NP (@NP (NNP Exabyte) (NNP Corp.)) (: --)))
+1.0
+inside  0.00106000900269
+outside  0.00147700309753
+Pruned  104  nonterminals
+parsing takes  0.00431394577026
+log of Pr(  sentence ) =  5.65828881903e-28
+(ROOT (S (@S (@S (NP (@NP (CD 2,850,000) (JJ common)) (NNS shares)) (, ,)) (PP (IN via) (NP (NNP Goldman) (NNP Sachs)))) (. .)))
+0.8
+inside  1.71661376953e-05
+outside  2.38418579102e-05
+Pruned  0  nonterminals
+parsing takes  3.09944152832e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00148105621338
+outside  0.00215196609497
+Pruned  138  nonterminals
+parsing takes  0.00786995887756
+log of Pr(  sentence ) =  2.04246721544e-28
+(ROOT (S (@S (@S (NP (@NP (QP (CD 2.4) (CD million)) (JJ common)) (NNS shares)) (, ,)) (PP (IN via) (NP (NNP Montgomery) (NNPS Securities)))) (. .)))
+0.8333
+inside  9.79900360107e-05
+outside  0.000150918960571
+Pruned  11  nonterminals
+parsing takes  0.000262022018433
+log of Pr(  sentence ) =  3.83566996706e-15
+(ROOT (NP (@NP (@NP (NP (NNP Washington)) (, ,)) (NNP D.C.)) (: --)))
+0.8571
+inside  0.000285863876343
+outside  0.000375032424927
+Pruned  25  nonterminals
+parsing takes  0.00106191635132
+log of Pr(  sentence ) =  1.19126463546e-22
+(ROOT (NP (@NP (@NP (@NP (NNP Virginia) (NNP Public)) (NNP School)) (NNP Authority)) (: --)))
+1.0
+inside  8.20159912109e-05
+outside  0.000136852264404
+Pruned  11  nonterminals
+parsing takes  0.000265836715698
+log of Pr(  sentence ) =  2.02926885146e-15
+(ROOT (NP (@NP (@NP (NP (NNP Austin)) (, ,)) (NNP Texas)) (: --)))
+0.8571
+inside  0.000447034835815
+outside  0.000580072402954
+Pruned  42  nonterminals
+parsing takes  0.00184798240662
+log of Pr(  sentence ) =  8.41680377493e-27
+(ROOT (NP (@NP (@NP (@NP (@NP (NNP California) (NNP Health)) (NNPS Facilities)) (NNP Financing)) (NNP Authority)) (: --)))
+1.0
+inside  0.000422954559326
+outside  0.000550031661987
+Pruned  32  nonterminals
+parsing takes  0.00185799598694
+log of Pr(  sentence ) =  2.78406442663e-29
+(ROOT (NP (@NP (@NP (@NP (@NP (NNP Pennsylvania) (NNP Higher)) (NNP Education)) (NNPS Facilities)) (NNP Authority)) (: --)))
+1.0
+inside  0.000116109848022
+outside  0.000166893005371
+Pruned  9  nonterminals
+parsing takes  0.00042200088501
+log of Pr(  sentence ) =  3.42312982635e-18
+(ROOT (NP (@NP (@NP (NNP Tennessee) (NNP Valley)) (NNP Authority)) (: --)))
+1.0
+inside  0.00168704986572
+outside  0.00233507156372
+Pruned  112  nonterminals
+parsing takes  0.0072181224823
+log of Pr(  sentence ) =  2.33675156524e-33
+(ROOT (NP (NP (NNP University)) (PP (IN of) (NP (NP (@NP (NNP Medicine) (CC And)) (NNP Dentistry)) (PP (IN of) (NP (@NP (NNP New) (NNP Jersey)) (: --)))))))
+0.5333
+inside  0.00199294090271
+outside  0.00317621231079
+Pruned  158  nonterminals
+parsing takes  0.00865578651428
+log of Pr(  sentence ) =  4.43486740814e-41
+(ROOT (S (@S (@S (@S (@S (NP (@NP (NNP West) (NNP Virginia)) (NNPS Parkways)) (, ,)) (NP (NNP Economic) (NNP Development))) (CC And)) (NP (NNP Tourism) (NNP Authority))) (: --)))
+0.4444
+inside  0.00021505355835
+outside  0.000331163406372
+Pruned  28  nonterminals
+parsing takes  0.000802993774414
+log of Pr(  sentence ) =  6.45993754193e-18
+(ROOT (NP (@NP (@NP (NP (NNP San) (NNP Antonio)) (, ,)) (NNP Texas)) (: --)))
+0.8571
+inside  0.000481843948364
+outside  5.69820404053e-05
+Pruned  0  nonterminals
+parsing takes  6.19888305664e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00229692459106
+outside  0.00292611122131
+Pruned  120  nonterminals
+parsing takes  0.0110621452332
+log of Pr(  sentence ) =  7.54213303828e-30
+(ROOT (S (@S (@S (@S (CC But) (NP (PRP he))) (VP (@VP (VBZ 's) (ADJP (@ADJP (RB not) (RB so)) (JJ sure))) (PP (IN about) (NP (NN everyone))))) (ADVP (RB else))) (. .)))
+0.4706
+inside  0.000823974609375
+outside  0.00103998184204
+Pruned  95  nonterminals
+parsing takes  0.00298404693604
+log of Pr(  sentence ) =  7.2518554885e-20
+(ROOT (S (@S (NP (PRP I)) (VP (VBP 'm) (VP (VBG going) (VP (TO to) (VP (VB hold) (PRT (RP on))))))) (. .)))
+0.9412
+inside  0.000613927841187
+outside  0.000893115997314
+Pruned  70  nonterminals
+parsing takes  0.00254583358765
+log of Pr(  sentence ) =  1.69397100983e-21
+(ROOT (S (@S (@S (@S (ADVP (RB Now)) (NP (PRP it))) (VP (VBZ 's) (VP (VBG happening) (ADVP (RB again))))) (. .)) ('' '')))
+1.0
+inside  0.000910043716431
+outside  7.9870223999e-05
+Pruned  0  nonterminals
+parsing takes  7.15255737305e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000741958618164
+outside  0.000908136367798
+Pruned  107  nonterminals
+parsing takes  0.00493192672729
+log of Pr(  sentence ) =  1.4452684202e-16
+(ROOT (SINV (@SINV (`` ``) (S (NP (PRP I)) (VP (@VP (VBD got) (PRT (RP out))) (PP (IN in) (NP (CD 1987)))))) (. .)))
+0.6667
+inside  0.000408172607422
+outside  7.39097595215e-05
+Pruned  0  nonterminals
+parsing takes  9.05990600586e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  8.01086425781e-05
+outside  2.78949737549e-05
+Pruned  0  nonterminals
+parsing takes  3.09944152832e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000284910202026
+outside  2.19345092773e-05
+Pruned  0  nonterminals
+parsing takes  2.86102294922e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000189065933228
+outside  0.000310897827148
+Pruned  43  nonterminals
+parsing takes  0.000805139541626
+log of Pr(  sentence ) =  1.09139153198e-13
+(ROOT (S (@S (@S (NP (PRP It)) (VP (VBZ 's) (ADJP (JJ huge)))) (. .)) ('' '')))
+1.0
+inside  0.00157713890076
+outside  0.00209999084473
+Pruned  51  nonterminals
+parsing takes  0.00550079345703
+log of Pr(  sentence ) =  5.0525533233e-34
+(ROOT (S (@S (@S (NP (NP (VBG Making) (NNS computers)) (ADJP (JJR smaller))) (ADVP (RB often))) (VP (VBZ means) (VP (VBG sacrificing) (NP (NN memory))))) (. .)))
+0.6667
+inside  0.00240802764893
+outside  0.00417685508728
+Pruned  151  nonterminals
+parsing takes  0.0101029872894
+log of Pr(  sentence ) =  1.07673999126e-37
+(ROOT (S (@S (@S (NP (@NP (@NP (NN Size) (CC and)) (NN weight)) (NNS considerations)) (ADVP (RB also))) (VP (VB have) (NP (@NP (JJ limited) (NN screen)) (NNS displays)))) (. .)))
+0.7692
+inside  0.000818014144897
+outside  8.70227813721e-05
+Pruned  0  nonterminals
+parsing takes  5.96046447754e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00107407569885
+outside  0.00174808502197
+Pruned  110  nonterminals
+parsing takes  0.00533699989319
+log of Pr(  sentence ) =  1.14508692992e-21
+(ROOT (S (@S (NP (NNS Analysts)) (VP (@VP (VBP do) (RB n't)) (VP (@VP (VB see) (NP (PRP it))) (PP (IN that) (NP (NN way)))))) (. .)))
+0.8
+inside  0.000265121459961
+outside  0.000364065170288
+Pruned  22  nonterminals
+parsing takes  0.00137996673584
+log of Pr(  sentence ) =  1.20355913263e-19
+(ROOT (FRAG (@FRAG (WHNP (WP What)) (PP (IN about) (NP (NNP Big) (NNP Blue)))) (. ?)))
+0.7273
+inside  4.10079956055e-05
+outside  7.00950622559e-05
+Pruned  5  nonterminals
+parsing takes  0.000113010406494
+log of Pr(  sentence ) =  6.53140449265e-14
+(ROOT (SBARQ (@SBARQ (WHNP (WP What)) (SQ (VB plunge))) (. ?)))
+0.2857
+inside  0.000828981399536
+outside  8.79764556885e-05
+Pruned  0  nonterminals
+parsing takes  8.10623168945e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.0010621547699
+outside  3.79085540771e-05
+Pruned  0  nonterminals
+parsing takes  5.96046447754e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000744104385376
+outside  0.000992059707642
+Pruned  121  nonterminals
+parsing takes  0.00299191474915
+log of Pr(  sentence ) =  4.911516299e-23
+(ROOT (S (@S (NP (DT That)) (VP (MD will) (VP (VB spur) (NP (NP (NNP Tandem) (POS 's)) (NN growth))))) (. .)))
+1.0
+inside  0.000262975692749
+outside  0.000342845916748
+Pruned  7  nonterminals
+parsing takes  0.00105905532837
+log of Pr(  sentence ) =  2.38631135285e-17
+(ROOT (S (VP (@VP (VBP Do) (RB n't)) (S (@S (NP (NN jump)) (ADVP (RB yet))) (. .)))))
+0.5455
+inside  0.000144958496094
+outside  4.10079956055e-05
+Pruned  0  nonterminals
+parsing takes  5.00679016113e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.00251603126526
+outside  0.00332307815552
+Pruned  280  nonterminals
+parsing takes  0.0110719203949
+log of Pr(  sentence ) =  1.52877286687e-28
+(ROOT (S (@S (NP (@NP (DT The) (JJ financial-services)) (NN industry)) (VP (VBD was) (VP (VBN battered) (PP (IN by) (NP (@NP (DT the) (CD 1987)) (NN crash)))))) (. .)))
+1.0
+inside  0.000123977661133
+outside  0.000190019607544
+Pruned  25  nonterminals
+parsing takes  0.000434875488281
+log of Pr(  sentence ) =  1.16056947195e-13
+(ROOT (S (@S (NP (NN Growth)) (VP (VBZ is) (ADJP (JJR slower)))) (. .)))
+1.0
+inside  0.000125885009766
+outside  0.000189065933228
+Pruned  28  nonterminals
+parsing takes  0.000429153442383
+log of Pr(  sentence ) =  4.32873242879e-14
+(ROOT (S (@S (NP (NNS Profits)) (VP (VBP are) (ADJP (JJR softer)))) (. .)))
+1.0
+inside  0.000242948532104
+outside  0.000348091125488
+Pruned  48  nonterminals
+parsing takes  0.000903129577637
+log of Pr(  sentence ) =  6.70496572076e-20
+(ROOT (S (@S (NP (NN Debt) (NNS burdens)) (VP (VBP are) (ADJP (JJR heavier)))) (. .)))
+1.0
+inside  0.00223708152771
+outside  0.00340509414673
+Pruned  205  nonterminals
+parsing takes  0.00828289985657
+log of Pr(  sentence ) =  5.92758813075e-28
+(ROOT (S (@S (`` ``) (S (@S (NP (NP (DT A) (NN lot)) (PP (IN of) (NP (JJ pent-up) (NN demand)))) (VP (VBZ is) (VP (VBN gone)))) (. .))) ('' '')))
+0.9412
+inside  0.00114798545837
+outside  0.00147485733032
+Pruned  74  nonterminals
+parsing takes  0.00635886192322
+log of Pr(  sentence ) =  1.16394385748e-24
+(ROOT (S (@S (@S (`` ``) (S (NP (DT That)) (VP (VBD was) (VP (VBN offset) (PP (IN by) (NP (NN strength))))))) (ADVP (RB elsewhere))) (. .)))
+0.5556
+inside  0.00228714942932
+outside  0.00305104255676
+Pruned  176  nonterminals
+parsing takes  0.0101020336151
+log of Pr(  sentence ) =  1.96340003632e-34
+(ROOT (S (@S (NP (NNS Surveys)) (VP (VBD suggested) (SBAR (WHNP (WDT that)) (S (NP (NN consumer) (NN confidence)) (VP (VBD was) (ADJP (JJ high) (PP (IN before) (NP (NNP Friday))))))))) (. .)))
+0.8696
+inside  0.000800132751465
+outside  0.00100493431091
+Pruned  148  nonterminals
+parsing takes  0.00395488739014
+log of Pr(  sentence ) =  1.10756479375e-22
+(ROOT (S (@S (NP (DT The) (NNS doomsayers)) (VP (VBD had) (NP (@NP (DT a) (JJ receptive)) (NN audience)))) (. .)))
+1.0
+inside  0.000685930252075
+outside  0.000954866409302
+Pruned  129  nonterminals
+parsing takes  0.00300407409668
+log of Pr(  sentence ) =  1.51934393616e-18
+(ROOT (S (@S (@S (NP (PRP They)) (VP (VBP are) (ADJP (RBR more) (JJ sophisticated)))) (NP (DT this) (NN time))) (. .)))
+0.8333
+inside  0.00228095054626
+outside  0.00384497642517
+Pruned  298  nonterminals
+parsing takes  0.0124349594116
+log of Pr(  sentence ) =  6.10854798916e-27
+(ROOT (S (@S (NP (@NP (DT A) (NNP Dow)) (NN spokeswoman)) (VP (VBD declined) (VP (TO to) (VP (VB comment) (PP (IN on) (NP (DT the) (NNS estimates))))))) (. .)))
+0.9412
+inside  0.000797033309937
+outside  7.39097595215e-05
+Pruned  0  nonterminals
+parsing takes  7.86781311035e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000377893447876
+outside  0.00082802772522
+Pruned  76  nonterminals
+parsing takes  0.00224590301514
+log of Pr(  sentence ) =  3.28670343642e-19
+(ROOT (S (@S (NP (NNP Du) (NNP Pont)) (VP (VBD declined) (VP (TO to) (VP (VB comment))))) (. .)))
+0.9231
+inside  0.000269889831543
+outside  0.000380039215088
+Pruned  36  nonterminals
+parsing takes  0.00100111961365
+log of Pr(  sentence ) =  2.68009238593e-16
+(ROOT (S (@S (NP (NNP Monsanto)) (VP (VBD declined) (VP (TO to) (VP (VB comment))))) (. .)))
+0.9231
+inside  0.000143051147461
+outside  0.000197887420654
+Pruned  11  nonterminals
+parsing takes  0.000512838363647
+log of Pr(  sentence ) =  1.02821989407e-15
+(ROOT (NP (@NP (@NP (NNP Dow) (NNP Chemical)) (NNP Co.)) (: --)))
+1.0
+inside  5.19752502441e-05
+outside  2.59876251221e-05
+Pruned  0  nonterminals
+parsing takes  3.09944152832e-06
+log of Pr(  sentence ) =  0.0
+
+No parse!
+inside  0.000440120697021
+outside  0.000564813613892
+Pruned  40  nonterminals
+parsing takes  0.00224804878235
+log of Pr(  sentence ) =  6.06094415892e-24
+(ROOT (NP (@NP (@NP (@NP (@NP (NNP Federal) (NNP Home)) (NNP Loan)) (NNP Mortgage)) (NNP Corp.)) (: --)))
+1.0
+inside  0.000452995300293
+outside  0.000596046447754
+Pruned  40  nonterminals
+parsing takes  0.00194311141968
+log of Pr(  sentence ) =  6.06094415892e-24
+(ROOT (NP (@NP (@NP (@NP (@NP (NNP Federal) (NNP Home)) (NNP Loan)) (NNP Mortgage)) (NNP Corp.)) (: --)))
+1.0
+inside  0.00075101852417
+outside  0.000951051712036
+Pruned  87  nonterminals
+parsing takes  0.0039439201355
+log of Pr(  sentence ) =  1.36973516514e-23
+(ROOT (S (@S (NP (NN Pricing) (NNS details)) (VP (VBD were) (ADJP (@ADJP (RB n't) (RB immediately)) (JJ available)))) (. .)))
+0.8
+inside  0.000626087188721
+outside  0.00069785118103
+Pruned  40  nonterminals
+parsing takes  0.00243902206421
+log of Pr(  sentence ) =  6.06094415892e-24
+(ROOT (NP (@NP (@NP (@NP (@NP (NNP Federal) (NNP Home)) (NNP Loan)) (NNP Mortgage)) (NNP Corp.)) (: --)))
+1.0
+inside  0.00233316421509
+outside  0.00468182563782
+Pruned  308  nonterminals
+parsing takes  0.0118069648743
+log of Pr(  sentence ) =  8.18269851451e-28
+(ROOT (S (@S (NP (DT The) (NN collateral)) (VP (VBZ is) (VP (VBG being) (VP (VBN sold) (PP (IN by) (NP (@NP (DT a) (NN thrift)) (NN institution))))))) (. .)))
+1.0
+Parsing takes 4.6679 secs
+
+Fraction of trees with parse = 0.8168
+
+Parsing accuracy = 0.8059
+
