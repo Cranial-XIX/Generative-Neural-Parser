@@ -57,7 +57,7 @@ ctypedef BRvv    *BRv
 ctypedef URvv    *URv
 ctypedef BRFvv   *BRFv
 
-cdef double log_zero = -100000
+cdef double log_zero = -1000000
 '''
 cdef double logsumexp(double a, double b):
     cdef double m
@@ -108,10 +108,10 @@ cdef class GrammarObject(object):
             self.idx2nt = processor.idx2Nonterm
             self.w2idx = processor.word2Idx
             self.idx2w = processor.idx2Word
-            self.num_nt = processor.nt
-            self.num_words = processor.nnt
-       
-       self._initialize()
+            self.num_nt = processor.nnt
+            self.num_words = processor.nt
+
+        self._initialize()
 
     def check_files_exist(self, file_list):
         for file_name in file_list:
@@ -127,9 +127,6 @@ cdef class GrammarObject(object):
             self.rule_y_x.push_back(new URvv())
             self.rule_y_xz.push_back(new BRvv())
             self.rule_x_yz.push_back(new BRFvv())
-            self.rule_y_x_L.push_back(new URvv_L())
-            self.rule_y_xz_L.push_back(new BRvv_L())
-            self.rule_x_yz_L.push_back(new BRFvv_L())
 
         for t in xrange(self.num_words):
             self.lexicon.push_back(new URvv())
@@ -188,8 +185,7 @@ cdef class GrammarObject(object):
                     word = 0
                 ur.parent = nt
                 ur.weight = float(lexicon[2].strip('[]'))
-                if ur.weight >= threshold:
-                    self.lexicon[word].push_back(ur)
+                self.lexicon[word].push_back(ur)
 
     def read_gr_file(self, gr_file):
         cdef:
@@ -201,9 +197,9 @@ cdef class GrammarObject(object):
         with open(gr_file, 'r') as file:
             for line in file:
                 rule = line.strip().split()
-                p = self.nt2idx[rule[0][:-2]]       # [:-2] is to remove "_0" from "NP_0" to form "NP"
+                p = self.nt2idx[rule[0][:-2]]          # [:-2] is to remove "_0" from "NP_0" to form "NP"
                 l = self.nt2idx[rule[2][:-2]]
-                if len(rule) == 5:                  # binary rule
+                if len(rule) == 5:                     # binary rule
                     r = self.nt2idx[rule[3][:-2]]
                     br.right = r
                     br.parent = p
@@ -213,19 +209,128 @@ cdef class GrammarObject(object):
                     brf.right = r
                     brf.weight = float(rule[4])
                     self.rule_x_yz[p].push_back(brf)
-                if len(rule) == 4:                  # unary rule
-                    if p != l:                      # Do not allow self-recurring X -> X rules
+                if len(rule) == 4:                     # unary rule
+                    if p != l:                         # Do not allow self-recurring X -> X rules
                         ur.parent = p
                         ur.weight = float(rule[3])
-                        if ur.weight >= threshold:
-                            self.rule_y_x[l].push_back(ur)
+                        self.rule_y_x[l].push_back(ur)
 
-    def init_rule_probs(self, preterm, unt_pr, p2l_pr, pl2r_pr, threshold=1e-7):
-        #TODODO initialize these matrices
-        self.preterm = preterm
-        self.unt_pr = unt_pr
-        self.p2l_pr = p2l_pr
-        self.pl2r_pr = pl2r_pr
+    cpdef parse1(self, sen, preterm, unt, p2l, pl2r):
+        cdef:
+            int i, j, k, tag, w, l, r, p, c, n, pp, ik, RI, U_NTM
+            str word
+            double parent, left, right, child, newscore
+            UR ur
+            BR br
+            intvec tmp
+            intvec* cell
+
+            Cell[:,:,:] chart
+
+        n = len(sen)
+        self.sen = sen
+        chart = np.zeros((n,n+1,self.num_nt), dtype=Cell_dt)
+        for i in xrange(n):
+            for j in xrange(n+1):
+                for k in xrange(self.num_nt):
+                    chart[i,j,k].score = log_zero
+
+        for ik in xrange(n*(n+1)//2):
+            self.spandex.push_back(new intvec())
+
+        RI = self.nt2idx['ROOT']
+        U_NTM = self.nt2idx['U_NTM']
+
+        # Do inside algorithm
+        t0 = time.time()
+
+        # initialization
+        for i in xrange(n):  # w-1 constituents
+            w = sen[i]
+            k = i+1
+            cell = self.spandex[tri(i, k)]
+            for tag in xrange(self.num_nt):
+                score = preterm[i, tag]
+                if score == log_zero:
+                    continue
+                else:
+                    if chart[i,k,tag].score == log_zero:
+                        cell.push_back(tag)
+                    chart[i,k,tag].score = score
+                    chart[i,k,tag].y = -1
+            # unary appending
+            for c in deref(cell):
+                for ur in deref(self.rule_y_x[c]):
+                    p = ur.parent
+
+                    newscore = chart[i,k,c].score + p2l[p, i, U_NTM] + unt[p, i, c]
+                    if newscore > chart[i,k,p].score:
+                        if chart[i,k,p].score == log_zero:
+                            tmp.push_back(p)
+                        chart[i,k,p].score = newscore
+                        chart[i,k,p].y = c
+                        chart[i,k,p].z = -1
+            for c in tmp:
+                cell.push_back(c)
+            tmp.clear()
+
+        for w in xrange(2, n+1):  # wider constituents
+            for i in xrange(n-w+1):
+                k = i + w
+                cell = self.spandex[tri(i, k)]
+                for j in xrange(i+1, k):
+                    for l in deref(self.spandex[tri(i, j)]):
+                        left = chart[i,j,l].score
+                        for br in deref(self.rule_y_xz[l]):
+                            r = br.right
+                            right = chart[j,k,r].score
+                            if right == log_zero:
+                                continue
+                            p = br.parent
+
+                            newscore = left + right + p2l[p, i, l] + pl2r[p, l, i, r]
+                            if newscore > chart[i,k,p].score:
+                                if chart[i,k,p].score == log_zero:
+                                    cell.push_back(p)
+                                chart[i,k,p].score = newscore
+                                chart[i,k,p].y = l
+                                chart[i,k,p].z = r
+                                chart[i,k,p].j = j
+                # unary appending
+                for c in deref(cell):
+                    for ur in deref(self.rule_y_x[c]):
+                        p = ur.parent
+
+                        newscore = chart[i,k,c].score + p2l[p, i, U_NTM] + unt[p, i, c]
+                        if newscore > chart[i,k,p].score:
+                            if chart[i,k,p].score == log_zero:
+                                tmp.push_back(p) 
+                            chart[i,k,p].score = newscore
+                            chart[i,k,p].y = c
+                            chart[i,k,p].z = -1
+                for c in tmp:
+                    cell.push_back(c)
+                tmp.clear()
+
+        t1 = time.time()
+        self.spandex.clear()
+        self.chart = chart
+        print "parsing takes ",t1 - t0
+
+        '''
+        for i in xrange(n):
+            for j in xrange(n+1):
+                for nt in xrange(self.num_nt):
+                    if chart[i,j,nt].score > 0:
+                        print (i,j,self.idx2nt[nt])
+        '''
+        #print "root has proba", chart[0,n,ri]
+        if self.chart[0,n,RI].score == log_zero:
+            print "No Parse"   # No parse found
+            return
+        print "i'm really happy"
+        print self.print_parse(0, n, RI)
+        return
         
     def __dealloc__(self):
         for x in self.spandex:
@@ -535,7 +640,7 @@ cdef class GrammarObject(object):
 
         if y == -1:
             # is terminal rule
-            return "(" + self.idx2nt[nt] + " " + self.sentence[i] + ")"
+            return "(" + self.idx2nt[nt] + " " + self.idx2w[self.sen[i]] + ")"
         elif z == -1:
             # unary rule
             return  "(" + self.idx2nt[nt] + " "  \

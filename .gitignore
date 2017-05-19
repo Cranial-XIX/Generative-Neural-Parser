@@ -9,4 +9,8 @@ baseline/output.txt
 */*.html
 */*.cpp
 */*.c
-*/Vincent*
+*.so
+*.html
+*.cpp
+*.c
+build/*

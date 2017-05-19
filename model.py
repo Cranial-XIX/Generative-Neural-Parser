@@ -193,15 +193,15 @@ class LCNPModel(nn.Module):
         ut_w = w2v_w.mm(self.ut.weight).t()
         ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
 
-        preterminal = [[0 for j in xrange(self.nnt)] for i in xrange(n)]
-        # append one level terminal symbols
+        preterminal = np.empty((n,self.nnt))
+        preterminal.fill(-1000000)
+        # append one level preterminal symbols
         for i in xrange(n):
             c = sen[i]
             for p in self.lexicon[c]:
-                preterminal[i][p] = self.log_prob_ut(lsm, ut_w, ut_b, p, c, output[0, i])
+                preterminal[i,p] = self.log_prob_ut(lsm, ut_w, ut_b, p, c, output[0, i]).data[0]
 
-        self.parser.init_rule_probs(preterminal, unt_pr, p2l_pr, pl2r_pr)
-        self.parser.parse(sen)
+        self.parser.parse1(sen.numpy(), preterminal, unt_pr.data.numpy(), p2l_pr.data.numpy(), pl2r_pr.data.numpy())
 
         end = time.time()
         if self.verbose == 'yes':
