@@ -201,7 +201,7 @@ def main():
                     break
             except (EOFError):
                 break
-            controller.parse_LCNP(p, parser, sen2parse, cmd_inp)
+            print controller.parse_LCNP(p, parser, sen2parse, cmd_inp)
     else:
         print "Cannot recognize the mode, should be chosen from " \
             "{spv_train, uspv_train, parse}"

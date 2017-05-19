@@ -215,7 +215,12 @@ cdef class GrammarObject(object):
                         ur.weight = float(rule[3])
                         self.rule_y_x[l].push_back(ur)
 
-    cpdef parse1(self, sen, preterm, unt, p2l, pl2r):
+    cpdef parse1(self, str sentence, 
+                np.ndarray[np.int64_t, ndim=1] sen, 
+                np.ndarray[np.float32_t, ndim=2] preterm, 
+                np.ndarray[np.float32_t, ndim=3] unt,
+                np.ndarray[np.float32_t, ndim=3] p2l,
+                np.ndarray[np.float32_t, ndim=4] pl2r):
         cdef:
             int i, j, k, tag, w, l, r, p, c, n, pp, ik, RI, U_NTM
             str word
@@ -227,6 +232,7 @@ cdef class GrammarObject(object):
 
             Cell[:,:,:] chart
 
+        self.sentence = sentence.strip().split()
         n = len(sen)
         self.sen = sen
         chart = np.zeros((n,n+1,self.num_nt), dtype=Cell_dt)
@@ -327,10 +333,9 @@ cdef class GrammarObject(object):
         #print "root has proba", chart[0,n,ri]
         if self.chart[0,n,RI].score == log_zero:
             print "No Parse"   # No parse found
-            return
-        print "i'm really happy"
-        print self.print_parse(0, n, RI)
-        return
+            return ""
+        print "i'm really happy" 
+        return self.print_parse(0, n, RI)
         
     def __dealloc__(self):
         for x in self.spandex:
@@ -640,7 +645,7 @@ cdef class GrammarObject(object):
 
         if y == -1:
             # is terminal rule
-            return "(" + self.idx2nt[nt] + " " + self.idx2w[self.sen[i]] + ")"
+            return "(" + self.idx2nt[nt] + " " + self.sentence[i] + ")"
         elif z == -1:
             # unary rule
             return  "(" + self.idx2nt[nt] + " "  \

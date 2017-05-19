@@ -39,7 +39,8 @@ def spv_train_LCNP(p, cmd_inp):
         'brules': p.binary,
         'unt_pre': p.unt_pre,
         'p2l_pre': p.p2l_pre,
-        'pl2r_pre': p.pl2r_pre
+        'pl2r_pre': p.pl2r_pre,
+        'parser': None
     }
 
     model = LCNPModel(inputs, cmd_inp['cuda'], cmd_inp['verbose'])
@@ -145,7 +146,8 @@ def uspv_train_LCNP(p, cmd_inp):
         'brules': p.binary,
         'unt_pre': p.unt_pre,
         'p2l_pre': p.p2l_pre,
-        'pl2r_pre': p.pl2r_pre
+        'pl2r_pre': p.pl2r_pre,
+        'parser': None
     }
 
     model = LCNPModel(inputs, cmd_inp['cuda'], cmd_inp['verbose'])
@@ -213,7 +215,7 @@ def uspv_train_LCNP(p, cmd_inp):
     if cmd_inp['verbose'] == 'yes':
         print "Finish unsupervised training"
 
-def parse_LCNP(p, parser, sen2parse, cmd_inp):
+def parse_LCNP(p, parser, sentence, cmd_inp):
 
     batch_size = 1
     inputs = {
@@ -243,22 +245,21 @@ def parse_LCNP(p, parser, sen2parse, cmd_inp):
     }
 
     model = LCNPModel(inputs, cmd_inp['cuda'], cmd_inp['verbose'])
+    if cmd_inp['cuda']:
+        model.cuda()
     if cmd_inp['pretrain'] == None:
-        pretrain = torch.load(constants.PRE_TRAINED_FILE, \
-            map_location=lambda storage, loc: storage)
+        pretrain = torch.load(constants.PRE_TRAINED_FILE)
         model.load_state_dict(pretrain['state_dict'])
     else:
-        pretrain = torch.load(cmd_inp['pretrain'], \
-            map_location=lambda storage, loc: storage)
+        pretrain = torch.load(cmd_inp['pretrain'])
         model.load_state_dict(pretrain['state_dict'])
 
-    inp = p.get_idx(sen2parse)
+    inp = p.get_idx(sentence)
 
     var_inp = Variable(inp)
     if cmd_inp['cuda']:
         var_inp = var_inp.cuda()
-    model.parse(var_inp)
-    # TODO add print_parse
+    return model.parse(sentence, var_inp)
 
 def print_parse(p, sen, bp, start, end, node):
     next = bp[start][end][node]

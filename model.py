@@ -139,7 +139,7 @@ class LCNPModel(nn.Module):
     def encoder_t(self, seq):
         return self.word2vec_plus(seq) + self.word2vec(seq)
 
-    def parse(self, sen):
+    def parse(self, sentence, sen):
         # sen is a torch.LongTensor object, containing fake BOS index
         # along with indices of the words
         start = time.time()
@@ -193,19 +193,41 @@ class LCNPModel(nn.Module):
         ut_w = w2v_w.mm(self.ut.weight).t()
         ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
 
-        preterminal = np.empty((n,self.nnt))
+        preterminal = np.empty((n,self.nnt), dtype=np.float32)
         preterminal.fill(-1000000)
         # append one level preterminal symbols
         for i in xrange(n):
             c = sen[i]
+            #TODO temporal hack that should be fixed
+            if c not in self.lexicon:
+                return ""
             for p in self.lexicon[c]:
                 preterminal[i,p] = self.log_prob_ut(lsm, ut_w, ut_b, p, c, output[0, i]).data[0]
 
-        self.parser.parse1(sen.numpy(), preterminal, unt_pr.data.numpy(), p2l_pr.data.numpy(), pl2r_pr.data.numpy())
+        if self.cuda_flag:
+            parse_tree = self.parser.parse1(
+                    sentence,
+                    sen.cpu().numpy(),
+                    preterminal,
+                    unt_pr.cpu().data.numpy(),
+                    p2l_pr.cpu().data.numpy(),
+                    pl2r_pr.cpu().data.numpy()
+                )
+        else:
+            parse_tree = self.parser.parse1(
+                    sentence,
+                    sen.numpy(),
+                    preterminal,
+                    unt_pr.data.numpy(),
+                    p2l_pr.data.numpy(),
+                    pl2r_pr.data.numpy()
+                )
 
         end = time.time()
         if self.verbose == 'yes':
             print "Precomputation takes %f" % round(end - start, 5)
+            
+        return parse_tree
 
     def unsupervised(self, sen):
         emb_inp = self.encoder_t(sen)
