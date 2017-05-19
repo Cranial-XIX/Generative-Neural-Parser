@@ -97,6 +97,7 @@ cdef double logsumexp(double a, double b):
 cdef inline int tri(int i, int j) nogil:
     return j*(j-1)/2 + i
 
+#TODODO rename GrammarObject to Parser
 cdef class GrammarObject(object):
 
     cdef object nt2idx    # nonterminal to index
@@ -126,11 +127,7 @@ cdef class GrammarObject(object):
     cdef double[:,:,:,:] alphas
     cdef Cell[:,:,:] chart
 
-    def __init__(self, processor=None):
-        """
-		grammar
-		"""
-        
+    def __init__(self, processor=None):        
         if processor == None:  
             self.nt2idx = {}    # nonterminal to index
             self.idx2nt = []    # index to nonterminal
@@ -143,7 +140,8 @@ cdef class GrammarObject(object):
             self.idx2w = processor.idx2Word
             self.num_nt = processor.nt
             self.num_words = processor.nnt
-            self._initialize()
+       
+       self._initialize()
 
     def check_files_exist(self, file_list):
         for file_name in file_list:
@@ -159,23 +157,27 @@ cdef class GrammarObject(object):
             self.rule_y_x.push_back(new URvv())
             self.rule_y_xz.push_back(new BRvv())
             self.rule_x_yz.push_back(new BRFvv())
+            self.rule_y_x_L.push_back(new URvv_L())
+            self.rule_y_xz_L.push_back(new BRvv_L())
+            self.rule_x_yz_L.push_back(new BRFvv_L())
 
         for t in xrange(self.num_words):
             self.lexicon.push_back(new URvv())
-
-    def read_grammar_from_file(self, filename, threshold=1e-7):
-        cdef:
-            UR ur
-            BR br
-            BRF brf
-
-        nt_file = filename + ".nonterminals"
-        word_file = filename + ".words"
-        lex_file = filename + ".lexicon"
-        gr_file = filename + ".grammar"
+            
+    def read_data_from_files(self, file_prefix, threshold=1e-7):
+        nt_file = file_prefix + ".nonterminals"
+        word_file = file_prefix + ".words"
+        lex_file = file_prefix + ".lexicon"
+        gr_file = file_prefix + ".grammar"
 
         self.check_files_exist([nt_file, word_file, lex_file, gr_file])
 
+        self.read_nt_file(nt_file)
+        self.read_word_file(word_file)
+        self.read_lexicon_file(lex_file)
+        self.read_gr_file(gr_file)
+    
+    def read_nt_file(self, nt_file):
         # Read nonterminal file
         with open(nt_file, 'r') as file:
             i = -2
@@ -189,6 +191,7 @@ cdef class GrammarObject(object):
                 i += 1
         self.num_nt = i
 
+    def read_word_file(self, word_file):
         # Read word file
         with open(word_file, 'r') as file:
             self.w2idx['OOV'] = 0
@@ -199,11 +202,12 @@ cdef class GrammarObject(object):
                 self.w2idx[w] = i
                 self.idx2w.append(w)
                 i += 1
-
         self.num_words = i
-        self._initialize()
 
-        # Read lexicon file        
+    def read_lexicon_file(self, lex_file):
+        cdef UR ur
+        
+        # Read lexicon file   
         with open(lex_file, 'r') as file:
             for line in file:
                 lexicon = line.strip().split()
@@ -216,6 +220,12 @@ cdef class GrammarObject(object):
                 ur.weight = float(lexicon[2].strip('[]'))
                 if ur.weight >= threshold:
                     self.lexicon[word].push_back(ur)
+
+    def read_gr_file(self, gr_file):
+        cdef:
+            UR ur
+            BR br
+            BRF brf
 
         # Read binary/unary rule file
         with open(gr_file, 'r') as file:
@@ -239,8 +249,9 @@ cdef class GrammarObject(object):
                         ur.weight = float(rule[3])
                         if ur.weight >= threshold:
                             self.rule_y_x[l].push_back(ur)
-                            
-    def read_grammar_from_matrix(self, n, p2l, pl2r, unt, preterm, threshold=1e-7):
+
+    def init_rule_probs(self, n, p2l_pr, pl2r_pr, unt_pr, preterm, threshold=1e-7):
+        #TODODO preterm not used
         cdef:
             UR ur
             BR br
@@ -251,25 +262,8 @@ cdef class GrammarObject(object):
             int nt, i, p, l, r, pos
 
         nt = self.num_nt
-            
-        # No need to read lexicon
-        
-        '''
-        # Read binary rule w/o left context
-        for p in xrange(nt):
-            for l in xrange(nt):
-                br.parent = p
-                brf.left = l
-                for r in xrange(nt):
-                    rule_prob = p2l0[p,l] * pl2r0[p,l,r]
-                    br.right = r
-                    br.weight = rule_prob
-                    self.rule_y_xz[l].push_back(br)
-                    brf.right = r
-                    brf.weight = rule_prob
-                    self.rule_x_yz[p].push_back(brf)
-        ''' 
-         
+
+        #TODODO make this code work         
         # Read binary rule w/ left context
         for p in xrange(nt):
             for l in xrange(nt):
@@ -277,7 +271,7 @@ cdef class GrammarObject(object):
                 brf_L.left = l
                 for r in xrange(nt):
                     for pos in xrange(n):
-                        rule_prob = p2l[p,pos,l] * pl2r[p,l,pos,r]
+                        rule_prob = p2l_pr[p,pos,l] * pl2r_pr[p,l,pos,r]
                         br_L.right = r
                         br_L.context = pos
                         br_L.weight = rule_prob
@@ -285,18 +279,7 @@ cdef class GrammarObject(object):
                         brf_L.right = r
                         brf_L.context = pos
                         brf_L.weight = rule_prob
-                        self.rule_x_yz_L[p].push_back(brf_L)
-        
-        '''
-        # Read unary rule w/o left context
-        for p in xrange(nt):
-            ur.parent = p
-            for l in xrange(nt):
-                #TODODO 0 should be "Unary"
-                ur.weight = p2l0[p, 0] * unt0[p,l]
-                if ur.weight >= threshold:
-                    self.rule_y_x[l].push_back(ur)
-        '''       
+                        self.rule_x_yz_L[p].push_back(brf_L)      
         
         # Read unary rule w/ left context
         for p in xrange(nt):
@@ -305,7 +288,7 @@ cdef class GrammarObject(object):
                 for pos in xrange(n):
                     #TODODO 0 should be "Unary"
                     ur_L.parent.context = pos
-                    ur_L.weight = p2l[p,pos, 0] * unt[p,pos,l]
+                    ur_L.weight = p2l_pr[p,pos, 0] * unt_pr[p,pos,l]
                     if ur_L.weight >= threshold:
                         self.rule_y_x_L[l].push_back(ur_L)
         
