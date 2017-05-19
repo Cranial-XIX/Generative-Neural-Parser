@@ -14,95 +14,95 @@ import gr
 
 def main():
 
-    parser = argparse.ArgumentParser(
+    args_parser = argparse.ArgumentParser(
         description='Welcome to the generative neural parser'
     )
 
     # Below are variables associated with files
     # =========================================================================
-    parser.add_argument(
+    args_parser.add_argument(
         '-train', '--TrainFile', required=False, default=constants.TRAIN,
         help='Train file path'
     )
 
-    parser.add_argument(
+    args_parser.add_argument(
         '-pretrain', '--PretrainedFile', required=False,
         help='Pretrained file path'
     )
 
-    parser.add_argument(
+    args_parser.add_argument(
         '-corpus', '--UseStoredCorpus', required=False, default="no",
         help='Whether to use stored corpus: True or False'
     )
 
-    parser.add_argument(
+    args_parser.add_argument(
         '-dt', '--TerminalDimension', required=False, default=100,
         help='Terminal\'s dimension'
     )
 
-    parser.add_argument(
+    args_parser.add_argument(
         '-rd', '--ShouldReadData', required=False, default="yes",
         help='Whether read and process new data'
     )
     
-    parser.add_argument(
+    args_parser.add_argument(
         '-v', '--Verbose', required=False, default="yes",
         help='Whether to print logging information'
     )
     
     # Below are variables associated with model
     # =========================================================================
-    parser.add_argument(
+    args_parser.add_argument(
         '-m', '--Mode', required=True,
         help='Which mode to run: spv_train, uspv_train, parse'
     )
 
-    parser.add_argument(
+    args_parser.add_argument(
         '-s', '--Seed', required=False, default=12345,
         help='Seed of random state'
     )
 
-    parser.add_argument(
+    args_parser.add_argument(
         '-lstm_coef', '--CoefLSTM', required=False, default=1.0,
     )
 
-    parser.add_argument(
+    args_parser.add_argument(
         '-lstm_layer', '--LayerLSTM', required=False, default=3,
     )
 
-    parser.add_argument(
+    args_parser.add_argument(
         '-lstm_dim', '--DimLSTM', required=False, default=100,
         help='Dimension of LSTM model '
     )
 
-    parser.add_argument(
+    args_parser.add_argument(
         '-cl2', '--CoefL2', required=False, default=1e-2,
         help='Coefficient of L2 norm'
     )
 
     # Below are variables associated with training
     # =========================================================================
-    parser.add_argument(
+    args_parser.add_argument(
         '-me', '--MaxEpoch', required=False, default=10,
         help='Max epoch number of training'
     )
 
-    parser.add_argument(
+    args_parser.add_argument(
         '-bsz', '--BatchSize', required=False, default=2,
         help='Size of mini-batch'
     )
 
-    parser.add_argument(
+    args_parser.add_argument(
         '-lr', '--LearningRate', required=False, default=0.02,
         help="Initial learning rate"
     )
     
-    parser.add_argument(
+    args_parser.add_argument(
         '-cuda', action='store_true',
         help='use CUDA'
     )
 
-    args = parser.parse_args()
+    args = args_parser.parse_args()
 
     if torch.cuda.is_available():
         if not args.cuda:
@@ -170,7 +170,7 @@ def main():
 
     p = data_processor.Processor(cmd_inp)
     p.read_and_process()
-    gr_Obj = gr.GrammarObject(p)
+    parser = gr.GrammarObject(p)
 
     if args.Mode == 'spv_train':
         # supervised training
@@ -195,7 +195,7 @@ def main():
                     break
             except (EOFError):
                 break
-            controller.parse_LCNP(p, sen2parse, cmd_inp, gr_Obj)
+            controller.parse_LCNP(p, parser, sen2parse, cmd_inp)
     else:
         print "Cannot recognize the mode, should be chosen from " \
             "{spv_train, uspv_train, parse}"
