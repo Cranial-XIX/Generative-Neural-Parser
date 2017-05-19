@@ -330,7 +330,7 @@ class LCNPModel(nn.Module):
 
         cond = torch.cat((self.encoder_nt(pi), h), 1)
         res = cond.mm(ut_w) + ut_b
-        UT_idx = 0 # UT_idx = the index for unary terminal symbol
+        UT_idx = 0  # UT_idx = the index for unary terminal symbol
         return lsm(self.p2l(cond))[0][UT_idx] + lsm(res)[0][c] 
 
     def log_prob_unt(self, lsm, p, c, h):

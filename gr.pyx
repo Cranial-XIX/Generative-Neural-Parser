@@ -48,26 +48,6 @@ cdef packed struct BRF:
 cdef packed struct UR:
     D_t parent
     V_t weight
-    
-# left-child indexed binary rule w/ left context
-cdef packed struct BR_L:
-    D_t right
-    D_t parent
-    D_t context
-    V_t weight
-
-# parent forward indexed binary rule w/ left context
-cdef packed struct BRF_L:
-    D_t left
-    D_t right
-    D_t context
-    V_t weight
-
-# left-child indexed binary rule w/ left context
-cdef packed struct UR_L:
-    D_t parent
-    D_t context
-    V_t weight
 
 # new school
 ctypedef vector[BR]    BRvv
@@ -76,12 +56,6 @@ ctypedef vector[BRF]   BRFvv
 ctypedef BRvv    *BRv
 ctypedef URvv    *URv
 ctypedef BRFvv   *BRFv
-ctypedef vector[BR_L]    BRvv_L
-ctypedef vector[UR_L]    URvv_L
-ctypedef vector[BRF_L]   BRFvv_L
-ctypedef BRvv_L    *BRv_L
-ctypedef URvv_L    *URv_L
-ctypedef BRFvv_L   *BRFv_L
 
 cdef double log_zero = -100000
 '''
@@ -116,10 +90,6 @@ cdef class GrammarObject(object):
     cdef vector[BRFv] rule_x_yz
     cdef vector[URv] rule_y_x               # [S] -> [(ROOT,log(0.9)), ...]
     cdef vector[URv] lexicon                # [word] -> [(N,log(0.3)), ...]
-    # with left contexts
-    cdef vector[BRv_L] rule_y_xz_L
-    cdef vector[BRFv_L] rule_x_yz_L
-    cdef vector[URv_L] rule_y_x_L
     
     cdef vector[intvec*] spandex
 
@@ -250,47 +220,12 @@ cdef class GrammarObject(object):
                         if ur.weight >= threshold:
                             self.rule_y_x[l].push_back(ur)
 
-    def init_rule_probs(self, n, p2l_pr, pl2r_pr, unt_pr, preterm, threshold=1e-7):
-        #TODODO preterm not used
-        cdef:
-            UR ur
-            BR br
-            BRF brf
-            UR_L ur_L
-            BR_L br_L
-            BRF_L brf_L
-            int nt, i, p, l, r, pos
-
-        nt = self.num_nt
-
-        #TODODO make this code work         
-        # Read binary rule w/ left context
-        for p in xrange(nt):
-            for l in xrange(nt):
-                br_L.parent = p
-                brf_L.left = l
-                for r in xrange(nt):
-                    for pos in xrange(n):
-                        rule_prob = p2l_pr[p,pos,l] * pl2r_pr[p,l,pos,r]
-                        br_L.right = r
-                        br_L.context = pos
-                        br_L.weight = rule_prob
-                        self.rule_y_xz_L[l].push_back(br_L)
-                        brf_L.right = r
-                        brf_L.context = pos
-                        brf_L.weight = rule_prob
-                        self.rule_x_yz_L[p].push_back(brf_L)      
-        
-        # Read unary rule w/ left context
-        for p in xrange(nt):
-            ur_L.parent = p
-            for l in xrange(nt):
-                for pos in xrange(n):
-                    #TODODO 0 should be "Unary"
-                    ur_L.parent.context = pos
-                    ur_L.weight = p2l_pr[p,pos, 0] * unt_pr[p,pos,l]
-                    if ur_L.weight >= threshold:
-                        self.rule_y_x_L[l].push_back(ur_L)
+    def init_rule_probs(self, preterm, unt_pr, p2l_pr, pl2r_pr, threshold=1e-7):
+        #TODODO initialize these matrices
+        self.preterm = preterm
+        self.unt_pr = unt_pr
+        self.p2l_pr = p2l_pr
+        self.pl2r_pr = pl2r_pr
         
     def __dealloc__(self):
         for x in self.spandex:

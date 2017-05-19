@@ -171,6 +171,7 @@ def main():
     p = data_processor.Processor(cmd_inp)
     p.read_and_process()
     parser = gr.GrammarObject(p)
+    parser.read_gr_file('xbar.grammar')
 
     if args.Mode == 'spv_train':
         # supervised training
