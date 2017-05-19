@@ -213,7 +213,7 @@ def uspv_train_LCNP(p, cmd_inp):
     if cmd_inp['verbose'] == 'yes':
         print "Finish unsupervised training"
 
-def parse_LCNP(p, sen2parse, cmd_inp):
+def parse_LCNP(p, parser, sen2parse, cmd_inp):
 
     batch_size = 1
     inputs = {
@@ -238,7 +238,8 @@ def parse_LCNP(p, sen2parse, cmd_inp):
         'brules': p.binary,
         'unt_pre': p.unt_pre,
         'p2l_pre': p.p2l_pre,
-        'pl2r_pre': p.pl2r_pre
+        'pl2r_pre': p.pl2r_pre,
+        'parser': parser
     }
 
     model = LCNPModel(inputs, cmd_inp['cuda'], cmd_inp['verbose'])
