@@ -1,8 +1,10 @@
 import copy
+import gr
 import itertools
 import math
 import numpy as np
 import time
+
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -36,6 +38,8 @@ class LCNPModel(nn.Module):
         self.urules = inputs['urules']       # dictionary of unary rules
         self.brules = inputs['brules']       # dictionary of binary rules
         self.lexicon = inputs['lexicon']     # dictionary of lexicon
+
+        self.parser = inputs['parser']       # the parser, written in Cython
 
         # the precomputed matrix that will be used in unsupervised learning
         if self.cuda_flag:
@@ -136,40 +140,35 @@ class LCNPModel(nn.Module):
         return self.word2vec_plus(seq) + self.word2vec(seq)
 
     def parse(self, sen):
+        # sen is a torch.LongTensor object, containing fake BOS index
+        # along with indices of the words
         start = time.time()
 
+        # translate to sequence of vectors
         emb_inp = self.encoder_t(sen)
+        # get left context hidden units with a trained h0 (start hidden state)
         output, hidden = self.LSTM(emb_inp, self.h0)
+        # get rid of the initial BOS symbol, since you need fake BOS 
+        # to make sure everyone gets their cup of left context
         sen = sen.view(-1).data[1:]
         n = len(sen)
+        # truncate the last left context out, since we need to ensure the
+        # matrix is of length n
+        # * output (batch_size * sen_length * hidden dimension)
         output = output.narrow(1, 0, n)
+
+        # * h1 (num_nt * sen_length * hidden dimension)
         h1 = output.repeat(self.nnt, 1, 1)
+        # * h2 (num_nt * num_nt * sen_length * hidden dimension)
         h2 = output.unsqueeze(0).repeat(self.nnt, self.nnt, 1, 1)
+
         lsm = nn.LogSoftmax()
 
         ## pre-compute all probabilities
 
-        # without context probabilities
-        padding = Variable(torch.zeros(self.nnt, self.dhid))
-        if self.cuda_flag:
-            padding = padding.cuda()
-
-        unt_cond0 = torch.cat((self.unt_pre, padding), 1)
-        p2l_cond0 = torch.cat((self.p2l_pre, padding), 1)
-        pl2r_cond0 = torch.cat((self.pl2r_pre, padding.unsqueeze(1).repeat(1, self.nnt, 1)), 2)
-
-        size = unt_cond0.size()
-        size2 = pl2r_cond0.size()
-
-        # parent to unary child
-        unt_pr0 = lsm(self.unt(unt_cond0.view(-1, size[1]))).view(size[0], -1)
-        # parent to left
-        p2l_pr0 = lsm(self.p2l(p2l_cond0.view(-1, size[1]))).view(size[0], -1)
-        # parent left to right
-        pl2r_pr0 = lsm(self.pl2r(pl2r_cond0.view(-1, size2[2]))).view(size2[0], size2[1], -1)
-
         # with context probabilities
         unt_i = self.unt_pre.unsqueeze(1).repeat(1, n, 1)
+        # * p2l_i (num_nt * sen_length * parent_emb_size) 
         p2l_i = self.p2l_pre.unsqueeze(1).repeat(1, n, 1)
         pl2r_i = self.pl2r_pre.unsqueeze(2).repeat(1, 1, n, 1)
 
@@ -181,6 +180,7 @@ class LCNPModel(nn.Module):
         size2 = pl2r_cond.size()
 
         # parent to unary child
+        # * unt_pr (num_nt * sen_length * num_nt) -> (parent, position i, child)
         unt_pr = lsm(self.unt(unt_cond.view(-1, size[2]))).view(size[0], size[1], -1)
         # parent to left
         p2l_pr = lsm(self.p2l(p2l_cond.view(-1, size[2]))).view(size[0], size[1], -1)
@@ -188,7 +188,7 @@ class LCNPModel(nn.Module):
         pl2r_pr = lsm(self.pl2r(pl2r_cond.view(-1, size2[3]))).view(size2[0], size2[1], size2[2], -1)
 
         # since for lexicon, Pr(x | P) = logsoftmax(A(Wx + b)). We
-        # precompute AW and Ab here to speed up the computation
+        # precompute AW (as ut_w) and Ab (as ut_b) here to speed up the computation
         w2v_w = self.word2vec.weight + self.word2vec_plus.weight
         ut_w = w2v_w.mm(self.ut.weight).t()
         ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
@@ -200,9 +200,12 @@ class LCNPModel(nn.Module):
             for p in self.lexicon[c]:
                 preterminal[i][p] = self.log_prob_ut(lsm, ut_w, ut_b, p, c, output[0, i])
 
+        self.parser.init_rule_probs(preterminal, unt_pr, p2l_pr, pl2r_pr)
+        self.parser.parse(sen)
+
         end = time.time()
         if self.verbose == 'yes':
-            print "Precomputation takes " % round(end - start, 5)
+            print "Precomputation takes %f" % round(end - start, 5)
 
     def unsupervised(self, sen):
         emb_inp = self.encoder_t(sen)
@@ -327,7 +330,8 @@ class LCNPModel(nn.Module):
 
         cond = torch.cat((self.encoder_nt(pi), h), 1)
         res = cond.mm(ut_w) + ut_b
-        return lsm(self.p2l(cond))[0][0] + lsm(res)[0][c] 
+        UT_idx = 0 # UT_idx = the index for unary terminal symbol
+        return lsm(self.p2l(cond))[0][UT_idx] + lsm(res)[0][c] 
 
     def log_prob_unt(self, lsm, p, c, h):
         pi = Variable(torch.LongTensor([p]))

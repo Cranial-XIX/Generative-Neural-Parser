@@ -252,12 +252,7 @@ cdef class GrammarObject(object):
 
         nt = self.num_nt
             
-        # Read lexicon
-        for i in xrange(len(preterm)):
-            for p in xrange(len(preterm[0])):
-                ur.parent = p
-                ur.weight = preterm[i][p]
-                self.lexicon[i].push_back(ur)
+        # No need to read lexicon
         
         '''
         # Read binary rule w/o left context
