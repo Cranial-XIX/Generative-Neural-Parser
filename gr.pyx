@@ -215,7 +215,8 @@ cdef class GrammarObject(object):
                         ur.weight = float(rule[3])
                         self.rule_y_x[l].push_back(ur)
 
-    cpdef parse1(self, str sentence, 
+    cpdef parse1(self, 
+                str sentence, 
                 np.ndarray[np.int64_t, ndim=1] sen, 
                 np.ndarray[np.float32_t, ndim=2] preterm, 
                 np.ndarray[np.float32_t, ndim=3] unt,

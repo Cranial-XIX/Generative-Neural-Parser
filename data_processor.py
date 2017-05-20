@@ -8,13 +8,13 @@ import constants
 
 class Processor(object):  
 
-    def __init__(self, cmd_inp):
-        self.train_data = cmd_inp['train']
-        self.read_data = cmd_inp['rd']
-        self.verbose = cmd_inp['verbose']
+    def __init__(self, train, read_data, verbose):
+        self.train_data = train
+        self.read_data = read_data
+        self.verbose = verbose
 
         ## Terminals
-        self.dt = cmd_inp['dt']         # dimension of terminal, as in word2vec
+        self.dt = 100                   # dimension of terminal, as in word2vec
         self.nt = -1                    # number of terminals
         self.word2Idx = {}              # (string -> int)
         self.idx2Word = {}              # (int -> string)
