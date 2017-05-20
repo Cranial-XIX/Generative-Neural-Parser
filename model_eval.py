@@ -53,6 +53,13 @@ def main():
     }
 
     p = data_processor.Processor(cmd_inp)
+    
+    #TODODO temp testing
+    p.create_nt_emb()
+    p.make_trainset()
+    import sys
+    sys.exit(1)
+
     p.read_and_process()
     parser = gr.GrammarObject(p)
     parser.read_gr_file('xbar.grammar')

@@ -5,6 +5,8 @@ import time
 import torch
 
 import constants
+from ptb import ptb
+import nltk
 
 class Processor(object):  
 
@@ -114,6 +116,56 @@ class Processor(object):
                     " the filename is %s" % nt_file         
         return
 
+    def make_trainset(self):
+        examples = ptb("train", minlength=3, maxlength=30, n=10)
+        train = list(examples)
+        
+        for (sentence, gold_tree) in train:
+            print self.convert_tree_to_encoded_list(gold_tree)
+        # Debug: print self.convert_tree_to_encoded_list(nltk.Tree.fromstring("(ROOT (S (@S (NP I) (VP (VBP live)))(. .)))"))
+                
+    def convert_tree_to_encoded_list(self, tree):       
+        self.encoded_list = ""
+        self.traverseTree(tree, 0, 0)
+        return self.encoded_list
+    
+    def traverseTree(self, tree, depth, width):
+        p = tree.label()
+        encoded_prefix = " " + str(width) + " " + str(self.nonterm2Idx[p])
+        encoded_suffix = ""
+        updated_width = width
+
+        if tree.height() == 2:  # is leaf
+            type_symb = "t"
+            child = tree.leaves()[0]
+        else:
+            ''' Logic:
+            1. give width to left child
+            2. get updated_width from left child
+            3. give updated_width+1 to left child
+            4. get updated_width from right child
+            '''
+            child_order = -1    # child_order == 0  =>  left child
+                                # child_order == 1  =>  right child
+            for subtree in tree:
+                child_order += 1
+                if child_order == 0:
+                    child = self.nonterm2Idx[subtree.label()]
+                encoded_suffix += " " + str(self.nonterm2Idx[subtree.label()]) # 1st time it will encode left child
+                                                                          # 2nd time it will encode right child
+                if type(subtree) == nltk.tree.Tree:
+                    updated_width = self.traverseTree(subtree, depth+1, updated_width+child_order)
+                    if child_order == 1:
+                        self.encoded_list += encoded_prefix + encoded_suffix
+
+            if child_order == 0:  # unary rule
+                type_symb = "u"
+            else:  # binary rule
+                type_symb = "l"
+        encoded_suffix = " " + type_symb + " " + str(child)
+        self.encoded_list += encoded_prefix + encoded_suffix
+        return updated_width
+    
     ##  read corpus
     def read_corpus(self):
 
