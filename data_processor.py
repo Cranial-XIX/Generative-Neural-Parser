@@ -1,19 +1,19 @@
+import constants
+import nltk
 import numpy as np
-from numpy import array
 import os
 import time
 import torch
 
-import constants
+from numpy import array
 from ptb import ptb
-import nltk
 
 class Processor(object):  
 
     def __init__(self, train, read_data, verbose):
-        self.train_data = train
-        self.read_data = read_data
-        self.verbose = verbose
+        self.train_data = train         # the train file
+        self.read_data = read_data      # whether read new data
+        self.verbose = verbose          # verbose mode or not
 
         ## Terminals
         self.dt = 100                   # dimension of terminal, as in word2vec
@@ -28,9 +28,11 @@ class Processor(object):
         self.idx2Nonterm = []           # (int -> string)
 
 
-    ## This method reads in word embeddings from the Word2vec file 
-    ## and store them into a hash map.
     def read_word2vec(self):
+        '''
+        This method reads in word embeddings from the Word2vec file 
+        and store them into a hash map.        
+        '''
         # Get the filename
         w2v_file = constants.W2V_FILE
 

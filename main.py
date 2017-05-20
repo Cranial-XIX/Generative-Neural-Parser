@@ -120,15 +120,16 @@ if args.verbose == 'yes':
     print template.format(" learning rate is :", str(args.learning_rate))
     print "="*80
 
+args.verbose = (args.verbose == 'yes')
+args.read_data = (args.read_data == 'yes')
 # let the processor read in data
-p = Processor(args.train, args.read_data=='yes', args.verbose)
+p = Processor(args.train, args.read_data, args.verbose)
 p.read_and_process()
 # create a grammar object
 parser = GrammarObject(p)
 parser.read_gr_file('xbar.grammar')
 
 # preprocessing
-args.verbose = (args.verbose == 'yes')
 if not args.mode == 'spv_train':
     args.batch_size = 1
 
@@ -317,7 +318,6 @@ def test():
     num_trees_with_parse = 0
     for (sentence, gold_tree) in test:
         parse_tree = parse(sentence)
-
         print parse_tree
 
         tree = oneline(unbinarize(gold_tree))
