@@ -121,9 +121,11 @@ class Processor(object):
     def make_trainset(self):
         examples = ptb("train", minlength=3, maxlength=30, n=10)
         train = list(examples)
-        
+
+        train_file = open(constants.TRAIN, 'w')
         for (sentence, gold_tree) in train:
-            print self.convert_tree_to_encoded_list(gold_tree)
+            train_file.write(sentence)
+            train_file.write(self.convert_tree_to_encoded_list(gold_tree))
         # Debug: print self.convert_tree_to_encoded_list(nltk.Tree.fromstring("(ROOT (S (@S (NP I) (VP (VBP live)))(. .)))"))
                 
     def convert_tree_to_encoded_list(self, tree):       

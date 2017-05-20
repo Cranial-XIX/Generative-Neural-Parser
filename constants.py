@@ -1,6 +1,6 @@
-W2V_FILE = "data/embed/w2v.txt"
-NT_EMB_FILE = "data/embed/nt.txt"
-TRAIN = "data/corpus/train19.txt"
+W2V_FILE = "data/w2v.txt"
+NT_EMB_FILE = "data/xbar.nonterminals"
+TRAIN = "data/train.txt"
 
 PRE_TRAINED_FILE = "output/default_cpu/model_dict"
 CORPUS_INFO_FILE = "corpus_info.tar"

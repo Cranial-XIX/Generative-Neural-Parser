@@ -30,11 +30,11 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--read-data', default="yes", help='Whether read data'
+    '--make-train', default="no", help='Whether to make a new train file'
 )
 
 argparser.add_argument(
-    '--verbose', default="yes", help='Use verbose mode'
+    '--read-data', default="yes", help='Whether read data'
 )
 
 # Below are variables associated with model
@@ -61,6 +61,10 @@ argparser.add_argument(
 
 argparser.add_argument(
     '--l2-coef', default=1e-2, help='l2 norm coefficient'
+)
+
+argparser.add_argument(
+    '--verbose', default="yes", help='Use verbose mode'
 )
 
 # Below are variables associated with training
@@ -122,9 +126,14 @@ if args.verbose == 'yes':
 
 args.verbose = (args.verbose == 'yes')
 args.read_data = (args.read_data == 'yes')
+args.make_train = (args.make_train == 'yes')
+
 # let the processor read in data
 p = Processor(args.train, args.read_data, args.verbose)
+if args.make_train:
+    p.make_trainset()
 p.read_and_process()
+
 # create a grammar object
 parser = GrammarObject(p)
 parser.read_gr_file('xbar.grammar')
@@ -343,13 +352,11 @@ elif args.mode == 'uspv_train':
 elif args.mode == 'test':
     test()
 elif args.mode == 'parse':
-    parsing = True
-    while parsing:
+    while True:
         sentence = raw_input()
         if sentence == "":
-            parsing = False
             break
         parse(sentence)
 else:
-    print "Cannot recognize the mode, should be chosen from " \
-        "{spv_train, uspv_train, parse}"
+    print "Cannot recognize the mode, allowed modes are: " \
+        "spv_train, uspv_train, parse, test"
