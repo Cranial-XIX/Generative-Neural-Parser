@@ -18,7 +18,7 @@ class LCNPModel(nn.Module):
         super(LCNPModel, self).__init__()
 
         self.verbose = args['verbose']
-        self.cuda = args['cuda']
+        self.use_cuda = args['cuda']
 
         # terminals
         self.term_emb = args['term_emb']   # embeddings of terminals
@@ -39,7 +39,7 @@ class LCNPModel(nn.Module):
         self.parser = args['parser']       # the parser, written in Cython
 
         # the precomputed matrix that will be used in unsupervised learning
-        if self.cuda:
+        if self.use_cuda:
             # the initial states for h0 and c0 of LSTM
             self.h0 = (Variable(torch.zeros(self.nlayers, self.bsz, self.dhid).cuda()),
                 Variable(torch.zeros(self.nlayers, self.bsz, self.dhid)).cuda())
@@ -201,7 +201,7 @@ class LCNPModel(nn.Module):
             for p in self.lexicon[c]:
                 preterminal[i,p] = self.preterm_prob(lsm, ut_w, ut_b, p, c, output[0, i]).data[0]
 
-        if self.cuda:
+        if self.use_cuda:
             parse_tree = self.parser.parse1(
                     sentence,
                     sen.cpu().numpy(),
@@ -296,7 +296,7 @@ class LCNPModel(nn.Module):
     def preterm_prob(self, lsm, ut_w, ut_b, p, c, h):
         pi = Variable(torch.LongTensor([p]))
         h = h.view(1, -1)
-        if self.cuda:
+        if self.use_cuda:
             pi = pi.cuda()
             h = h.cuda()
 

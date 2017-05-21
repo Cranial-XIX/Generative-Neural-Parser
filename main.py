@@ -92,7 +92,7 @@ if torch.cuda.is_available():
     if not args.cuda:
         print("WARNING: You have a CUDA device, so you should probably run with --cuda")
     else:
-        torch.cuda.manual_seed(args.Seed)
+        torch.cuda.manual_seed(args.seed)
 
 # Create folder to save model and log files
 file_save = ""
