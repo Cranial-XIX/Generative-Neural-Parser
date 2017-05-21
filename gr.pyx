@@ -104,10 +104,10 @@ cdef class GrammarObject(object):
             self.w2idx = {}     # word to index
             self.idx2w = []     # index to word
         else:
-            self.nt2idx = processor.nonterm2Idx
-            self.idx2nt = processor.idx2Nonterm
-            self.w2idx = processor.word2Idx
-            self.idx2w = processor.idx2Word
+            self.nt2idx = processor.nt2idx
+            self.idx2nt = processor.idx2nt
+            self.w2idx = processor.w2idx
+            self.idx2w = processor.idx2w
             self.num_nt = processor.nnt
             self.num_words = processor.nt
 

@@ -131,6 +131,8 @@ args.make_train = (args.make_train == 'yes')
 # let the processor read in data
 p = Processor(args.train, args.read_data, args.verbose)
 if args.make_train:
+    #TODO @Bo: maybe p.create_nt_emb() is redundant
+    p.create_nt_emb() # need to make sure there is nonterminal embeddings first
     p.make_trainset()
 p.read_and_process()
 
@@ -352,6 +354,7 @@ elif args.mode == 'uspv_train':
 elif args.mode == 'test':
     test()
 elif args.mode == 'parse':
+    print "Please enter sentences to parse, one per newline (press \"Enter\" to quit):"
     while True:
         sentence = raw_input()
         if sentence == "":
