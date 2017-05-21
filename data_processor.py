@@ -19,7 +19,7 @@ class Processor(object):
         self.dt = 100                   # dimension of terminal, as in word2vec
         self.nt = -1                    # number of terminals
         self.w2idx = {}                 # (string -> int)
-        self.idx2w = {}                 # (int -> string)
+        self.idx2w = []                 # (int -> string)
 
         ## Nonterminals
         self.dnt = -1                   # dimension of nonterminal feature
@@ -27,102 +27,167 @@ class Processor(object):
         self.nt2idx = {}                # (string -> int)
         self.idx2nt = []                # (int -> string)
 
+        ## Lexicon and grammar
+        self.lexicon = {}               # (int -> int)
+        self.unary = {}                 # (int -> int)
+        self.binary = {}                # ((int,int) -> int)
 
-    def read_word2vec(self):
-        '''
-        This method reads in word embeddings from the Word2vec file 
-        and store them into a hash map.        
-        '''
-        # Get the filename
-        w2v_file = constants.W2V_FILE
 
+    def check_file_exists(self, filename, file_type):
+        '''
+        Check if a file with given name exists.
+        @param file_type Type of file
+        @param filename  Name of file
+        @return          True if the file exists, False otherwise
+        '''
+        if not os.path.exists(filename):
+            if self.verbose:
+                print "No such %s file," \
+                    " the filename is %s" % (file_type, filename)
+            return False
+        return True
+
+    def read_w2v_file(self, w2v_file):
+        '''
+        Reads in word embeddings from the Word2vec file 
+        and store them into a hash map.    
+        '''
+        if not self.check_file_exists(w2v_file, "word2vec"):
+            return
+        
         self.term_emb = torch.FloatTensor(
             int(constants.MAX_VOCAB_SIZE), self.dt)
 
-        # Deal with OOV (TODO@Bo: change this to be more signature specific)
+        # Add OOV and BOS symbols
+        self.w2idx[constants.OOV] = 0
+        self.w2idx[constants.BOS] = 1
+        self.idx2w.append(constants.OOV)
+        self.idx2w.append(constants.BOS)
         self.term_emb[0] = torch.ones(self.dt)  # for OOV
         self.term_emb[1] = torch.zeros(self.dt) # for BOS
-        self.w2idx['OOV'] = 0
-        self.w2idx['BOS'] = 1
-        self.idx2w[0] = 'OOV'
-        self.idx2w[1] = 'BOS'
 
-        if os.path.exists(w2v_file):
-            begin_time = time.time()
-            with open(w2v_file, 'r') as w2v:
-                wordIdx = 2
-                for line in w2v:
-                    embeddingStr = line.split()
-                    word = embeddingStr.pop(0)
-                    embedding = torch.FloatTensor([float(v_i) for v_i in embeddingStr])
-                    self.term_emb[wordIdx] = embedding
-                    self.w2idx[word] = wordIdx
-                    self.idx2w[wordIdx] = word
-                    wordIdx += 1
-            # record the size of our vocabulary
-            self.nt = wordIdx
-            self.term_emb = self.term_emb.narrow(0, 0, self.nt)
-            end_time = time.time()
+  
+        begin_time = time.time()        
+        with open(w2v_file, 'r') as w2v_f:
+            w_idx = 2
+            for line in w2v_f:
+                w2v_str = line.split()
+                w = w2v_str.pop(0)
+                self.w2idx[w] = w_idx
+                self.idx2w.append(w)
+                w_emb = torch.FloatTensor(map(float, w2v_str))
+                self.term_emb[w_idx] = w_emb
+                w_idx += 1
+        # record the size of our vocabulary
+        self.nt = w_idx
+        self.term_emb = self.term_emb.narrow(0, 0, self.nt)
+        end_time = time.time()
+
+        if self.verbose:
+            print "-- Reading word2vec takes %.4f, secs" % round(end_time - begin_time, 5)
+            print "Number of words read:", self.nt
+        return
+ 
+    def read_nt_file(self, nt_file):
+        '''
+        Reads and creates the nonterminal embeddings
+        '''
+        if not self.check_file_exists(nt_file, "nonterminal embeddings"):
+             return
+
+        begin_time = time.time()
+        with open(nt_file, 'r') as nt_f:
+            nt_f.next()  # skip the comment
+            self.dnt = self.nnt = int(nt_f.next()) + 2  # add 2 to account for U_TM and U_NTM
+
+            self.nonterm_emb = torch.eye(self.nnt, self.dnt)  # an identity matrix
             if self.verbose:
-                print "-- Reading word2vec takes %.4f, secs" % round(end_time - begin_time, 5)
-        else:
-            # the file does not exist
-            if self.verbose:
-                print "No embeddings of the given dimension," \
-                    " the filename is %s" % w2v_file
+                print "The number of nonterminals " \
+                "(include symbols U_TM and U_NTM) is %d" % self.nnt
+
+            # Set up the special symbol UNARY for 
+            # unary terminal and nonterminal rules:
+            # 0 U_TM
+            # 1 U_NTM
+            # 2 ROOT
+            # ...
+
+            self.nt2idx[constants.U_TM] = 0
+            self.nt2idx[constants.U_NTM] = 1
+            self.idx2nt.append(constants.U_TM)
+            self.idx2nt.append(constants.U_NTM)
+            
+            idx = self.n_new_nt = 2
+            for line in nt_f: 
+                nt = line.strip()
+                self.nt2idx[nt] = idx
+                self.idx2nt.append(nt)
+                idx += 1
+        end_time = time.time()
+
+        if self.verbose:
+            print "-- Reading nonterminals takes %.4f, secs" \
+                % round(end_time - begin_time, 5)      
         return
 
-    ## this method reads and creates the nonterminal embeddings
-    def create_nt_emb(self):
+    def read_lex_file(self, lex_file):
+        if not self.check_file_exists(lex_file, "lexicon"):
+             return
+             
+        begin_time = time.time()
+        with open(lex_file, 'r') as lex_f:
+            for line in lex_f:
+                lex = line.strip().split()
+                nt_idx = self.nt2idx[lex[0]]
+                w = lex[1]
+                if w in self.w2idx:
+                    w_idx = self.w2idx[w]
+                else:  # if word is OOV
+                    w_idx = constants.OOV_IDX
+                if not w_idx in self.lexicon:
+                    self.lexicon[w_idx] = []
+                self.lexicon[w_idx].append(nt_idx)
+        end_time = time.time()
 
-        nt_file = constants.NT_EMB_FILE
-
-        if os.path.exists(nt_file):
-            begin_time = time.time()
-            with open(nt_file, 'r') as nt:
-                nt.next() # skip the comment
-                self.dnt = self.nnt = int(nt.next().split('\t', 1)[0]) + 2
-
-                self.nonterm_emb = torch.eye(self.nnt, self.dnt)
-                if self.verbose:
-                    print "The number of nonterminals" \
-                    "(include symbols U_TM and U_NTM) is %d" % self.nnt
-
-                # Set up the special symbol UNARY for 
-                # unary terminal and nonterminal rules:
-                # 0 U_TM
-                # 1 U_NTM
-                # 2 ROOT
-                # ...
-
-                self.nt2idx['U_TM'] = 0
-                self.nt2idx['U_NTM'] = 1
-                self.idx2nt.append('U_TM')
-                self.idx2nt.append('U_NTM')
-                self.new_nt_num = 2
-
-                idx = self.new_nt_num
-                for n in nt: 
-                    nonterminal = n.strip()
-                    self.nt2idx[nonterminal] = idx
-                    self.idx2nt.append(nonterminal)
-                    idx += 1
-            end_time = time.time()
-            if self.verbose:
-                print "-- Reading nonterminals takes %.4f, secs" \
-                    % round(end_time - begin_time, 5)
-        else:
-             # the file does not exist
-             if self.verbose:
-                print "No such nonterminal embedding file," \
-                    " the filename is %s" % nt_file         
+        if self.verbose:
+            print "-- Reading lexicons takes %.4f, secs" \
+                % round(end_time - begin_time, 5) 
         return
+    
+    def read_gr_file(self, gr_file):
+        if not self.check_file_exists(gr_file, "grammar"):
+             return
 
+        begin_time = time.time()
+        with open(gr_file, 'r') as gr_f:
+            for line in gr_f:
+                rule = line.strip().split()
+                p = self.nt2idx[rule[0][:-2]]  # [:-2] is to remove "_0" from "NP_0" to form "NP"
+                l = self.nt2idx[rule[2][:-2]]
+                if len(rule) == 5:                     # binary rule
+                    r = self.nt2idx[rule[3][:-2]]
+                    tpl = (l,r)
+                    if not tpl in self.binary:
+                        self.binary[tpl] = []
+                    self.binary[tpl].append(p)
+                if len(rule) == 4:                     # unary rule
+                    if p != l:                         # Do not allow self-recurring X -> X rules
+                        if not l in self.unary:
+                            self.unary[l] = []
+                        self.unary[l].append(p)
+        end_time = time.time()
+
+        if self.verbose:
+            print "-- Reading nonterminals takes %.4f, secs" \
+                % round(end_time - begin_time, 5)
+        return
+     
+      
     def make_trainset(self):
         examples = ptb("train", minlength=3, maxlength=30, n=10)
         train = list(examples)
 
-        train_file = open(constants.TRAIN, 'w')
+        train_file = open(constants.TRAIN_FILE, 'w')
         for (sentence, gold_tree) in train:
             train_file.write(sentence + "\n")
             train_file.write(self.convert_tree_to_encoded_list(gold_tree) + "\n")
@@ -171,73 +236,7 @@ class Processor(object):
         encoded_suffix = " " + type_symb + " " + str(child)
         self.encoded_list += encoded_prefix + encoded_suffix
         return updated_width
-    
-    ##  read corpus
-    def read_corpus(self):
 
-        # lexicon = (nt, nnt)
-        # unary_dict = (nnt, nnt)
-        # binary_dict = (nnt, nnt, nnt)
-
-        lexicon = {}
-        unary = {}
-        binary = {}
-
-        if os.path.exists(self.train_data):
-            with open(self.train_data, 'r') as data:
-                self.lines = data.readlines()
-                nsen = len(self.lines) / 2
-                assert (len(self.lines) % 2 == 0)
-                if self.verbose:
-                    print "There are %d sentences in data" % nsen
-
-                for i in xrange(nsen):           
-                    # look at the parse
-                    parse = self.lines[2*i+1].split()
-                    for j in xrange(len(parse)/4):
-                        if self.is_digit(parse[4*j+2]):
-                            # binary rule
-                            parent = int(parse[4*j+1]) + self.new_nt_num
-                            left = int(parse[4*j+2]) + self.new_nt_num
-                            right = int(parse[4*j+3]) + self.new_nt_num
-                            tpl = (left, right)
-                            if not tpl in binary:
-                                binary[tpl] = set()
-                            binary[tpl].add(parent)
-                        elif parse[4*j+2] == 'u':
-                            # unary nonterminal rule
-                            parent = int(parse[4*j+1]) + self.new_nt_num
-                            child = int(parse[4*j+3]) + self.new_nt_num
-                            if not child in unary:
-                                unary[child] = set()
-                            unary[child].add(parent)
-                        elif parse[4*j+2] == 't':
-                            # unary terminal rule
-                            parent = int(parse[4*j+1]) + self.new_nt_num
-                            word = parse[4*j+3].lower()
-                            child = self.w2idx[word] \
-                                if word in self.w2idx else 0
-
-                            if not child in lexicon:
-                                lexicon[child] = set()
-                            lexicon[child].add(parent)     
-        else:
-            print "No such corpus with filename: %s" % self.train_data
-
-        self.lexicon = {}
-        self.unary = {}
-        self.binary = {}
-
-        for s in lexicon:
-            self.lexicon[s] = list(lexicon[s])
-
-        for u in unary:
-            self.unary[u] = list(unary[u])
-
-        for b in binary:
-            self.binary[b] = list(binary[b])
-
-        return
 
     def next(self, idx, bzs=None):
         start = time.time()
@@ -310,24 +309,24 @@ class Processor(object):
                 for j in xrange(len(rest)/4):
                     if rest[4*j+2] == 'u' and i_unt < c_unt and i_p2l < c_p2l:
                         # unary nonterminal rule
-                        self.unt[senNum-1][i_unt] = self.nonterm_emb[int(rest[4*j+1]) + self.new_nt_num]
-                        self.unt_t[senNum-1][i_unt] = int(rest[4*j+3]) + self.new_nt_num
+                        self.unt[senNum-1][i_unt] = self.nonterm_emb[int(rest[4*j+1]) + self.n_new_nt]
+                        self.unt_t[senNum-1][i_unt] = int(rest[4*j+3]) + self.n_new_nt
                         self.unt_hi[senNum-1][i_unt] = int(rest[4*j]) + (senNum-1) * c_ut
                         i_unt += 1
 
-                        self.p2l[senNum-1][i_p2l] = self.nonterm_emb[int(rest[4*j+1]) + self.new_nt_num]
+                        self.p2l[senNum-1][i_p2l] = self.nonterm_emb[int(rest[4*j+1]) + self.n_new_nt]
                         self.p2l_t[senNum-1][i_p2l] = 1
                         self.p2l_hi[senNum-1][i_p2l] = int(rest[4*j]) + (senNum-1) * c_ut
                         i_p2l += 1
                     elif rest[4*j+2] == 'l' and i_p2l < c_p2l:
                         # left part of binary rule
-                        self.p2l[senNum-1][i_p2l] = self.nonterm_emb[int(rest[4*j+1]) + self.new_nt_num]
-                        self.p2l_t[senNum-1][i_p2l] = int(rest[4*j+3]) + self.new_nt_num
+                        self.p2l[senNum-1][i_p2l] = self.nonterm_emb[int(rest[4*j+1]) + self.n_new_nt]
+                        self.p2l_t[senNum-1][i_p2l] = int(rest[4*j+3]) + self.n_new_nt
                         self.p2l_hi[senNum-1][i_p2l] = int(rest[4*j]) + (senNum-1) * c_ut
                         i_p2l += 1
                     elif rest[4*j+2] == 't' and i_ut < c_ut and i_p2l < c_p2l:
                         # terminal rule
-                        self.ut[senNum-1][i_ut] = self.nonterm_emb[int(rest[4*j+1]) + self.new_nt_num]
+                        self.ut[senNum-1][i_ut] = self.nonterm_emb[int(rest[4*j+1]) + self.n_new_nt]
                         try:
                             self.ut_t[senNum-1][i_ut] = self.w2idx[rest[4*j+3].lower()]
                             self.sens[senNum-1][i_ut] = self.w2idx[rest[4*j+3].lower()]
@@ -337,19 +336,19 @@ class Processor(object):
                         self.ut_hi[senNum-1][i_ut] = int(rest[4*j]) + (senNum-1) * c_ut
                         i_ut += 1
 
-                        self.p2l[senNum-1][i_p2l] = self.nonterm_emb[int(rest[4*j+1]) + self.new_nt_num]
+                        self.p2l[senNum-1][i_p2l] = self.nonterm_emb[int(rest[4*j+1]) + self.n_new_nt]
                         self.p2l_t[senNum-1][i_p2l] = 0
                         self.p2l_hi[senNum-1][i_p2l] = int(rest[4*j]) + (senNum-1) * c_ut
                         i_p2l += 1
                     elif self.is_digit(rest[4*j+2]) and i_pl2r < c_pl2r:
                         # right part of binary rule
                         temp = torch.cat((
-                                self.nonterm_emb[int(rest[4*j+1]) + self.new_nt_num].view(-1),
-                                self.nonterm_emb[int(rest[4*j+2]) + self.new_nt_num].view(-1)
+                                self.nonterm_emb[int(rest[4*j+1]) + self.n_new_nt].view(-1),
+                                self.nonterm_emb[int(rest[4*j+2]) + self.n_new_nt].view(-1)
                             ), 0)
 
                         self.pl2r[senNum-1][i_pl2r] = temp
-                        self.pl2r_t[senNum-1][i_pl2r] = int(rest[4*j+3]) + self.new_nt_num
+                        self.pl2r_t[senNum-1][i_pl2r] = int(rest[4*j+3]) + self.n_new_nt
                         self.pl2r_hi[senNum-1][i_pl2r] = int(rest[4*j]) + (senNum-1) * c_ut
                         i_pl2r += 1
                 senIdx += 1
@@ -430,7 +429,7 @@ class Processor(object):
         #print len(p2l_p)
         #print len(pl2r_p)
 
-    def read_and_process(self):
+    def read_data_from_files(self):
         if self.read_data:
             if os.path.exists(constants.CORPUS_INFO_FILE):
                 os.remove(constants.CORPUS_INFO_FILE)
@@ -438,9 +437,11 @@ class Processor(object):
                 print "Reading and processing data ... "
             start = time.time()
 
-            self.read_word2vec()
-            self.create_nt_emb()
-            self.read_corpus()
+            self.read_w2v_file(constants.W2V_FILE)
+            self.read_nt_file(constants.NT_EMB_FILE)
+            self.read_lex_file(constants.LEX_FILE)
+            self.read_gr_file(constants.GR_FILE)
+        
             self.create_precomputed_matrix()
 
             end = time.time()
@@ -462,7 +463,6 @@ class Processor(object):
                     'lexicon': self.lexicon,
                     'unary': self.unary,
                     'binary': self.binary,
-                    'lines': self.lines,
                     'unt_pre': self.unt_pre,
                     'p2l_pre': self.p2l_pre,
                     'pl2r_pre': self.pl2r_pre
@@ -486,14 +486,13 @@ class Processor(object):
             self.idx2w = d['idx2w']
             self.nt2idx = d['nt2idx']
             self.idx2nt = d['idx2nt']
-            self.lines = d['lines']
             self.lexicon = d['lexicon']
             self.unary = d['unary']
             self.binary = d['binary']
             self.unt_pre = d['unt_pre']
             self.p2l_pre = d['p2l_pre']
             self.pl2r_pre = d['pl2r_pre']
-            self.new_nt_num = 2
+            self.n_new_nt = 2
             #self.print_rules()
             end = time.time()
 

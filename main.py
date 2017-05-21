@@ -22,7 +22,7 @@ argparser = argparse.ArgumentParser(description='Generative Neural Parser')
 # Below are variables associated with files
 # =========================================================================
 argparser.add_argument(
-    '--train', default=constants.TRAIN, help='Train file path'
+    '--train', default=constants.TRAIN_FILE, help='Train file path'
 )
 
 argparser.add_argument(
@@ -130,11 +130,9 @@ args.make_train = (args.make_train == 'yes')
 
 # let the processor read in data
 p = Processor(args.train, args.read_data, args.verbose)
+p.read_data_from_files()
 if args.make_train:
-    #TODO @Bo: maybe p.create_nt_emb() is redundant
-    p.create_nt_emb() # need to make sure there is nonterminal embeddings first
     p.make_trainset()
-p.read_and_process()
 
 # create a grammar object
 parser = GrammarObject(p)
