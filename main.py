@@ -129,10 +129,8 @@ args.read_data = (args.read_data == 'yes')
 args.make_train = (args.make_train == 'yes')
 
 # let the processor read in data
-p = Processor(args.train, args.read_data, args.verbose)
+p = Processor(args.train, args.read_data, args.verbose, args.make_train)
 p.read_data_from_files()
-if args.make_train:
-    p.make_trainset()
 
 # create a grammar object
 parser = GrammarObject(p)

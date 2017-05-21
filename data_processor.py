@@ -10,10 +10,11 @@ from ptb import ptb
 
 class Processor(object):  
 
-    def __init__(self, train, read_data, verbose):
+    def __init__(self, train, read_data, verbose, make_train):
         self.train_data = train         # the train file
-        self.read_data = read_data      # whether read new data
+        self.read_data = read_data      # whether to read new data
         self.verbose = verbose          # verbose mode or not
+        self.make_train = make_train    # whether to make train set
 
         ## Terminals
         self.dt = 100                   # dimension of terminal, as in word2vec
@@ -181,10 +182,17 @@ class Processor(object):
             print "-- Reading nonterminals takes %.4f, secs" \
                 % round(end_time - begin_time, 5)
         return
-     
-      
+    
+    def read_train_data(self):
+        if not self.check_file_exists(self.train_data, "training data"):
+            return
+
+        with open(self.train_data, 'r') as data:
+            self.lines = data.readlines()    
+
+                
     def make_trainset(self):
-        examples = ptb("train", minlength=3, maxlength=30, n=10)
+        examples = ptb("train", minlength=3, maxlength=30)
         train = list(examples)
 
         train_file = open(constants.TRAIN_FILE, 'w')
@@ -441,6 +449,10 @@ class Processor(object):
             self.read_nt_file(constants.NT_EMB_FILE)
             self.read_lex_file(constants.LEX_FILE)
             self.read_gr_file(constants.GR_FILE)
+
+            if self.make_train:
+                self.make_trainset()
+            self.read_train_data()
         
             self.create_precomputed_matrix()
 
@@ -463,6 +475,7 @@ class Processor(object):
                     'lexicon': self.lexicon,
                     'unary': self.unary,
                     'binary': self.binary,
+                    'lines': self.lines,
                     'unt_pre': self.unt_pre,
                     'p2l_pre': self.p2l_pre,
                     'pl2r_pre': self.pl2r_pre
@@ -486,6 +499,7 @@ class Processor(object):
             self.idx2w = d['idx2w']
             self.nt2idx = d['nt2idx']
             self.idx2nt = d['idx2nt']
+            self.lines = d['lines']
             self.lexicon = d['lexicon']
             self.unary = d['unary']
             self.binary = d['binary']
@@ -498,7 +512,7 @@ class Processor(object):
 
         if self.verbose:
             print "Reading data takes %.4f secs" % round(end - start, 5)
-
+ 
     def get_sen(self, indices):
         return " ".join([self.idx2w[i] for i in indices])
 
