@@ -202,7 +202,7 @@ class LCNPModel(nn.Module):
                 preterminal[i,p] = self.preterm_prob(lsm, ut_w, ut_b, p, c, output[0, i]).data[0]
 
         if self.use_cuda:
-            parse_tree = self.parser.parse1(
+            parse_tree = self.parser.viterbi_parse(
                     sentence,
                     sen.cpu().numpy(),
                     preterminal,
@@ -211,7 +211,7 @@ class LCNPModel(nn.Module):
                     pl2r_pr.cpu().data.numpy()
                 )
         else:
-            parse_tree = self.parser.parse1(
+            parse_tree = self.parser.viterbi_parse(
                     sentence,
                     sen.numpy(),
                     preterminal,
