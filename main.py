@@ -34,7 +34,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--read-data', default="yes", help='Whether read data'
+    '--read-data', default="no", help='Whether read data'
 )
 
 # Below are variables associated with model
@@ -113,17 +113,24 @@ if args.verbose == 'yes':
     print template.format(" whether to read new data :", args.read_data)
     print "- Model:"
     print template.format(" model mode :", args.mode)
-    print template.format(" seed is :", str(args.seed))
-    print template.format(" LSTM coefficient :", str(args.lstm_coef))
-    print template.format(" LSTM # of layer :", str(args.lstm_layer))
-    print template.format(" LSTM dimension :", str(args.lstm_dim))
-    print template.format(" l2 coefficient :", str(args.l2_coef))
+    print template.format(" seed is :", args.seed)
+    print template.format(" LSTM coefficient :", args.lstm_coef)
+    print template.format(" LSTM # of layer :", args.lstm_layer)
+    print template.format(" LSTM dimension :", args.lstm_dim)
+    print template.format(" l2 coefficient :", args.l2_coef)
     print "- Train:"
-    print template.format(" # of epochs is :", str(args.epochs))
-    print template.format(" batch size is :", str(args.batch_size))
-    print template.format(" learning rate is :", str(args.learning_rate))
+    print template.format(" # of epochs is :", args.epochs)
+    print template.format(" batch size is :", args.batch_size)
+    print template.format(" learning rate is :", args.learning_rate)
     print "="*80
 
+args.seed = int(args.seed)
+args.lstm_coef = float(args.lstm_coef)
+args.lstm_layer = int(args.lstm_layer)
+args.lstm_dim = int(args.lstm_dim)
+args.l2_coef = float(args.l2_coef)
+args.epochs = int(args.epochs)
+args.batch_size = int(args.batch_size)
 args.verbose = (args.verbose == 'yes')
 args.read_data = (args.read_data == 'yes')
 args.make_train = (args.make_train == 'yes')

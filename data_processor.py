@@ -199,7 +199,7 @@ class Processor(object):
             self.lines = data.readlines()    
 
     def make_trainset(self):
-        examples = ptb("train", minlength=3, maxlength=30)
+        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH)
         train_trees = list(examples)
 
         f = open(self.train_file, 'w')
@@ -300,7 +300,7 @@ class Processor(object):
             wrong = False
             length = len(self.lines)
             while senNum < bzs: # gather bzs number of sentences as input
-                if 2 * senIdx >= length:
+                if 2 * senIdx+2 >= length:
                     wrong = True
                     break
 

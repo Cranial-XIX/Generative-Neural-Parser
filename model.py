@@ -312,7 +312,7 @@ class LCNPModel(nn.Module):
 
         #t0 = time.time()
         # run the LSTM to extract features from left context
-        output, hidden = self.LSTM(self.encoder_t(sens), self.h0) 
+        output, hidden = self.LSTM(self.encoder_t(sens), self.h0)
         output = self.lstm_coef * output.contiguous().view(-1, output.size(2))
 
         #t1 = time.time()
