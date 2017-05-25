@@ -101,7 +101,7 @@ if not args.mode == 'parse':
     time_current = datetime.datetime.now().isoformat()
     name = 'PID='+str(id_process)+'_TIME='+time_current
     os.makedirs('./output/' + name + '/')
-    file_save = os.path.abspath(name + 'model_dict')
+    file_save = os.path.abspath('./output/' + name + '/' + 'model_dict')
 
 ## show values ##
 if args.verbose == 'yes':
