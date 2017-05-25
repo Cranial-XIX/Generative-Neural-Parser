@@ -10,8 +10,8 @@ from ptb import ptb
 
 class Processor(object):  
 
-    def __init__(self, train, read_data, verbose, make_train):
-        self.train_data = train         # the train file
+    def __init__(self, train_file, make_train, read_data, verbose):
+        self.train_file = train_file    # the train file
         self.read_data = read_data      # whether to read new data
         self.verbose = verbose          # verbose mode or not
         self.make_train = make_train    # whether to make train set
@@ -29,9 +29,9 @@ class Processor(object):
         self.idx2nt = []                # (int -> string)
 
         ## Lexicon and grammar
-        self.lexicon = {}               # (int -> int)
-        self.unary = {}                 # (int -> int)
-        self.binary = {}                # ((int,int) -> int)
+        self.lexicon = {}               # (int -> [int])
+        self.unary = {}                 # (int -> [int])
+        self.binary = {}                # ((int,int) -> [int])
 
 
     def check_file_exists(self, filename, file_type):
@@ -55,7 +55,7 @@ class Processor(object):
         '''
         if not self.check_file_exists(w2v_file, "word2vec"):
             return
-        
+
         self.term_emb = torch.FloatTensor(
             int(constants.MAX_VOCAB_SIZE), self.dt)
 
@@ -85,8 +85,8 @@ class Processor(object):
         end_time = time.time()
 
         if self.verbose:
-            print "-- Reading word2vec takes %.4f, secs" % round(end_time - begin_time, 5)
-            print "Number of words read:", self.nt
+            print "-- Reading word2vec takes %.4f s" % round(end_time - begin_time, 5)
+            print "   # words: ", self.nt
         return
  
     def read_nt_file(self, nt_file):
@@ -99,12 +99,12 @@ class Processor(object):
         begin_time = time.time()
         with open(nt_file, 'r') as nt_f:
             nt_f.next()  # skip the comment
-            self.dnt = self.nnt = int(nt_f.next()) + 2  # add 2 to account for U_TM and U_NTM
+            self.dnt = self.nnt = int(nt_f.next()) + 2  # +2 for U_TM & U_NTM
 
-            self.nonterm_emb = torch.eye(self.nnt, self.dnt)  # an identity matrix
+            self.nonterm_emb = torch.eye(self.nnt, self.dnt)
             if self.verbose:
-                print "The number of nonterminals " \
-                "(include symbols U_TM and U_NTM) is %d" % self.nnt
+                print "# nonterminals " \
+                "(include symbols U_TM and U_NTM): %d" % self.nnt
 
             # Set up the special symbol UNARY for 
             # unary terminal and nonterminal rules:
@@ -112,7 +112,6 @@ class Processor(object):
             # 1 U_NTM
             # 2 ROOT
             # ...
-
             self.nt2idx[constants.U_TM] = 0
             self.nt2idx[constants.U_NTM] = 1
             self.idx2nt.append(constants.U_TM)
@@ -127,17 +126,19 @@ class Processor(object):
         end_time = time.time()
 
         if self.verbose:
-            print "-- Reading nonterminals takes %.4f, secs" \
+            print "-- Reading nonterminals takes %.4f s" \
                 % round(end_time - begin_time, 5)      
         return
 
     def read_lex_file(self, lex_file):
         if not self.check_file_exists(lex_file, "lexicon"):
              return
-             
+
+        npt = 0 # number of preterminal rules
         begin_time = time.time()
         with open(lex_file, 'r') as lex_f:
             for line in lex_f:
+                npt += 1
                 lex = line.strip().split()
                 nt_idx = self.nt2idx[lex[0]]
                 w = lex[1]
@@ -151,14 +152,17 @@ class Processor(object):
         end_time = time.time()
 
         if self.verbose:
-            print "-- Reading lexicons takes %.4f, secs" \
-                % round(end_time - begin_time, 5) 
+            print "-- Reading lexicon takes %.4f s" \
+                % round(end_time - begin_time, 5)
+            print "   # preterminal rules: ", npt
         return
     
     def read_gr_file(self, gr_file):
         if not self.check_file_exists(gr_file, "grammar"):
              return
 
+        nu = 0 # number of unary rules
+        nb = 0 # number of binary rules
         begin_time = time.time()
         with open(gr_file, 'r') as gr_f:
             for line in gr_f:
@@ -166,6 +170,7 @@ class Processor(object):
                 p = self.nt2idx[rule[0][:-2]]  # [:-2] is to remove "_0" from "NP_0" to form "NP"
                 l = self.nt2idx[rule[2][:-2]]
                 if len(rule) == 5:                     # binary rule
+                    nb += 1
                     r = self.nt2idx[rule[3][:-2]]
                     tpl = (l,r)
                     if not tpl in self.binary:
@@ -173,35 +178,40 @@ class Processor(object):
                     self.binary[tpl].append(p)
                 if len(rule) == 4:                     # unary rule
                     if p != l:                         # Do not allow self-recurring X -> X rules
+                        nu += 1
                         if not l in self.unary:
                             self.unary[l] = []
                         self.unary[l].append(p)
         end_time = time.time()
 
         if self.verbose:
-            print "-- Reading nonterminals takes %.4f, secs" \
+            print "-- Reading grammar takes %.4f s" \
                 % round(end_time - begin_time, 5)
+            print "   # binary rules: ", nb
+            print "   # unary rules: ", nu            
         return
     
     def read_train_data(self):
-        if not self.check_file_exists(self.train_data, "training data"):
+        if not self.check_file_exists(self.train_file, "training data"):
             return
 
-        with open(self.train_data, 'r') as data:
+        with open(self.train_file, 'r') as data:
             self.lines = data.readlines()    
 
-                
     def make_trainset(self):
         examples = ptb("train", minlength=3, maxlength=30)
-        train = list(examples)
+        train_trees = list(examples)
 
-        train_file = open(constants.TRAIN_FILE, 'w')
-        for (sentence, gold_tree) in train:
-            train_file.write(sentence + "\n")
-            train_file.write(self.convert_tree_to_encoded_list(gold_tree) + "\n")
-        # Debug: print self.convert_tree_to_encoded_list(nltk.Tree.fromstring("(ROOT (S (@S (NP I) (VP (VBP live)))(. .)))"))
-        
-        train_file.close()
+        f = open(self.train_file, 'w')
+        begin_time = time.time()
+        for (sentence, gold_tree) in train_trees:
+            f.write(sentence + "\n")
+            f.write(self.convert_tree_to_encoded_list(gold_tree) + "\n")
+        # DEBUG: print self.convert_tree_to_encoded_list(nltk.Tree.fromstring("(ROOT (S (@S (NP I) (VP (VBP live)))(. .)))"))
+        end_time = time.time()
+        print "-- Making trainset takes %.4f s" \
+            % round(end_time - begin_time, 5)
+        f.close()
                 
     def convert_tree_to_encoded_list(self, tree):       
         self.encoded_list = ""
@@ -244,7 +254,6 @@ class Processor(object):
         encoded_suffix = " " + type_symb + " " + str(child)
         self.encoded_list += encoded_prefix + encoded_suffix
         return updated_width
-
 
     def next(self, idx, bzs=None):
         start = time.time()
@@ -419,8 +428,6 @@ class Processor(object):
                     self.unt_pre[parent] = self.nonterm_emb[parent]
                     unt_p.add(parent)
 
-        #print len(unt_p)
-
         self.p2l_pre[0] = self.nonterm_emb[0]
         self.p2l_pre[1] = self.nonterm_emb[1]
 
@@ -434,10 +441,7 @@ class Processor(object):
                     self.pl2r_pre[parent][key[0]] = \
                         torch.cat((self.nonterm_emb[parent], self.nonterm_emb[key[0]]), 0).view(1, -1)
 
-        #print len(p2l_p)
-        #print len(pl2r_p)
-
-    def read_data_from_files(self):
+    def process_data(self):
         if self.read_data:
             if os.path.exists(constants.CORPUS_INFO_FILE):
                 os.remove(constants.CORPUS_INFO_FILE)
@@ -458,7 +462,7 @@ class Processor(object):
 
             end = time.time()
 
-            self.print_rules()
+            # DEBUG: self.print_rules()
 
             # save those for future use
             torch.save({

@@ -40,7 +40,7 @@ argparser.add_argument(
 # Below are variables associated with model
 # =========================================================================
 argparser.add_argument(
-    '--mode', default="parse", help='mode: spvtrain, uspvtrain, test, parse'
+    '--mode', default="parse", help='mode: spv_train, uspv_train, test, parse'
 )
 
 argparser.add_argument(
@@ -129,14 +129,14 @@ args.read_data = (args.read_data == 'yes')
 args.make_train = (args.make_train == 'yes')
 
 # let the processor read in data
-p = Processor(args.train, args.read_data, args.verbose, args.make_train)
-p.read_data_from_files()
+p = Processor(args.train, args.make_train, args.read_data, args.verbose)
+p.process_data()
 
 # create a grammar object
 parser = GrammarObject(p)
-parser.read_gr_file('xbar.grammar')
+parser.read_gr_file(constants.GR_FILE)
 
-# preprocessing
+# set batch size for unsupervised learning and parsing
 if not args.mode == 'spv_train':
     args.batch_size = 1
 

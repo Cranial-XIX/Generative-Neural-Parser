@@ -6,15 +6,15 @@
 #cython: cdivision=True
 #distutils: language=c++
 
-import os, sys
+import os
+import sys
 import time
 import numpy as np
 cimport numpy as np
 
 from cython.operator cimport dereference as deref
-from libcpp cimport bool
-from libcpp.vector cimport vector
 from libc.math cimport log, exp
+from libcpp.vector cimport vector
 from numpy cimport int_t, double_t, int16_t
 
 Vt = np.double
@@ -25,6 +25,7 @@ ctypedef int16_t    D_t
 ctypedef double_t   V_t
 ctypedef vector[short int] intvec
 
+# cell in cky parsing chart
 cdef packed struct Cell:
     V_t score
     D_t y
@@ -467,7 +468,9 @@ cdef class GrammarObject(object):
             intvec tmp
             intvec* cell
 
-       for ik in xrange(n*(n+1)//2):
+        n = len(sentence)
+
+        for ik in xrange(n*(n+1)//2):
             self.spandex.push_back(new intvec())
 
         RI = self.nt2idx['ROOT']
@@ -540,7 +543,7 @@ cdef class GrammarObject(object):
 
         # Do outside algorithm
         self.alphas = np.zeros((n, n+1, self.num_nt, 2))
-        self.alphas[0,n,ri,1] = 1.0
+        self.alphas[0,n,RI,1] = 1.0
 
         for w in reversed(xrange(2, n+1)): # wide to narrow
             for i in xrange(n-w+1):
@@ -591,7 +594,7 @@ cdef class GrammarObject(object):
         print "outside ", time.time() - t1
         self.spandex.clear()
 
-        return self.betas[0,n,ri,1]
+        return self.betas[0,n,RI,1]
 
     cpdef do_inside_outside(self, sentence):
         cdef:
@@ -601,6 +604,7 @@ cdef class GrammarObject(object):
             double d, d_times_left, d_times_right
             UR ur
             BR br
+            BRF brf
             intvec tmp
             intvec* cell
 
