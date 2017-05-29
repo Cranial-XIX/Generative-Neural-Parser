@@ -49,7 +49,10 @@ class LCNPModel(nn.Module):
 
         if self.use_cuda:
             # the initial states for h0 and c0 of LSTM
-            self.h0 = self.h0.cuda()
+            self.h0 = (
+                Variable(torch.zeros(self.nlayers, self.bsz, self.dhid).cuda()),
+                Variable(torch.zeros(self.nlayers, self.bsz, self.dhid).cuda())
+            )
             # initialize precomputed matrix
             self.unt_pre = self.unt_pre.cuda()
             self.p2l_pre = self.p2l_pre.cuda()
