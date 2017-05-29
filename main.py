@@ -195,57 +195,53 @@ def supervised():
         parameters, lr=args.learning_rate, weight_decay=args.l2_coef
     )
 
-    total = len(p.lines)
+    total = len(p.lines) / 2
     template = "Epoch {} Batch {} [{}/{} ({:.1f}%)] Loss: {:.4f}" \
         + " Forward: {:.4f} Backward: {:.4f} Optimize: {:.4f}"
+
     try:
         for epoch in range(args.epochs):
             idx = 0
             batch = 0
             while not idx == -1:
+                start = time.time()
+                # get next training instances
                 idx = p.next(idx, args.batch_size)
-                if not idx == -1:
-                    batch += 1
-                    start = time.time()
-                    optimizer.zero_grad()
-                    # the parameters array
-                    p_array = [
-                        p.sens,
-                        p.p2l, p.pl2r, p.unt, p.ut,
-                        p.p2l_t, p.pl2r_t, p.unt_t, p.ut_t,
-                        p.p2l_hi, p.pl2r_hi, p.unt_hi, p.ut_hi
-                    ]
+                batch += 1
+                optimizer.zero_grad()
+                # the parameters array
+                p_array = [
+                    p.sens,
+                    p.p2l, p.pl2r_p, p.pl2r_l, p.unt, p.ut,
+                    p.p2l_t, p.pl2r_t, p.unt_t, p.ut_t,
+                    p.p2l_i, p.pl2r_i, p.unt_i, p.ut_i
+                ]
 
-                    # create PyTorch Variables
-                    if args.cuda:
-                        p_array = [(Variable(x)).cuda() for x in p_array]
-                    else:
-                        p_array = [Variable(x) for x in p_array]
+                # create PyTorch Variables
+                if args.cuda:
+                    p_array = [(Variable(x)).cuda() for x in p_array]
+                else:
+                    p_array = [Variable(x) for x in p_array]
 
-                    # compute loss
-                    loss = model(
-                        p_array[0],
-                        p_array[1], p_array[2], p_array[3], p_array[4],
-                        p_array[5], p_array[6], p_array[7], p_array[8],
-                        p_array[9], p_array[10], p_array[11], p_array[12]
-                    )
+                # compute loss
+                loss = model('supervised', p_array)
 
-                    # back propagation
-                    t0 = time.time()
-                    loss.backward()
-                    t1 = time.time()
-                    # take an optimization step
-                    optimizer.step()
-                    end = time.time()
-                    if args.verbose:
-                        print template.format(
-                                epoch, batch, idx, total,
-                                float(idx)/total * 100., 
-                                loss.data[0],
-                                round(t0 - start, 5),
-                                round(t1 - t0, 5),
-                                round(end - t1, 5)
-                            )
+                # back propagation
+                t0 = time.time()
+                loss.backward()
+                t1 = time.time()
+                # take an optimization step
+                optimizer.step()
+                end = time.time()
+                if args.verbose:
+                    print template.format(
+                            epoch, batch, idx, total,
+                            float(idx)/total * 100., 
+                            loss.data[0],
+                            round(t0 - start, 5),
+                            round(t1 - t0, 5),
+                            round(end - t1, 5)
+                        )
         torch.save( {'state_dict': model.state_dict()}, file_save )
 
     except KeyboardInterrupt:
@@ -326,7 +322,7 @@ def parse(sentence):
 def test():
     # parsing
     start = time.time()
-    instances = ptb("test", minlength=3, maxlength=30)
+    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
     test = list(instances)
     cumul_accuracy = 0
     num_trees_with_parse = 0

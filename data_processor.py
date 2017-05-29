@@ -199,14 +199,19 @@ class Processor(object):
             self.lines = data.readlines()    
 
     def make_trainset(self):
-        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH)
+        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
         train_trees = list(examples)
 
         f = open(self.train_file, 'w')
         begin_time = time.time()
+        first = True
         for (sentence, gold_tree) in train_trees:
-            f.write(sentence + "\n")
-            f.write(self.convert_tree_to_encoded_list(gold_tree) + "\n")
+            if first:
+                f.write(sentence)
+                first = False                
+            else:
+                f.write("\n" + sentence)
+            f.write("\n" + self.convert_tree_to_encoded_list(gold_tree))
         # DEBUG: print self.convert_tree_to_encoded_list(nltk.Tree.fromstring("(ROOT (S (@S (NP I) (VP (VBP live)))(. .)))"))
         end_time = time.time()
         print "-- Making trainset takes %.4f s" \
@@ -214,50 +219,47 @@ class Processor(object):
         f.close()
                 
     def convert_tree_to_encoded_list(self, tree):       
-        self.encoded_list = ""
-        self.traverseTree(tree, 0, 0)
-        return self.encoded_list
-    
-    def traverseTree(self, tree, depth, width):
-        p = tree.label()
-        encoded_prefix = " " + str(width) + " " + str(self.nt2idx[p])
-        encoded_suffix = ""
-        updated_width = width
+        self.encoded_list = [""]
+        self.wi = -1 # word index
+        self.traverseTree(tree)
+        return " ".join(self.encoded_list)
 
+    def traverseTree(self, tree):
+        p = str(self.nt2idx[tree.label()])
         if tree.height() == 2:  # is leaf
-            type_symb = "t"
             child = tree.leaves()[0]
+            self.wi += 1
+            self.encoded_list.append(str(self.wi))
+            self.encoded_list.append(p)
+            self.encoded_list.append("t")
+            self.encoded_list.append(child)
+            return self.wi, "0"
         else:
-            ''' Logic:
-            1. give width to left child
-            2. get updated_width from left child
-            3. give updated_width+1 to left child
-            4. get updated_width from right child
-            '''
-            child_order = -1    # child_order == 0  =>  left child
-                                # child_order == 1  =>  right child
+            nchild = 0
             for subtree in tree:
-                child_order += 1
-                if child_order == 0:
-                    child = self.nt2idx[subtree.label()]
-                encoded_suffix += " " + str(self.nt2idx[subtree.label()]) # 1st time it will encode left child
-                                                                          # 2nd time it will encode right child
-                if type(subtree) == nltk.tree.Tree:
-                    updated_width = self.traverseTree(subtree, depth+1, updated_width+child_order)
-                    if child_order == 1:
-                        self.encoded_list += encoded_prefix + encoded_suffix
+                if nchild == 0:
+                    position, child = self.traverseTree(subtree)
+                else:
+                    _, right = self.traverseTree(subtree)
+                nchild += 1
 
-            if child_order == 0:  # unary rule
-                type_symb = "u"
-            else:  # binary rule
-                type_symb = "l"
-        encoded_suffix = " " + type_symb + " " + str(child)
-        self.encoded_list += encoded_prefix + encoded_suffix
-        return updated_width
+            self.encoded_list.append(str(self.wi))
+            self.encoded_list.append(p)
+            if nchild == 1:
+                # unary rule
+                self.encoded_list.append("u")
+                self.encoded_list.append(child)
+            else:
+                # binary rule
+                self.encoded_list.append(child)
+                self.encoded_list.append(right)
+            return position, p
 
     def next(self, idx, bzs=None):
-        start = time.time()
-
+        '''
+        this function extract the next batch of training instances
+        and save them for later use
+        '''
         if bzs == None:
             ## unsupervised
             if 2*idx < len(self.lines):
@@ -267,113 +269,105 @@ class Processor(object):
                 return -1
         else:
             ## supervised
-
             # bzs is batch size, the number of sentences we process each time
 
-            # c stands for cut_off value here
-            c_pl2r = c_ut = constants.MAX_SEN_LENGTH
-            c_unt = constants.C_UNT
-            c_p2l = constants.C_P2L
+            # the maximum number of training instances in a batch
+            m = constants.MAX_SEN_LENGTH
+            cutoff = bzs * (m+5)
 
-            self.sens = torch.LongTensor(bzs, c_ut).fill_(0)
+            self.sens = torch.LongTensor(bzs, m).fill_(0)
 
-            self.p2l = torch.zeros(bzs, c_p2l, self.dnt)
-            self.pl2r = torch.zeros(bzs, c_pl2r, self.dnt*2)
-            self.ut = torch.zeros(bzs, c_ut, self.dnt)
-            self.unt = torch.zeros(bzs, c_unt, self.dnt)
+            self.p2l = torch.LongTensor(cutoff*3,)
+            self.ut = torch.LongTensor(cutoff,)
+            self.unt = torch.LongTensor(cutoff,)
+            self.pl2r_p = torch.LongTensor(cutoff,)
+            self.pl2r_l = torch.LongTensor(cutoff,)
 
             # target list, for softmax select
-            self.p2l_t = torch.LongTensor(bzs, c_p2l).fill_(-1)
-            self.pl2r_t = torch.LongTensor(bzs, c_pl2r).fill_(-1)
-            self.ut_t = torch.LongTensor(bzs, c_ut).fill_(-1)
-            self.unt_t = torch.LongTensor(bzs, c_unt).fill_(-1)
+            self.p2l_t = torch.LongTensor(cutoff*3,)
+            self.pl2r_t = torch.LongTensor(cutoff,)
+            self.ut_t = torch.LongTensor(cutoff,)
+            self.unt_t = torch.LongTensor(cutoff,)
 
             # hidden index list
-            self.p2l_hi = torch.LongTensor(bzs, c_p2l).fill_(0)
-            self.pl2r_hi = torch.LongTensor(bzs, c_pl2r).fill_(0)
-            self.ut_hi = torch.LongTensor(bzs, c_ut).fill_(0)
-            self.unt_hi = torch.LongTensor(bzs, c_unt).fill_(0)
+            self.p2l_i = torch.LongTensor(cutoff*3,)
+            self.pl2r_i = torch.LongTensor(cutoff,)
+            self.ut_i = torch.LongTensor(cutoff,)
+            self.unt_i = torch.LongTensor(cutoff,)
 
-            senIdx = idx
-            senNum = 0
-
-            wrong = False
             length = len(self.lines)
-            while senNum < bzs: # gather bzs number of sentences as input
-                if 2 * senIdx+2 >= length:
-                    wrong = True
-                    break
 
-                sen = [w.lower() for w in self.lines[2*senIdx].split()]
-                sen = ['BOS'] + sen
+            num_p2l = num_pl2r = num_ut = num_unt = num_sen = 0
 
-                # ignore sentences that are too long
-                if len(sen) > constants.MAX_SEN_LENGTH:
-                    senIdx += 1
-                    continue
-                # find a valid sentence
-                senNum += 1
-
+            while num_sen < bzs and 2*(idx+1) <= length:
+                # get the encoded sentence, exclude the last word
+                # since we only need left context
+                self.sens[num_sen] = self.get_idx_maxlength(self.lines[2*idx])
                 # deal with the rest of inputs
-                rest = self.lines[2*senIdx+1].split()
-
-                # index of each
-                i_p2l = 0
-                i_pl2r = 0
-                i_ut = 0
-                i_unt = 0
+                rest = self.lines[2*idx+1].split()
 
                 for j in xrange(len(rest)/4):
-                    if rest[4*j+2] == 'u' and i_unt < c_unt and i_p2l < c_p2l:
-                        # unary nonterminal rule
-                        self.unt[senNum-1][i_unt] = self.nonterm_emb[int(rest[4*j+1]) + self.n_new_nt]
-                        self.unt_t[senNum-1][i_unt] = int(rest[4*j+3]) + self.n_new_nt
-                        self.unt_hi[senNum-1][i_unt] = int(rest[4*j]) + (senNum-1) * c_ut
-                        i_unt += 1
+                    lc = int(rest[4*j])       # left context position
+                    li = num_sen * m + lc
+                    p = int(rest[4*j+1])      # parent index
+                    symbol = rest[4*j+2]      # might be from: {
+                                              # 't'    (unary terminal rule)
+                                              # 'u'    (unary nontemrinal rule)
+                                              # number (the left sibling) }
+                    if symbol == 't':
+                        # terminal rule found
+                        word = rest[4*j+3].lower()
+                        c = self.w2idx[word] if word in self.w2idx else 0
+                        self.ut[num_ut] = p
+                        self.ut_t[num_ut] = c
+                        self.ut_i[num_ut] = li
+                        l = 0
+                        num_ut += 1
+                    elif symbol == "u":
+                        # unary nonterminal rule found
+                        c = int(rest[4*j+3])
+                        self.unt[num_unt] = p
+                        self.unt_t[num_unt] = c
+                        self.unt_i[num_unt] = li
+                        l = 1
+                        num_unt += 1
+                    else:
+                        # binary rule
+                        c = int(rest[4*j+3])
+                        l = int(symbol)
+                        self.pl2r_p[num_pl2r] = p
+                        self.pl2r_l[num_pl2r] = l
+                        self.pl2r_t[num_pl2r] = c
+                        self.pl2r_i[num_pl2r] = li
+                        num_pl2r += 1
 
-                        self.p2l[senNum-1][i_p2l] = self.nonterm_emb[int(rest[4*j+1]) + self.n_new_nt]
-                        self.p2l_t[senNum-1][i_p2l] = 1
-                        self.p2l_hi[senNum-1][i_p2l] = int(rest[4*j]) + (senNum-1) * c_ut
-                        i_p2l += 1
-                    elif rest[4*j+2] == 'l' and i_p2l < c_p2l:
-                        # left part of binary rule
-                        self.p2l[senNum-1][i_p2l] = self.nonterm_emb[int(rest[4*j+1]) + self.n_new_nt]
-                        self.p2l_t[senNum-1][i_p2l] = int(rest[4*j+3]) + self.n_new_nt
-                        self.p2l_hi[senNum-1][i_p2l] = int(rest[4*j]) + (senNum-1) * c_ut
-                        i_p2l += 1
-                    elif rest[4*j+2] == 't' and i_ut < c_ut and i_p2l < c_p2l:
-                        # terminal rule
-                        self.ut[senNum-1][i_ut] = self.nonterm_emb[int(rest[4*j+1]) + self.n_new_nt]
-                        try:
-                            self.ut_t[senNum-1][i_ut] = self.w2idx[rest[4*j+3].lower()]
-                            self.sens[senNum-1][i_ut] = self.w2idx[rest[4*j+3].lower()]
-                        except KeyError:
-                            self.ut_t[senNum-1][i_ut] = 0
-                            self.sens[senNum-1][i_ut] = 0
-                        self.ut_hi[senNum-1][i_ut] = int(rest[4*j]) + (senNum-1) * c_ut
-                        i_ut += 1
+                    self.p2l[num_p2l] = p
+                    self.p2l_t[num_p2l] = l
+                    self.p2l_i[num_p2l] = li
+                    num_p2l += 1
 
-                        self.p2l[senNum-1][i_p2l] = self.nonterm_emb[int(rest[4*j+1]) + self.n_new_nt]
-                        self.p2l_t[senNum-1][i_p2l] = 0
-                        self.p2l_hi[senNum-1][i_p2l] = int(rest[4*j]) + (senNum-1) * c_ut
-                        i_p2l += 1
-                    elif self.is_digit(rest[4*j+2]) and i_pl2r < c_pl2r:
-                        # right part of binary rule
-                        temp = torch.cat((
-                                self.nonterm_emb[int(rest[4*j+1]) + self.n_new_nt].view(-1),
-                                self.nonterm_emb[int(rest[4*j+2]) + self.n_new_nt].view(-1)
-                            ), 0)
+                num_sen += 1
+                idx += 1
 
-                        self.pl2r[senNum-1][i_pl2r] = temp
-                        self.pl2r_t[senNum-1][i_pl2r] = int(rest[4*j+3]) + self.n_new_nt
-                        self.pl2r_hi[senNum-1][i_pl2r] = int(rest[4*j]) + (senNum-1) * c_ut
-                        i_pl2r += 1
-                senIdx += 1
-            end = time.time()
-            if self.verbose:
-                print " - Extracting input takes %.4f" % round(end - start, 5)
+            self.p2l = self.p2l[:num_p2l]
+            self.ut = self.ut[:num_ut]
+            self.unt = self.unt[:num_unt]
+            self.pl2r_p = self.pl2r_p[:num_pl2r]
+            self.pl2r_l = self.pl2r_p[:num_pl2r]
 
-            return -1 if wrong else senIdx
+            # target list, for softmax select
+            self.p2l_t = self.p2l_t[:num_p2l]
+            self.pl2r_t = self.pl2r_t[:num_pl2r]
+            self.ut_t = self.ut_t[:num_ut]
+            self.unt_t = self.unt_t[:num_unt]
+
+            # hidden index list
+            self.p2l_i = self.p2l_i[:num_p2l]
+            self.pl2r_i = self.pl2r_i[:num_pl2r]
+            self.ut_i = self.ut_i[:num_ut]
+            self.unt_i = self.unt_i[:num_unt]
+
+            return -1 if num_sen < bzs else idx
 
     def is_digit(self, n):
         try:
@@ -529,3 +523,14 @@ class Processor(object):
             except KeyError:
                 sen_i[0][i] = 0
         return sen_i
+
+    def get_idx_maxlength(self, sen):
+        sen_w = ['BOS'] + [w.lower() for w in sen.split()]
+        sen_i = torch.LongTensor(1, constants.MAX_SEN_LENGTH).fill_(0)
+        for i in xrange(len(sen_w)-1):
+            try:
+                sen_i[0][i] = self.w2idx[sen_w[i]]
+            except KeyError:
+                sen_i[0][i] = 0
+        return sen_i
+
