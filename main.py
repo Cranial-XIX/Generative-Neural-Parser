@@ -134,6 +134,8 @@ args.batch_size = int(args.batch_size)
 args.verbose = (args.verbose == 'yes')
 args.read_data = (args.read_data == 'yes')
 args.make_train = (args.make_train == 'yes')
+if args.make_train:
+    args.read_data = True
 
 # let the processor read in data
 p = Processor(args.train, args.make_train, args.read_data, args.verbose)
