@@ -350,7 +350,6 @@ cdef class GrammarObject(object):
             BR br
             intvec tmp
             intvec* cell
-
             Cell[:,:,:] chart
 
         self.sentence = sentence.strip().split()

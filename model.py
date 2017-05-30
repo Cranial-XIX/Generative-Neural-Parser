@@ -67,7 +67,7 @@ class LCNPModel(nn.Module):
         # The LSTM and some linear transformation layers
         self.LSTM = nn.LSTM(
                 self.dt, self.dhid, self.nlayers,
-                batch_first=True, dropout=0.2, bias=True
+                batch_first=True, dropout=0.5, bias=True
             )
 
         self.dp2l = self.dnt + self.dhid
@@ -76,6 +76,7 @@ class LCNPModel(nn.Module):
         self.dut = self.dnt + self.dhid
 
         self.lsm = nn.LogSoftmax()
+        self.sm = nn.Softmax()
         self.relu = nn.ReLU()
 
         # parent to left
@@ -193,7 +194,7 @@ class LCNPModel(nn.Module):
         ut_w = w2v_w.mm(self.ut.weight).t()
         ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
 
-        preterminal = np.empty((n,self.nnt), dtype=np.float32)
+        preterminal = np.empty((n, self.nnt), dtype=np.float32)
         preterminal.fill(-1000000)
         # append one level preterminal symbols
 
@@ -207,7 +208,7 @@ class LCNPModel(nn.Module):
             print "Precomputation takes %f" % round(end - start, 5)
 
         if self.use_cuda:
-            return self.parser.viterbi_parse(
+            return self.parser.mbr_parse(
                     sentence,
                     sen.cpu().numpy(),
                     preterminal,

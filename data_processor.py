@@ -204,13 +204,15 @@ class Processor(object):
             self.lines = data.readlines()    
 
     def make_trainset(self):
-        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
+        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH)
         train_trees = list(examples)
 
         f = open(self.train_file, 'w')
         begin_time = time.time()
         first = True
         for (sentence, gold_tree) in train_trees:
+            #if self.containOOV(sentence):
+            #    continue
             if first:
                 f.write(sentence)
                 first = False                
@@ -238,7 +240,7 @@ class Processor(object):
             self.encoded_list.append(p)
             self.encoded_list.append("t")
             self.encoded_list.append(child)
-            return self.wi, "0"
+            return self.wi, p
         else:
             nchild = 0
             for subtree in tree:
@@ -247,8 +249,7 @@ class Processor(object):
                 else:
                     _, right = self.traverseTree(subtree)
                 nchild += 1
-
-            self.encoded_list.append(str(self.wi))
+            self.encoded_list.append(str(position))
             self.encoded_list.append(p)
             if nchild == 1:
                 # unary rule
@@ -261,6 +262,7 @@ class Processor(object):
             return position, p
 
     def containOOV(self, sentence):
+        sentence = sentence.strip().split()
         for i in xrange(len(sentence)):
             if sentence[i].lower() not in self.w2idx:
                 return True
