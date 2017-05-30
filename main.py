@@ -70,11 +70,11 @@ argparser.add_argument(
 # Below are variables associated with training
 # =========================================================================
 argparser.add_argument(
-    '--epochs', default=10, help='# epochs to train'
+    '--epochs', default=40, help='# epochs to train'
 )
 
 argparser.add_argument(
-    '--batch-size', default=2, help='# instances in a batch'
+    '--batch-size', default=20, help='# instances in a batch'
 )
 
 argparser.add_argument(
@@ -205,10 +205,13 @@ def supervised():
         for epoch in range(args.epochs):
             idx = 0
             batch = 0
-            while not idx == -1:
+            tot_loss = 0
+            while True:
                 start = time.time()
                 # get next training instances
                 idx = p.next(idx, args.batch_size)
+                if idx == -1:
+                    break
                 batch += 1
                 optimizer.zero_grad()
                 # the parameters array
@@ -227,7 +230,7 @@ def supervised():
 
                 # compute loss
                 loss = model('supervised', p_array)
-
+                tot_loss += loss
                 # back propagation
                 t0 = time.time()
                 loss.backward()
@@ -238,12 +241,13 @@ def supervised():
                 if args.verbose:
                     print template.format(
                             epoch, batch, idx, total,
-                            float(idx)/total * 100., 
+                            float(idx)/total * 100.,
                             loss.data[0],
                             round(t0 - start, 5),
                             round(t1 - t0, 5),
                             round(end - t1, 5)
                         )
+            print "\n Total loss of the trainset ", tot_loss.data[0]
         torch.save( {'state_dict': model.state_dict()}, file_save )
 
     except KeyboardInterrupt:
@@ -331,7 +335,6 @@ def test():
     for (sentence, gold_tree) in test:
         parse_tree = parse(sentence)
         print parse_tree
-
         tree = oneline(unbinarize(gold_tree))
         if parse_tree != "":
             tree_accruacy = evalb.evalb(tree, unbinarize(Tree.fromstring(parse_tree)))

@@ -117,7 +117,7 @@ class Processor(object):
             self.idx2nt.append(constants.U_TM)
             self.idx2nt.append(constants.U_NTM)
             
-            idx = self.n_new_nt = 2
+            idx = 2
             for line in nt_f: 
                 nt = line.strip()
                 self.nt2idx[nt] = idx
@@ -136,6 +136,7 @@ class Processor(object):
 
         npt = 0 # number of preterminal rules
         begin_time = time.time()
+        oov_set = set()
         with open(lex_file, 'r') as lex_f:
             for line in lex_f:
                 npt += 1
@@ -148,7 +149,11 @@ class Processor(object):
                     w_idx = constants.OOV_IDX
                 if not w_idx in self.lexicon:
                     self.lexicon[w_idx] = []
-                self.lexicon[w_idx].append(nt_idx)
+                if w_idx == constants.OOV_IDX:
+                    oov_set.add(nt_idx)
+                else:
+                    self.lexicon[w_idx].append(nt_idx)
+        self.lexicon[constants.OOV_IDX] = list(oov_set)
         end_time = time.time()
 
         if self.verbose:
@@ -199,7 +204,7 @@ class Processor(object):
             self.lines = data.readlines()    
 
     def make_trainset(self):
-        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH)
+        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
         train_trees = list(examples)
 
         f = open(self.train_file, 'w')
@@ -255,12 +260,18 @@ class Processor(object):
                 self.encoded_list.append(right)
             return position, p
 
-    def next(self, idx, bzs=None):
+    def containOOV(self, sentence):
+        for i in xrange(len(sentence)):
+            if sentence[i].lower() not in self.w2idx:
+                return True
+        return False
+
+    def next(self, idx, bsz=None):
         '''
         this function extract the next batch of training instances
         and save them for later use
         '''
-        if bzs == None:
+        if bsz == None:
             ## unsupervised
             if 2*idx < len(self.lines):
                 self.sen = self.get_idx(self.lines[2*idx])
@@ -269,13 +280,15 @@ class Processor(object):
                 return -1
         else:
             ## supervised
-            # bzs is batch size, the number of sentences we process each time
-
+            length = len(self.lines)
+            if 2*(idx+bsz) > length:
+                return -1
+            # bsz is batch size, the number of sentences we process each time
             # the maximum number of training instances in a batch
             m = constants.MAX_SEN_LENGTH
-            cutoff = bzs * (m+5)
+            cutoff = bsz * (m+5)
 
-            self.sens = torch.LongTensor(bzs, m).fill_(0)
+            self.sens = torch.LongTensor(bsz, m).fill_(0)
 
             self.p2l = torch.LongTensor(cutoff*3,)
             self.ut = torch.LongTensor(cutoff,)
@@ -295,11 +308,9 @@ class Processor(object):
             self.ut_i = torch.LongTensor(cutoff,)
             self.unt_i = torch.LongTensor(cutoff,)
 
-            length = len(self.lines)
-
             num_p2l = num_pl2r = num_ut = num_unt = num_sen = 0
 
-            while num_sen < bzs and 2*(idx+1) <= length:
+            while num_sen < bsz and 2*(idx+1) <= length:
                 # get the encoded sentence, exclude the last word
                 # since we only need left context
                 self.sens[num_sen] = self.get_idx_maxlength(self.lines[2*idx])
@@ -367,7 +378,7 @@ class Processor(object):
             self.ut_i = self.ut_i[:num_ut]
             self.unt_i = self.unt_i[:num_unt]
 
-            return -1 if num_sen < bzs else idx
+            return idx
 
     def is_digit(self, n):
         try:
@@ -504,10 +515,8 @@ class Processor(object):
             self.unt_pre = d['unt_pre']
             self.p2l_pre = d['p2l_pre']
             self.pl2r_pre = d['pl2r_pre']
-            self.n_new_nt = 2
             #self.print_rules()
             end = time.time()
-
         if self.verbose:
             print "Reading data takes %.4f secs" % round(end - start, 5)
  

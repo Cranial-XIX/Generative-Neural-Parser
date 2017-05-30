@@ -64,7 +64,7 @@ class LCNPModel(nn.Module):
         # The LSTM and some linear transformation layers
         self.LSTM = nn.LSTM(
                 self.dt, self.dhid, self.nlayers,
-                batch_first=True, dropout=0.5, bias=True
+                batch_first=True, dropout=0.2, bias=True
             )
 
         self.dp2l = self.dnt + self.dhid
@@ -161,8 +161,6 @@ class LCNPModel(nn.Module):
         # * h2 (num_nt * num_nt * sen_length * hidden dimension)
         h2 = output.unsqueeze(0).repeat(self.nnt, self.nnt, 1, 1)
 
-        lsm = nn.LogSoftmax()
-
         ## pre-compute all probabilities
 
         # with context probabilities
@@ -175,16 +173,16 @@ class LCNPModel(nn.Module):
         p2l_cond = torch.cat((p2l_i, h1), 2)
         pl2r_cond = torch.cat((pl2r_i, h2), 3)
 
-        size = unt_cond.size()
-        size2 = pl2r_cond.size()
+        sz = unt_cond.size()
+        sz2 = pl2r_cond.size()
 
         # parent to unary child
         # * unt_pr (num_nt * sen_length * num_nt) -> (parent, position i, child)
-        unt_pr = lsm(self.unt(unt_cond.view(-1, size[2]))).view(size[0], size[1], -1)
+        unt_pr = self.lsm(self.unt(unt_cond.view(-1, sz[2]))).view(sz[0], sz[1], -1)
         # parent to left
-        p2l_pr = lsm(self.p2l(p2l_cond.view(-1, size[2]))).view(size[0], size[1], -1)
+        p2l_pr = self.lsm(self.p2l(p2l_cond.view(-1, sz[2]))).view(sz[0], sz[1], -1)
         # parent left to right
-        pl2r_pr = lsm(self.pl2r(pl2r_cond.view(-1, size2[3]))).view(size2[0], size2[1], size2[2], -1)
+        pl2r_pr = self.lsm(self.relu(self.pl2r(pl2r_cond.view(-1, sz2[3])))).view(sz2[0], sz2[1], sz2[2], -1)
 
         # since for lexicon, Pr(x | P) = logsoftmax(A(Wx + b)). We
         # precompute AW (as ut_w) and Ab (as ut_b) here to speed up the computation
@@ -195,23 +193,18 @@ class LCNPModel(nn.Module):
         preterminal = np.empty((n,self.nnt), dtype=np.float32)
         preterminal.fill(-1000000)
         # append one level preterminal symbols
-        xx = set()
+
         for i in xrange(n):
             c = sen[i]
-            #TODO temporal hack that should be fixed
-            if c not in self.lexicon:
-                print "aaa"
-                return ""
             for p in self.lexicon[c]:
-                xx.add(p)
-                #print p
-                #preterminal[i,p] = self.preterm_prob(lsm, ut_w, ut_b, p, c, output[0, i]).data[0]
-        print len(xx)
-        print sen
-        print "aaaaa"
-        '''
+                preterminal[i,p] = self.preterm_prob(ut_w, ut_b, p, c, output[0, i]).data[0]
+
+        end = time.time()
+        if self.verbose:
+            print "Precomputation takes %f" % round(end - start, 5)
+
         if self.use_cuda:
-            parse_tree = self.parser.viterbi_parse(
+            return self.parser.viterbi_parse(
                     sentence,
                     sen.cpu().numpy(),
                     preterminal,
@@ -220,7 +213,7 @@ class LCNPModel(nn.Module):
                     pl2r_pr.cpu().data.numpy()
                 )
         else:
-            parse_tree = self.parser.viterbi_parse(
+            return self.parser.viterbi_parse(
                     sentence,
                     sen.numpy(),
                     preterminal,
@@ -228,14 +221,6 @@ class LCNPModel(nn.Module):
                     p2l_pr.data.numpy(),
                     pl2r_pr.data.numpy()
                 )
-
-        end = time.time()
-        if self.verbose:
-            print "Precomputation takes %f" % round(end - start, 5)
-  
-        return parse_tree
-        '''
-        return ""
 
     def unsupervised(self, sen):
         # sen is a torch.LongTensor object, containing fake BOS index
@@ -304,7 +289,7 @@ class LCNPModel(nn.Module):
 
         return Variable(torch.FloatTensor[1])
 
-    def preterm_prob(self, lsm, ut_w, ut_b, p, c, h):
+    def preterm_prob(self, ut_w, ut_b, p, c, h):
         pi = Variable(torch.LongTensor([p]))
         h = h.view(1, -1)
         if self.use_cuda:
@@ -314,7 +299,7 @@ class LCNPModel(nn.Module):
         cond = torch.cat((self.encoder_nt(pi), h), 1)
         res = cond.mm(ut_w) + ut_b
         UT_idx = 0  # UT_idx = the index for unary terminal symbol
-        return lsm(self.p2l(cond))[0][UT_idx] + lsm(res)[0][c]
+        return self.lsm(self.p2l(cond))[0][UT_idx] + self.lsm(res)[0][c]
 
     def supervised(self, sens,
         p2l, pl2r_p, pl2r_l, unt, ut,

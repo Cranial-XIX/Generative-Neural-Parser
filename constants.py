@@ -2,7 +2,7 @@ W2V_FILE = "data/w2v.txt"
 NT_EMB_FILE = "data/xbar.nonterminals"
 LEX_FILE = "data/xbar.lexicon"
 GR_FILE = "data/xbar.grammar"
-TRAIN_FILE = "data/train.txt"
+TRAIN_FILE = "data/train_temp.txt"
 
 PRE_TRAINED_FILE = "output/default_cpu/model_dict"
 CORPUS_INFO_FILE = "corpus_info.tar"
