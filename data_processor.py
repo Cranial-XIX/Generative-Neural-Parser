@@ -204,15 +204,15 @@ class Processor(object):
             self.lines = data.readlines()    
 
     def make_trainset(self):
-        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH)
+        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH,n=30)
         train_trees = list(examples)
 
         f = open(self.train_file, 'w')
         begin_time = time.time()
         first = True
         for (sentence, gold_tree) in train_trees:
-            #if self.containOOV(sentence):
-            #    continue
+            if self.containOOV(sentence):
+                continue
             if first:
                 f.write(sentence)
                 first = False                
@@ -321,7 +321,7 @@ class Processor(object):
 
                 for j in xrange(len(rest)/4):
                     lc = int(rest[4*j])       # left context position
-                    li = num_sen * m + lc
+                    li = num_sen * m + lc     # left index in matrix
                     p = int(rest[4*j+1])      # parent index
                     symbol = rest[4*j+2]      # might be from: {
                                               # 't'    (unary terminal rule)

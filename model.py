@@ -67,7 +67,7 @@ class LCNPModel(nn.Module):
         # The LSTM and some linear transformation layers
         self.LSTM = nn.LSTM(
                 self.dt, self.dhid, self.nlayers,
-                batch_first=True, dropout=0.5, bias=True
+                batch_first=True, bias=True
             )
 
         self.dp2l = self.dnt + self.dhid
@@ -82,7 +82,8 @@ class LCNPModel(nn.Module):
         # parent to left
         self.p2l = nn.Linear(self.dp2l, self.nnt)
         # parent left to right
-        self.pl2r = nn.Linear(self.dpl2r, self.nnt)
+        self.pl2r = nn.Linear(self.dpl2r, 200)
+        self.pl2r_out = nn.Linear(200, self.nnt)
         # unary nonterminal
         self.unt = nn.Linear(self.dunt, self.nnt)
         # unary terminal
@@ -102,22 +103,31 @@ class LCNPModel(nn.Module):
         lstm_weight_range = 0.2
 
         self.LSTM.weight_ih_l0.data.uniform_(-lstm_weight_range, lstm_weight_range)
+        '''
         self.LSTM.weight_ih_l1.data.uniform_(-lstm_weight_range, lstm_weight_range)
-        self.LSTM.weight_ih_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)
-        self.LSTM.weight_hh_l0.data.uniform_(-lstm_weight_range, lstm_weight_range)
-        self.LSTM.weight_hh_l1.data.uniform_(-lstm_weight_range, lstm_weight_range)
-        self.LSTM.weight_hh_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)
 
-        size = len(self.LSTM.bias_ih_l1)
+        self.LSTM.weight_ih_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)
+        '''
+
+        self.LSTM.weight_hh_l0.data.uniform_(-lstm_weight_range, lstm_weight_range)
+        '''      
+        self.LSTM.weight_hh_l1.data.uniform_(-lstm_weight_range, lstm_weight_range)
+  
+        self.LSTM.weight_hh_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)
+        '''
+
+        size = len(self.LSTM.bias_ih_l0)
         section = size / 4
         for i in xrange(section, 2*section):
             self.LSTM.bias_ih_l0.data[i] = 1.0
+            self.LSTM.bias_hh_l0.data[i] = 1.0
+            '''
             self.LSTM.bias_ih_l1.data[i] = 1.0
             self.LSTM.bias_ih_l2.data[i] = 1.0
-            self.LSTM.bias_hh_l0.data[i] = 1.0
+
             self.LSTM.bias_hh_l1.data[i] = 1.0
             self.LSTM.bias_hh_l2.data[i] = 1.0
-
+            '''
         self.p2l.bias.data.fill_(0)
         self.p2l.weight.data.uniform_(-initrange, initrange)
 
@@ -186,7 +196,7 @@ class LCNPModel(nn.Module):
         # parent to left
         p2l_pr = self.lsm(self.p2l(p2l_cond.view(-1, sz[2]))).view(sz[0], sz[1], -1)
         # parent left to right
-        pl2r_pr = self.lsm(self.relu(self.pl2r(pl2r_cond.view(-1, sz2[3])))).view(sz2[0], sz2[1], sz2[2], -1)
+        pl2r_pr = self.lsm(self.pl2r_out(self.relu(self.pl2r(pl2r_cond.view(-1, sz2[3]))))).view(sz2[0], sz2[1], sz2[2], -1)
 
         # since for lexicon, Pr(x | P) = logsoftmax(A(Wx + b)). We
         # precompute AW (as ut_w) and Ab (as ut_b) here to speed up the computation
@@ -217,6 +227,16 @@ class LCNPModel(nn.Module):
                     pl2r_pr.cpu().data.numpy()
                 )
         else:
+            '''
+            self.parser.inside_outside(
+                    sentence,
+                    sen.numpy(),
+                    preterminal,
+                    unt_pr.data.numpy(),
+                    p2l_pr.data.numpy(),
+                    pl2r_pr.data.numpy()
+            )
+            '''
             return self.parser.viterbi_parse(
                     sentence,
                     sen.numpy(),
@@ -312,7 +332,7 @@ class LCNPModel(nn.Module):
 
         # run the LSTM to extract features from left context
         output, hidden = self.LSTM(self.encoder_t(sens), self.h0)
-        output = output.contiguous().view(-1, output.size(2))
+        output = self.lstm_coef * output.contiguous().view(-1, output.size(2))
 
         # compute the log probability of p2l rules
         p2l_cond = torch.cat((
@@ -340,9 +360,9 @@ class LCNPModel(nn.Module):
             torch.index_select(output, 0, ut_i)
         ), 1)
 
-        matrix = self.ut(ut_cond).mm((self.word2vec.weight + self.word2vec_plus.weight).t())
+        m_ut = self.ut(ut_cond).mm((self.word2vec.weight + self.word2vec_plus.weight).t())
         nll_ut = -torch.sum(
-            self.lsm(matrix).gather(1, ut_t.unsqueeze(1))
+            self.lsm(m_ut).gather(1, ut_t.unsqueeze(1))
         )
 
         # compute the log probability of pl2r rules
@@ -353,9 +373,9 @@ class LCNPModel(nn.Module):
         ), 1)
 
         # pass to a single layer neural net for nonlinearity
-        matrix = self.relu(self.pl2r(pl2r_cond))
+        m_pl2r = self.relu(self.pl2r(pl2r_cond))
         nll_pl2r = -torch.sum(
-            self.lsm(matrix).gather(1, pl2r_t.unsqueeze(1))
+            self.lsm(self.pl2r_out(m_pl2r)).gather(1, pl2r_t.unsqueeze(1))
         )
 
         return nll_p2l + nll_pl2r + nll_unt + nll_ut

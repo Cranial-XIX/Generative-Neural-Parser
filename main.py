@@ -44,7 +44,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--seed', default=12345, help='random seed'
+    '--seed', default=419, help='random seed'
 )
 
 argparser.add_argument(
@@ -52,15 +52,15 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--lstm-layer', default=3, help='# LSTM layer'
+    '--lstm-layer', default=1, help='# LSTM layer'
 )
 
 argparser.add_argument(
-    '--lstm-dim', default=100, help='LSTM hidden dimension'
+    '--lstm-dim', default=120, help='LSTM hidden dimension'
 )
 
 argparser.add_argument(
-    '--l2-coef', default=1e-2, help='l2 norm coefficient'
+    '--l2-coef', default=0.02, help='l2 norm coefficient'
 )
 
 argparser.add_argument(
@@ -98,14 +98,14 @@ if torch.cuda.is_available():
 file_save = ""
 if not args.mode == 'parse':
     id_process = os.getpid()
-    time_current = datetime.datetime.now().isoformat()
-    name = 'PID='+str(id_process)+'_TIME='+time_current
+    #time_current = datetime.datetime.now().isoformat()
+    name = 'PID='+str(id_process)#+'_TIME='+time_current
     os.makedirs('./output/' + name + '/')
     file_save = os.path.abspath('./output/' + name + '/' + 'model_dict')
 
 ## show values ##
 if args.verbose == 'yes':
-    template = "{0:30}{1:20}"
+    template = "{0:30}{1:35}"
     print "="*80
     print "- Files:"
     print template.format(" train file :", args.train)
@@ -328,26 +328,34 @@ def parse(sentence):
 def test():
     # parsing
     start = time.time()
-    instances = ptb("test", minlength=3, maxlength=constants.MAX_SEN_LENGTH)
+    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH,n=30)
     test = list(instances)
     cumul_accuracy = 0
     num_trees_with_parse = 0
+    total = 0
     for (sentence, gold_tree) in test:
-        parse_tree = parse(sentence)
-        print parse_tree
-
-        tree = oneline(unbinarize(gold_tree))
-        if parse_tree != "":
-            tree_accruacy = evalb.evalb(tree, unbinarize(Tree.fromstring(parse_tree)))
+        if p.containOOV(sentence):
+            continue
+        total += 1
+        parse_string = parse(sentence)
+        if parse_string != "":
+            parse_tree = Tree.fromstring(parse_string)
+            tree_accruacy = evalb.evalb(
+                oneline(unbinarize(gold_tree)), 
+                unbinarize(parse_tree)
+            )
             cumul_accuracy += tree_accruacy
             num_trees_with_parse += 1
             print tree_accruacy
+            print parse_tree
+            print gold_tree
+            print "-"*80
         else:
             print "No parse!"
 
     end = time.time()
     print "Parsing takes %.4f secs\n" % round(end - start, 5)
-    print "Fraction of trees with parse = %.4f\n" % round(float(num_trees_with_parse) / len(test), 5)
+    print "Fraction of trees with parse = %.4f\n" % round(float(num_trees_with_parse) / total, 5)
     accuracy = cumul_accuracy / num_trees_with_parse
     print "Parsing accuracy = %.4f\n" % round(accuracy, 5)
 

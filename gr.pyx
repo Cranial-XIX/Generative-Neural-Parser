@@ -445,10 +445,9 @@ cdef class GrammarObject(object):
 
         return self.print_parse(0, n, RI)
 
-    cdef inside_outside(self, 
-                str sentence, 
-                np.ndarray[np.int64_t, ndim=1] sen, 
-                np.ndarray[np.float32_t, ndim=2] preterm, 
+    cpdef inside_outside(self, str sentence,
+                np.ndarray[np.int64_t, ndim=1] sen,
+                np.ndarray[np.float32_t, ndim=2] preterm,
                 np.ndarray[np.float32_t, ndim=3] unt,
                 np.ndarray[np.float32_t, ndim=3] p2l,
                 np.ndarray[np.float32_t, ndim=4] pl2r):
