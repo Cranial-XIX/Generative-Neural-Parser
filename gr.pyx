@@ -352,9 +352,14 @@ cdef class GrammarObject(object):
             intvec* cell
             Cell[:,:,:] chart
 
-        self.sentence = sentence.strip().split()
+        # Get alpha and beta values
         n = len(sen)
+        self.inside_outside(n, sen, preterm, unt, p2l, pl2r)
+
         self.sen = sen
+        self.sentence = sentence.strip().split()
+
+        # initialize chart
         chart = np.zeros((n,n+1,self.num_nt), dtype=Cell_dt)
 
         for ik in xrange(n*(n+1)//2):
@@ -445,7 +450,7 @@ cdef class GrammarObject(object):
 
         return self.print_parse(0, n, RI)
 
-    cpdef inside_outside(self, str sentence,
+    cpdef inside_outside(self, int n,
                 np.ndarray[np.int64_t, ndim=1] sen,
                 np.ndarray[np.float32_t, ndim=2] preterm,
                 np.ndarray[np.float32_t, ndim=3] unt,
@@ -465,8 +470,6 @@ cdef class GrammarObject(object):
             BRF brf
             intvec tmp
             intvec* cell
-
-        n = len(sentence)
 
         for ik in xrange(n*(n+1)//2):
             self.spandex.push_back(new intvec())
