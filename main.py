@@ -96,7 +96,7 @@ if torch.cuda.is_available():
 
 # Create folder to save model and log files
 file_save = ""
-if not args.mode == 'parse':
+if args.mode == 'spv_train' or args.mode == 'uspv_train':
     id_process = os.getpid()
     #time_current = datetime.datetime.now().isoformat()
     name = 'PID='+str(id_process)#+'_TIME='+time_current
@@ -146,7 +146,7 @@ parser = GrammarObject(p)
 parser.read_gr_file(constants.GR_FILE)
 
 # set batch size for unsupervised learning and parsing
-if not args.mode == 'spv_train':
+if not (args.mode == 'spv_train' or args.mode == 'KLD'):
     args.batch_size = 1
 
 # input arguments for model
@@ -210,8 +210,7 @@ def supervised():
                 start = time.time()
                 # get next training instances
                 idx = p.next(idx, args.batch_size)
-                if idx == -1:
-                    break
+
                 batch += 1
                 optimizer.zero_grad()
                 # the parameters array
@@ -239,14 +238,25 @@ def supervised():
                 optimizer.step()
                 end = time.time()
                 if args.verbose:
-                    print template.format(
-                            epoch, batch, idx, total,
-                            float(idx)/total * 100.,
-                            loss.data[0],
-                            round(t0 - start, 5),
-                            round(t1 - t0, 5),
-                            round(end - t1, 5)
-                        )
+                    if idx == -1:
+                        print template.format(
+                                epoch, batch, total, total,
+                                100.,
+                                loss.data[0],
+                                round(t0 - start, 5),
+                                round(t1 - t0, 5),
+                                round(end - t1, 5)
+                            )
+                        break                      
+                    else: 
+                        print template.format(
+                                epoch, batch, idx, total,
+                                float(idx)/total * 100.,
+                                loss.data[0],
+                                round(t0 - start, 5),
+                                round(t1 - t0, 5),
+                                round(end - t1, 5)
+                            )
             print "\n Total loss of the trainset ", tot_loss.data[0]
         torch.save( {'state_dict': model.state_dict()}, file_save )
 
@@ -346,9 +356,10 @@ def test():
             )
             cumul_accuracy += tree_accruacy
             num_trees_with_parse += 1
-            print tree_accruacy
-            print parse_tree
-            print gold_tree
+            if not tree_accruacy == 1.0:            
+                print tree_accruacy
+                print parse_tree.pretty_print()
+                print gold_tree.pretty_print()
             print "-"*80
         else:
             print "No parse!"
@@ -358,6 +369,58 @@ def test():
     print "Fraction of trees with parse = %.4f\n" % round(float(num_trees_with_parse) / total, 5)
     accuracy = cumul_accuracy / num_trees_with_parse
     print "Parsing accuracy = %.4f\n" % round(accuracy, 5)
+
+def is_digit(n):
+    try:
+        int(n)
+        return True
+    except ValueError:
+        return False
+
+def KLD():
+    lines = p.lines
+    num_sen = len(lines)/2
+    dict = {}
+    for i in xrange(num_sen):
+        line = lines[2*i+1].strip().split()
+        for j in xrange(len(line)/4):
+            if is_digit(line[4*j+2]):
+                pos, parent, l, c = line[4*j:4*j+4]
+                tpl = (int(parent), int(l))
+                c = int(c)
+                if tpl not in dict:
+                    dict[tpl] = [0 for x in xrange(102)]
+                dict[tpl][c] += 1
+                dict[tpl][101] += 1
+    for key in dict:
+        for x in xrange(101):
+            if dict[key][x] > 0:
+                dict[key][x] /= float(dict[key][101])
+                print "(", key[0], " ", key[1], " ", x, ") = ", dict[key][x]
+
+
+    idx = 0
+    while True:
+        print "="*80
+        # get next training instances
+        idx = p.next(idx, args.batch_size)
+
+        # the parameters array
+        p_array = [
+            p.sens, p.pl2r_p, p.pl2r_l, p.pl2r_t, p.pl2r_i
+        ]
+
+        # create PyTorch Variables
+        if args.cuda:
+            p_array = [(Variable(x)).cuda() for x in p_array]
+        else:
+            p_array = [Variable(x) for x in p_array]
+        sm = model.pl2r_test(p_array[0], p_array[1], p_array[2],
+            p_array[3], p_array[4])
+        for i in xrange(len(p.pl2r_p)):
+            print "(", p.pl2r_p[i] , " ", p.pl2r_l[i], " ", p.pl2r_t[i], ") = ", sm.data[i][0]
+        if idx == -1:
+            break
 
 ## run the model
 if args.mode == 'spv_train':
@@ -373,6 +436,8 @@ elif args.mode == 'parse':
         if sentence == "":
             break
         parse(sentence)
+elif args.mode == 'KLD':
+    KLD()
 else:
     print "Cannot recognize the mode, allowed modes are: " \
         "spv_train, uspv_train, parse, test"

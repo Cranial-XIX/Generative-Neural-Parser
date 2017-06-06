@@ -283,8 +283,7 @@ class Processor(object):
         else:
             ## supervised
             length = len(self.lines)
-            if 2*(idx+bsz) > length:
-                return -1
+
             # bsz is batch size, the number of sentences we process each time
             # the maximum number of training instances in a batch
             m = constants.MAX_SEN_LENGTH
@@ -366,7 +365,7 @@ class Processor(object):
             self.ut = self.ut[:num_ut]
             self.unt = self.unt[:num_unt]
             self.pl2r_p = self.pl2r_p[:num_pl2r]
-            self.pl2r_l = self.pl2r_p[:num_pl2r]
+            self.pl2r_l = self.pl2r_l[:num_pl2r]
 
             # target list, for softmax select
             self.p2l_t = self.p2l_t[:num_p2l]
@@ -380,7 +379,10 @@ class Processor(object):
             self.ut_i = self.ut_i[:num_ut]
             self.unt_i = self.unt_i[:num_unt]
 
-            return idx
+            if 2*(idx+1) > length:
+                return -1
+            else:
+                return idx
 
     def is_digit(self, n):
         try:

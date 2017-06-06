@@ -198,6 +198,8 @@ class LCNPModel(nn.Module):
         # parent left to right
         pl2r_pr = self.lsm(self.pl2r_out(self.relu(self.pl2r(pl2r_cond.view(-1, sz2[3]))))).view(sz2[0], sz2[1], sz2[2], -1)
 
+        print unt_pr[41,3,26]
+        print unt_pr[25,3,26]
         # since for lexicon, Pr(x | P) = logsoftmax(A(Wx + b)). We
         # precompute AW (as ut_w) and Ab (as ut_b) here to speed up the computation
         w2v_w = self.word2vec.weight + self.word2vec_plus.weight
@@ -379,3 +381,20 @@ class LCNPModel(nn.Module):
         )
 
         return nll_p2l + nll_pl2r + nll_unt + nll_ut
+
+    def pl2r_test(self, sens, pl2r_p, pl2r_l, pl2r_t, pl2r_i):
+
+        # run the LSTM to extract features from left context
+        output, hidden = self.LSTM(self.encoder_t(sens), self.h0)
+        output = self.lstm_coef * output.contiguous().view(-1, output.size(2))
+
+        # compute the log probability of pl2r rules
+        pl2r_cond = torch.cat((
+            self.encoder_nt(pl2r_p),
+            self.encoder_nt(pl2r_l),
+            torch.index_select(output, 0, pl2r_i)
+        ), 1)
+
+        # pass to a single layer neural net for nonlinearity
+        m_pl2r = self.relu(self.pl2r(pl2r_cond))
+        return self.sm(self.pl2r_out(m_pl2r)).gather(1, pl2r_t.unsqueeze(1))
