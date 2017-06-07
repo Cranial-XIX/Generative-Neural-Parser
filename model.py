@@ -198,8 +198,6 @@ class LCNPModel(nn.Module):
         # parent left to right
         pl2r_pr = self.lsm(self.pl2r_out(self.relu(self.pl2r(pl2r_cond.view(-1, sz2[3]))))).view(sz2[0], sz2[1], sz2[2], -1)
 
-        print unt_pr[41,3,26]
-        print unt_pr[25,3,26]
         # since for lexicon, Pr(x | P) = logsoftmax(A(Wx + b)). We
         # precompute AW (as ut_w) and Ab (as ut_b) here to speed up the computation
         w2v_w = self.word2vec.weight + self.word2vec_plus.weight
@@ -220,7 +218,7 @@ class LCNPModel(nn.Module):
             print "Precomputation takes %f" % round(end - start, 5)
 
         if self.use_cuda:
-            return self.parser.mbr_parse(
+            return self.parser.viterbi_parse(
                     sentence,
                     sen.cpu().numpy(),
                     preterminal,
@@ -229,16 +227,6 @@ class LCNPModel(nn.Module):
                     pl2r_pr.cpu().data.numpy()
                 )
         else:
-            '''
-            self.parser.inside_outside(
-                    sentence,
-                    sen.numpy(),
-                    preterminal,
-                    unt_pr.data.numpy(),
-                    p2l_pr.data.numpy(),
-                    pl2r_pr.data.numpy()
-            )
-            '''
             return self.parser.viterbi_parse(
                     sentence,
                     sen.numpy(),
