@@ -14,7 +14,9 @@ cimport numpy as np
 
 from cython.operator cimport dereference as deref
 from libc.math cimport log, exp
+from libcpp.map cimport map
 from libcpp.vector cimport vector
+
 from numpy cimport int_t, double_t, int16_t
 
 Vt = np.double
@@ -59,6 +61,7 @@ ctypedef URvv    *URv
 ctypedef BRFvv   *BRFv
 
 cdef double log_zero = -1000000
+
 '''
 cdef double logsumexp(double a, double b):
     cdef double m
@@ -72,7 +75,10 @@ cdef double logsumexp(double a, double b):
 cdef inline int tri(int i, int j) nogil:
     return j*(j-1)/2 + i
 
-#TODODO rename GrammarObject to Parser
+cdef inline int pl2rhash(int p, int l, int i, int j) nogil:
+    return p*90900+l*900+i*30+j
+
+#TODO(@Bo) rename GrammarObject to Parser
 cdef class GrammarObject(object):
 
     cdef object nt2idx    # nonterminal to index
@@ -91,8 +97,9 @@ cdef class GrammarObject(object):
     cdef vector[BRFv] rule_x_yz
     cdef vector[URv] rule_y_x               # [S] -> [(ROOT,log(0.9)), ...]
     cdef vector[URv] lexicon                # [word] -> [(N,log(0.3)), ...]
-    
     cdef vector[intvec*] spandex
+
+    cdef map[int, int] pl2r_map
 
     cdef double[:,:,:,:] betas
     cdef double[:,:,:,:] alphas
@@ -225,10 +232,10 @@ cdef class GrammarObject(object):
                 np.ndarray[np.float32_t, ndim=2] preterm,
                 np.ndarray[np.float32_t, ndim=3] unt,
                 np.ndarray[np.float32_t, ndim=3] p2l,
-                np.ndarray[np.float32_t, ndim=4] pl2r):
+                np.ndarray[np.float32_t, ndim=2] pl2r):
 
         cdef:
-            int i, j, k, tag, w, l, r, p, c, n, pp, ik, RI, U_NTM
+            int i, j, k, tag, w, l, r, p, c, n, pp, ik, RI, U_NTM, idx
             str word
             double parent, left, right, child, newscore
             UR ur
@@ -300,7 +307,7 @@ cdef class GrammarObject(object):
                                 continue
                             p = br.parent
 
-                            newscore = left + right + p2l[p, i, l] + pl2r[p, l, i, r]
+                            newscore = left + right + p2l[p, i, l] + pl2r[self.pl2r_map[pl2rhash(p,l,i,j)],r]
                             if newscore > chart[i,k,p].score:
                                 if chart[i,k,p].score == log_zero:
                                     cell.push_back(p)
@@ -316,7 +323,7 @@ cdef class GrammarObject(object):
                         newscore = chart[i,k,c].score + p2l[p, i, U_NTM] + unt[p, i, c]
                         if newscore > chart[i,k,p].score:
                             if chart[i,k,p].score == log_zero:
-                                tmp.push_back(p) 
+                                tmp.push_back(p)
                             chart[i,k,p].score = newscore
                             chart[i,k,p].y = c
                             chart[i,k,p].z = -1
@@ -326,6 +333,7 @@ cdef class GrammarObject(object):
 
         t1 = time.time()
         self.spandex.clear()
+        self.pl2r_map.clear()
         self.chart = chart
         print "parsing takes ",t1 - t0
 
@@ -461,7 +469,7 @@ cdef class GrammarObject(object):
         '''
 
         cdef:
-            int i, j, k, tag, w, l, r, p, c, n, pp, ik, RI, U_NTM
+            int i, j, k, tag, w, l, r, p, c, pp, ik, RI, U_NTM
             str word
             double parent, left, right, child
             double d, d_times_left, d_times_right
@@ -597,35 +605,30 @@ cdef class GrammarObject(object):
 
         return self.betas[0,n,RI,1]
 
-    cpdef do_inside_outside(self, sentence):
+    cpdef preprocess(self, sen):
         cdef:
-            int i, j, k, tag, w, l, r, p, c, n, ri, pp, ik
-            str word
-            double parent, left, right, child
-            double d, d_times_left, d_times_right
+            int i, j, k, tag, w, l, r, p, c, n, ik, size, hsh
+            double right
             UR ur
             BR br
-            BRF brf
-            intvec tmp
+            intvec tmp, pl2r_p, pl2r_l, pl2r_pi, pl2r_ci
             intvec* cell
 
-        sen = []
-        sentence = sentence.strip().split()
+            np.ndarray[np.int8_t, ndim=4] betas
+            np.ndarray[np.int64_t, ndim=1] np_p
+            np.ndarray[np.int64_t, ndim=1] np_l
+            np.ndarray[np.int64_t, ndim=1] np_pi
+            np.ndarray[np.int64_t, ndim=1] np_ci
 
-        n = len(sentence)
-        self.N = n
-        for i in xrange(n):
-            word = sentence[i]
-            sen.append(self.w2idx[word] if word in self.w2idx else 0)
-
-        self.sen = sen
-        ri = self.nt2idx['ROOT']
-
+        n = len(sen)
         for ik in xrange(n*(n+1)//2):
             self.spandex.push_back(new intvec())
 
         # Do inside algorithm
-        self.betas = np.zeros((n, n+1, self.num_nt, 2))
+        betas = np.zeros((n, n+1, self.num_nt, 2), dtype=np.int8)
+
+        size = -1
+
         t0 = time.time()
         # initialization
         for i in xrange(n):  # w-1 constituents
@@ -634,22 +637,22 @@ cdef class GrammarObject(object):
             cell = self.spandex[tri(i, k)]
             for ur in deref(self.lexicon[w]):
                 tag = ur.parent
-                if self.betas[i,k,tag,0] == 0:
+                if betas[i,k,tag,0] == 0:
                     cell.push_back(tag)
-                self.betas[i,k,tag,0] = ur.weight
+                betas[i,k,tag,0] = 1
             # unary appending
             for c in deref(cell):
-                self.betas[i,k,c,1] += self.betas[i,k,c,0]
+                betas[i,k,c,1] = 1
 
             for c in deref(cell):
                 for ur in deref(self.rule_y_x[c]):
                     p = ur.parent
-                    if self.betas[i,k,p,1] == 0:
+                    if betas[i,k,p,1] == 0:
                         tmp.push_back(p)
-                    self.betas[i,k,p,1] += self.betas[i,k,c,0] * ur.weight
+                    betas[i,k,p,1] = 1
 
-            for c in tmp:
-                cell.push_back(c)
+            for p in tmp:
+                cell.push_back(p)
             tmp.clear()
 
         for w in xrange(2, n+1):  # wider constituents
@@ -658,97 +661,68 @@ cdef class GrammarObject(object):
                 cell = self.spandex[tri(i, k)]
                 for j in xrange(i+1, k):
                     for l in deref(self.spandex[tri(i, j)]):
-                        left = self.betas[i,j,l,1] 
                         for br in deref(self.rule_y_xz[l]):
                             r = br.right
-                            right = self.betas[j,k,r,1]
+                            right = betas[j,k,r,1]
                             if right == 0:
                                 continue
                             p = br.parent
-                            if self.betas[i,k,p,0] == 0:
+                            hsh = pl2rhash(p,l,i,j)
+                            if self.pl2r_map.count(hsh) == 0:
+                                size += 1
+                                pl2r_p.push_back(p)
+                                pl2r_l.push_back(l)
+                                pl2r_pi.push_back(i)
+                                pl2r_ci.push_back(j)
+                                self.pl2r_map[hsh] = size
+                            if betas[i,k,p,0] == 0:
                                 cell.push_back(p)
-                            self.betas[i,k,p,0] += br.weight * left * right
+                            betas[i,k,p,0] = 1
                 # unary appending
                 for c in deref(cell):
-                    self.betas[i,k,c,1] += self.betas[i,k,c,0]
+                    betas[i,k,c,1] = 1
 
                 for c in deref(cell):
                     for ur in deref(self.rule_y_x[c]):
                         p = ur.parent
-                        if self.betas[i,k,p,1] == 0:
+                        if betas[i,k,p,1] == 0:
                             tmp.push_back(p)
-                        self.betas[i,k,p,1] += self.betas[i,k,c,0] * ur.weight
+                        betas[i,k,p,1] = 1
 
-                for c in tmp:
-                    cell.push_back(c)
+                for p in tmp:
+                    cell.push_back(p)
                 tmp.clear()
 
-        t1 = time.time()
-        print "inside ",t1 - t0
+        size += 1
+        np_p = np.zeros((size,), dtype=int)
+        np_l = np.zeros((size,), dtype=int)
+        np_pi = np.zeros((size,), dtype=int)
+        np_ci = np.zeros((size,), dtype=int)
 
-        # Do outside algorithm
-        self.alphas = np.zeros((n, n+1, self.num_nt, 2))
-        self.alphas[0,n,ri,1] = 1.0
+        for i in xrange(size):
+            np_p[i] = pl2r_p.at(i)
+            np_l[i] = pl2r_l.at(i)
+            np_pi[i] = pl2r_pi.at(i)
+            np_ci[i] = pl2r_ci.at(i)
 
-        for w in reversed(xrange(2, n+1)): # wide to narrow
-            for i in xrange(n-w+1):
-                k = i + w
-
-                # unary
-                for c in deref(self.spandex[tri(i, k)]):
-                    for ur in deref(self.rule_y_x[c]):
-                        p = ur.parent
-                        if self.alphas[i,k,p,1] == 0:
-                            continue
-                        self.alphas[i,k,c,0] += self.alphas[i,k,p,1] * ur.weight
-                for c in deref(self.spandex[tri(i, k)]):
-                    self.alphas[i,k,c,0] += self.alphas[i,k,c,1]
-
-                # binary
-                for p in deref(self.spandex[tri(i, k)]):
-                    parent = self.alphas[i,k,p,0]
-                    if parent == 0:
-                        continue
-                    for j in xrange(i+1, k):
-                        for brf in deref(self.rule_x_yz[p]):
-                            l = brf.left
-                            r = brf.right
-                            left = self.betas[i,j,l,1]
-                            if left == 0:
-                                continue
-                            right = self.betas[j,k,r,1]
-                            if right == 0:
-                                continue
-                            d = parent * brf.weight
-                            d_times_left = d * left
-                            d_times_right = d * right
-                            self.alphas[j,k,r,1] += d_times_left
-                            self.alphas[i,j,l,1] += d_times_right
-
-        for i in xrange(n):
-            k = i+1
-            for c in deref(self.spandex[tri(i, k)]):
-                for ur in deref(self.rule_y_x[c]):
-                    p = ur.parent
-                    if self.alphas[i,k,p,1] == 0:
-                        continue
-                    self.alphas[i,k,c,0] += self.alphas[i,k,p,1] * ur.weight
-            for c in deref(self.spandex[tri(i, k)]):
-                self.alphas[i,k,c,0] += self.alphas[i,k,c,1]
-
-        print "outside ", time.time() - t1
         self.spandex.clear()
+        pl2r_p.clear()
+        pl2r_l.clear()
+        pl2r_pi.clear()
+        pl2r_ci.clear()
+        t1 = time.time()
 
-        return self.betas[0,n,ri,1]
+        print "preprocess takes ",t1 - t0
+        return np_p, np_l, np_pi, np_ci
 
-    cpdef prune_the_chart(self, prob_sen, posterior_threshold):
+    cpdef prune(self, prob_sen, posterior_threshold):
         cdef:
             int i, j, nt, deleted=0
             double threshold, a, b
 
         threshold = prob_sen * posterior_threshold
 
-        self.prune_chart = np.full((self.N, self.N+1, self.num_nt), False)
+        self.allowed = np.full((self.N, self.N+1, self.num_nt), False)
         for i in xrange(self.N):
             for j in xrange(i+1, self.N+1):
                 for nt in xrange(self.num_nt):
@@ -757,108 +731,10 @@ cdef class GrammarObject(object):
                     if b == 0 or a == 0:
                         continue
                     if a * b > threshold:
-                        self.prune_chart[i,j,nt] = True
+                        self.allowed[i,j,nt] = True
                     else:
                         deleted += 1
         print "Pruned ", deleted, " nonterminals"
-
-    cpdef str parse(self, str sentence):
-        cdef:
-            int i, j, k, tag, w, l, r, p, c, n, ri, pp, ik
-            str word
-            double parent, left, right, child, newscore
-            UR ur
-            BR br
-            intvec tmp
-            intvec* cell
-
-            Cell[:,:,:] chart
-
-        n = self.N
-        sen = self.sen
-        self.sentence = sentence.strip().split()
-        chart = np.zeros((n,n+1,self.num_nt), dtype=Cell_dt)
-
-        for ik in xrange(n*(n+1)//2):
-            self.spandex.push_back(new intvec())
-
-        ri = self.nt2idx['ROOT']
-        # Do inside algorithm
-        t0 = time.time()
-
-        # initialization
-        for i in xrange(n):  # w-1 constituents
-            w = sen[i]
-            k = i+1
-            cell = self.spandex[tri(i, k)]
-            for ur in deref(self.lexicon[w]):
-                tag = ur.parent
-                if self.prune_chart[i,k,tag]:
-                    if chart[i,k,tag].score == 0:
-                        cell.push_back(tag)
-                    chart[i,k,tag].score = ur.weight
-                    chart[i,k,tag].y = -1
-            # unary appending
-            for c in deref(cell):
-                for ur in deref(self.rule_y_x[c]):
-                    p = ur.parent
-                    if self.prune_chart[i,k,p]:
-                        newscore = chart[i,k,c].score * ur.weight
-                        if newscore > chart[i,k,p].score:
-                            if chart[i,k,p].score == 0:
-                                tmp.push_back(p)
-                            chart[i,k,p].score = newscore
-                            chart[i,k,p].y = c
-                            chart[i,k,p].z = -1
-            for c in tmp:
-                cell.push_back(c)
-            tmp.clear()
-
-        for w in xrange(2, n+1):  # wider constituents
-            for i in xrange(n-w+1):
-                k = i + w
-                cell = self.spandex[tri(i, k)]
-                for j in xrange(i+1, k):
-                    for l in deref(self.spandex[tri(i, j)]):
-                        left = chart[i,j,l].score
-                        for br in deref(self.rule_y_xz[l]):
-                            r = br.right
-                            right = chart[j,k,r].score
-                            if right == 0:
-                                continue
-                            p = br.parent
-                            if self.prune_chart[i,k,p]:
-                                newscore = br.weight * left * right
-                                if newscore > chart[i,k,p].score:
-                                    if chart[i,k,p].score == 0:
-                                        cell.push_back(p)
-                                    chart[i,k,p].score = newscore
-                                    chart[i,k,p].y = l
-                                    chart[i,k,p].z = r
-                                    chart[i,k,p].j = j
-                # unary appending
-                for c in deref(cell):
-                    for ur in deref(self.rule_y_x[c]):
-                        p = ur.parent
-                        if self.prune_chart[i,k,p]:
-                            newscore = chart[i,k,c].score * ur.weight
-                            if newscore > chart[i,k,p].score:
-                                if chart[i,k,p].score == 0:
-                                    tmp.push_back(p) 
-                                chart[i,k,p].score = newscore
-                                chart[i,k,p].y = c
-                                chart[i,k,p].z = -1
-                for c in tmp:
-                    cell.push_back(c)
-                tmp.clear()
-        t1 = time.time()
-        self.spandex.clear()
-        self.chart = chart
-        print "parsing takes ",t1 - t0
-
-        if self.chart[0,n,ri].score == 0:
-            return ""
-        return self.print_parse(0, n, ri)
 
     cpdef print_parse(self, int i, int k, int nt):
         cdef:

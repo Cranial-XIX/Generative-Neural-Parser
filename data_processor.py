@@ -204,7 +204,7 @@ class Processor(object):
             self.lines = data.readlines()    
 
     def make_trainset(self):
-        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH,n=30)
+        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH,n=50)
         train_trees = list(examples)
 
         f = open(self.train_file, 'w')
@@ -240,6 +240,7 @@ class Processor(object):
             self.encoded_list.append(p)
             self.encoded_list.append("t")
             self.encoded_list.append(child)
+            self.encoded_list.append("_")
             return self.wi, p
         else:
             nchild = 0
@@ -247,7 +248,7 @@ class Processor(object):
                 if nchild == 0:
                     position, child = self.traverseTree(subtree)
                 else:
-                    _, right = self.traverseTree(subtree)
+                    mid, right = self.traverseTree(subtree)
                 nchild += 1
             self.encoded_list.append(str(position))
             self.encoded_list.append(p)
@@ -255,10 +256,12 @@ class Processor(object):
                 # unary rule
                 self.encoded_list.append("u")
                 self.encoded_list.append(child)
+                self.encoded_list.append("_")
             else:
                 # binary rule
                 self.encoded_list.append(child)
                 self.encoded_list.append(right)
+                self.encoded_list.append(str(mid))
             return position, p
 
     def containOOV(self, sentence):
@@ -305,7 +308,8 @@ class Processor(object):
 
             # hidden index list
             self.p2l_i = torch.LongTensor(cutoff*3,)
-            self.pl2r_i = torch.LongTensor(cutoff,)
+            self.pl2r_pi = torch.LongTensor(cutoff,)
+            self.pl2r_ci = torch.LongTensor(cutoff,)
             self.ut_i = torch.LongTensor(cutoff,)
             self.unt_i = torch.LongTensor(cutoff,)
 
@@ -318,17 +322,17 @@ class Processor(object):
                 # deal with the rest of inputs
                 rest = self.lines[2*idx+1].split()
 
-                for j in xrange(len(rest)/4):
-                    lc = int(rest[4*j])       # left context position
+                for j in xrange(len(rest)/5):
+                    lc = int(rest[5*j])       # left context position
                     li = num_sen * m + lc     # left index in matrix
-                    p = int(rest[4*j+1])      # parent index
-                    symbol = rest[4*j+2]      # might be from: {
+                    p = int(rest[5*j+1])      # parent index
+                    symbol = rest[5*j+2]      # might be from: {
                                               # 't'    (unary terminal rule)
                                               # 'u'    (unary nontemrinal rule)
                                               # number (the left sibling) }
                     if symbol == 't':
                         # terminal rule found
-                        word = rest[4*j+3].lower()
+                        word = rest[5*j+3].lower()
                         c = self.w2idx[word] if word in self.w2idx else 0
                         self.ut[num_ut] = p
                         self.ut_t[num_ut] = c
@@ -337,7 +341,7 @@ class Processor(object):
                         num_ut += 1
                     elif symbol == "u":
                         # unary nonterminal rule found
-                        c = int(rest[4*j+3])
+                        c = int(rest[5*j+3])
                         self.unt[num_unt] = p
                         self.unt_t[num_unt] = c
                         self.unt_i[num_unt] = li
@@ -345,12 +349,13 @@ class Processor(object):
                         num_unt += 1
                     else:
                         # binary rule
-                        c = int(rest[4*j+3])
+                        c = int(rest[5*j+3])
                         l = int(symbol)
                         self.pl2r_p[num_pl2r] = p
                         self.pl2r_l[num_pl2r] = l
                         self.pl2r_t[num_pl2r] = c
-                        self.pl2r_i[num_pl2r] = li
+                        self.pl2r_pi[num_pl2r] = li
+                        self.pl2r_ci[num_pl2r] = int(rest[5*j+4])
                         num_pl2r += 1
 
                     self.p2l[num_p2l] = p
@@ -369,15 +374,16 @@ class Processor(object):
 
             # target list, for softmax select
             self.p2l_t = self.p2l_t[:num_p2l]
-            self.pl2r_t = self.pl2r_t[:num_pl2r]
             self.ut_t = self.ut_t[:num_ut]
             self.unt_t = self.unt_t[:num_unt]
+            self.pl2r_t = self.pl2r_t[:num_pl2r]
 
             # hidden index list
             self.p2l_i = self.p2l_i[:num_p2l]
-            self.pl2r_i = self.pl2r_i[:num_pl2r]
             self.ut_i = self.ut_i[:num_ut]
             self.unt_i = self.unt_i[:num_unt]
+            self.pl2r_pi = self.pl2r_pi[:num_pl2r]
+            self.pl2r_ci = self.pl2r_ci[:num_pl2r]
 
             if 2*(idx+1) > length:
                 return -1

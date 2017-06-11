@@ -78,7 +78,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--learning-rate', default=0.02, help="learning rate"
+    '--learning-rate', default=0.05, help="learning rate"
 )
 
 argparser.add_argument(
@@ -144,6 +144,7 @@ p.process_data()
 # create a grammar object
 parser = GrammarObject(p)
 parser.read_gr_file(constants.GR_FILE)
+parser.read_lexicon_file(constants.LEX_FILE)
 
 # set batch size for unsupervised learning and parsing
 if not (args.mode == 'spv_train' or args.mode == 'KLD'):
@@ -218,7 +219,7 @@ def supervised():
                     p.sens,
                     p.p2l, p.pl2r_p, p.pl2r_l, p.unt, p.ut,
                     p.p2l_t, p.pl2r_t, p.unt_t, p.ut_t,
-                    p.p2l_i, p.pl2r_i, p.unt_i, p.ut_i
+                    p.p2l_i, p.pl2r_pi, p.pl2r_ci, p.unt_i, p.ut_i
                 ]
 
                 # create PyTorch Variables
@@ -338,7 +339,7 @@ def parse(sentence):
 def test():
     # parsing
     start = time.time()
-    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH,n=30)
+    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH,n=50)
     test = list(instances)
     cumul_accuracy = 0
     num_trees_with_parse = 0
@@ -383,9 +384,9 @@ def KLD():
     dict = {}
     for i in xrange(num_sen):
         line = lines[2*i+1].strip().split()
-        for j in xrange(len(line)/4):
-            if is_digit(line[4*j+2]):
-                pos, parent, l, c = line[4*j:4*j+4]
+        for j in xrange(len(line)/5):
+            if is_digit(line[5*j+2]):
+                pos, parent, l, c, mid = line[5*j:5*j+5]
                 tpl = (int(parent), int(l))
                 c = int(c)
                 if tpl not in dict:
@@ -407,7 +408,7 @@ def KLD():
 
         # the parameters array
         p_array = [
-            p.sens, p.pl2r_p, p.pl2r_l, p.pl2r_t, p.pl2r_i
+            p.sens, p.pl2r_p, p.pl2r_l, p.pl2r_t, p.pl2r_pi, p.pl2r_ci
         ]
 
         # create PyTorch Variables
@@ -416,7 +417,7 @@ def KLD():
         else:
             p_array = [Variable(x) for x in p_array]
         sm = model.pl2r_test(p_array[0], p_array[1], p_array[2],
-            p_array[3], p_array[4])
+            p_array[3], p_array[4], p_array[5])
         for i in xrange(len(p.pl2r_p)):
             print "(", p.pl2r_p[i] , " ", p.pl2r_l[i], " ", p.pl2r_t[i], ") = ", sm.data[i][0]
         if idx == -1:

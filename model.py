@@ -71,7 +71,7 @@ class LCNPModel(nn.Module):
             )
 
         self.dp2l = self.dnt + self.dhid
-        self.dpl2r = 2 * self.dnt + self.dhid
+        self.dpl2r = 2 * (self.dnt + self.dhid)
         self.dunt = self.dnt + self.dhid
         self.dut = self.dnt + self.dhid
 
@@ -82,8 +82,8 @@ class LCNPModel(nn.Module):
         # parent to left
         self.p2l = nn.Linear(self.dp2l, self.nnt)
         # parent left to right
-        self.pl2r = nn.Linear(self.dpl2r, 200)
-        self.pl2r_out = nn.Linear(200, self.nnt)
+        self.pl2r = nn.Linear(self.dpl2r, 250)
+        self.pl2r_out = nn.Linear(250, self.nnt)
         # unary nonterminal
         self.unt = nn.Linear(self.dunt, self.nnt)
         # unary terminal
@@ -155,12 +155,9 @@ class LCNPModel(nn.Module):
     def parse(self, sentence, sen):
         # sen is a torch.LongTensor object, containing fake BOS index
         # along with indices of the words
-        start = time.time()
 
-        # translate to sequence of vectors
-        emb_inp = self.encoder_t(sen)
         # get left context hidden units with a trained h0 (start hidden state)
-        output, hidden = self.LSTM(emb_inp, self.h0)
+        output, hidden = self.LSTM(self.encoder_t(sen), self.h0)
         # get rid of the initial BOS symbol, since you need fake BOS 
         # to make sure everyone gets their cup of left context
         sen = sen.view(-1).data[1:]
@@ -170,33 +167,76 @@ class LCNPModel(nn.Module):
         # * output (batch_size * sen_length * hidden dimension)
         output = output.narrow(1, 0, n)
 
+        '''
+        # first do the precomputation for preprocessing -- without left context
+        # * unt_i (num_nt * sen_length * parent_emb_size)
+
+        # parent to unary child
+        # * unt_pr (num_nt * sen_length * num_nt) -> (parent, position i, child)
+        unt_pr = self.lsm(
+            unt_pre.mm(
+                self.unt.weight.narrow(1, 0, self.nnt).t()
+            )
+        )
+        # parent to left
+        p2l_pr = self.lsm(
+            p2l_pre.mm(
+                self.p2l.weight.narrow(1, 0, self.nnt).t()
+            )
+        )
+        # parent left to right
+        pl2r_pr = self.lsm(
+            self.pl2r_out(
+                self.relu(
+                    pl2r_pre.view(-1, 2*self.nnt).mm(
+                        self.pl2r.weight.narrow(1, 0, 2*self.nnt).t()
+                    )
+                )
+            )
+        ).view(self.nnt, self.nnt, -1)
+        '''
+
         # * h1 (num_nt * sen_length * hidden dimension)
         h1 = output.repeat(self.nnt, 1, 1)
-        # * h2 (num_nt * num_nt * sen_length * hidden dimension)
-        h2 = output.unsqueeze(0).repeat(self.nnt, self.nnt, 1, 1)
 
         ## pre-compute all probabilities
 
         # with context probabilities
+        # * unt_i (num_nt * sen_length * parent_emb_size) 
         unt_i = self.unt_pre.unsqueeze(1).repeat(1, n, 1)
-        # * p2l_i (num_nt * sen_length * parent_emb_size) 
         p2l_i = self.p2l_pre.unsqueeze(1).repeat(1, n, 1)
-        pl2r_i = self.pl2r_pre.unsqueeze(2).repeat(1, 1, n, 1)
-
         unt_cond = torch.cat((unt_i, h1), 2)
         p2l_cond = torch.cat((p2l_i, h1), 2)
-        pl2r_cond = torch.cat((pl2r_i, h2), 3)
-
         sz = unt_cond.size()
-        sz2 = pl2r_cond.size()
 
         # parent to unary child
         # * unt_pr (num_nt * sen_length * num_nt) -> (parent, position i, child)
         unt_pr = self.lsm(self.unt(unt_cond.view(-1, sz[2]))).view(sz[0], sz[1], -1)
-        # parent to left
         p2l_pr = self.lsm(self.p2l(p2l_cond.view(-1, sz[2]))).view(sz[0], sz[1], -1)
-        # parent left to right
-        pl2r_pr = self.lsm(self.pl2r_out(self.relu(self.pl2r(pl2r_cond.view(-1, sz2[3]))))).view(sz2[0], sz2[1], sz2[2], -1)
+
+        # preprocess
+        pl2r_p, pl2r_l, pl2r_pi, pl2r_ci = self.parser.preprocess(sen)
+        pl2r_p = Variable(torch.LongTensor(pl2r_p))
+        pl2r_l = Variable(torch.LongTensor(pl2r_l))
+        pl2r_pi = Variable(torch.LongTensor(pl2r_pi))
+        pl2r_ci = Variable(torch.LongTensor(pl2r_ci))
+
+        output = output.view(n, -1)
+        # compute the log probability of pl2r rules
+        pl2r_pr = self.lsm(
+            self.pl2r_out(
+                self.relu(
+                    self.pl2r(
+                        torch.cat((
+                            self.encoder_nt(pl2r_p),
+                            self.encoder_nt(pl2r_l),
+                            torch.index_select(output, 0, pl2r_pi),
+                            torch.index_select(output, 0, pl2r_ci)
+                        ), 1)
+                    )
+                )
+            )
+        )
 
         # since for lexicon, Pr(x | P) = logsoftmax(A(Wx + b)). We
         # precompute AW (as ut_w) and Ab (as ut_b) here to speed up the computation
@@ -207,15 +247,10 @@ class LCNPModel(nn.Module):
         preterminal = np.empty((n, self.nnt), dtype=np.float32)
         preterminal.fill(-1000000)
         # append one level preterminal symbols
-
         for i in xrange(n):
             c = sen[i]
             for p in self.lexicon[c]:
-                preterminal[i,p] = self.preterm_prob(ut_w, ut_b, p, c, output[0, i]).data[0]
-
-        end = time.time()
-        if self.verbose:
-            print "Precomputation takes %f" % round(end - start, 5)
+                preterminal[i,p] = self.preterm_prob(ut_w, ut_b, p, c, output[i]).data[0]
 
         if self.use_cuda:
             return self.parser.viterbi_parse(
@@ -292,6 +327,7 @@ class LCNPModel(nn.Module):
 
         preterminal = np.empty((n,self.nnt), dtype=np.float32)
         preterminal.fill(-1000000)
+
         # append one level preterminal symbols
         for i in xrange(n):
             c = sen[i]
@@ -318,7 +354,7 @@ class LCNPModel(nn.Module):
     def supervised(self, sens,
         p2l, pl2r_p, pl2r_l, unt, ut,
         p2l_t, pl2r_t, unt_t, ut_t,
-        p2l_i, pl2r_i, unt_i, ut_i):
+        p2l_i, pl2r_pi, pl2r_ci, unt_i, ut_i):
 
         # run the LSTM to extract features from left context
         output, hidden = self.LSTM(self.encoder_t(sens), self.h0)
@@ -359,18 +395,24 @@ class LCNPModel(nn.Module):
         pl2r_cond = torch.cat((
             self.encoder_nt(pl2r_p),
             self.encoder_nt(pl2r_l),
-            torch.index_select(output, 0, pl2r_i)
+            torch.index_select(output, 0, pl2r_pi),
+            torch.index_select(output, 0, pl2r_ci)
         ), 1)
 
         # pass to a single layer neural net for nonlinearity
-        m_pl2r = self.relu(self.pl2r(pl2r_cond))
         nll_pl2r = -torch.sum(
-            self.lsm(self.pl2r_out(m_pl2r)).gather(1, pl2r_t.unsqueeze(1))
+            self.lsm(
+                self.pl2r_out(
+                    self.relu(
+                        self.pl2r(pl2r_cond)
+                    )
+                )
+            ).gather(1, pl2r_t.unsqueeze(1))
         )
 
         return nll_p2l + nll_pl2r + nll_unt + nll_ut
 
-    def pl2r_test(self, sens, pl2r_p, pl2r_l, pl2r_t, pl2r_i):
+    def pl2r_test(self, sens, pl2r_p, pl2r_l, pl2r_t, pl2r_pi, pl2r_ci):
 
         # run the LSTM to extract features from left context
         output, hidden = self.LSTM(self.encoder_t(sens), self.h0)
@@ -380,7 +422,8 @@ class LCNPModel(nn.Module):
         pl2r_cond = torch.cat((
             self.encoder_nt(pl2r_p),
             self.encoder_nt(pl2r_l),
-            torch.index_select(output, 0, pl2r_i)
+            torch.index_select(output, 0, pl2r_pi),
+            torch.index_select(output, 0, pl2r_ci)
         ), 1)
 
         # pass to a single layer neural net for nonlinearity
