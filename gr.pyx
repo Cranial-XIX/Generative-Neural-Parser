@@ -240,7 +240,7 @@ cdef class GrammarObject(object):
             double parent, left, right, child, newscore
             UR ur
             BR br
-            intvec tmp
+            intvec tmp, tmp2
             intvec* cell
 
             Cell[:,:,:] chart
@@ -289,9 +289,25 @@ cdef class GrammarObject(object):
                         chart[i,k,p].score = newscore
                         chart[i,k,p].y = c
                         chart[i,k,p].z = -1
+            # second level appending
             for c in tmp:
                 cell.push_back(c)
+                for ur in deref(self.rule_y_x[c]):
+                    p = ur.parent
+
+                    newscore = chart[i,k,c].score + p2l[p, i, U_NTM] + unt[p, i, c]
+                    if newscore > chart[i,k,p].score:
+                        if chart[i,k,p].score == log_zero:
+                            tmp2.push_back(p)
+                        chart[i,k,p].score = newscore
+                        chart[i,k,p].y = c
+                        chart[i,k,p].z = -1
+
+            for c in tmp2:
+                cell.push_back(c)
+
             tmp.clear()
+            tmp2.clear()
 
         for w in xrange(2, n+1):  # wider constituents
             for i in xrange(n-w+1):

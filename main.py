@@ -56,7 +56,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--lstm-dim', default=120, help='LSTM hidden dimension'
+    '--lstm-dim', default=150, help='LSTM hidden dimension'
 )
 
 argparser.add_argument(
@@ -78,7 +78,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--learning-rate', default=0.01, help="learning rate"
+    '--learning-rate', default=0.005, help="learning rate"
 )
 
 argparser.add_argument(

@@ -216,7 +216,7 @@ class Processor(object):
                 continue
             if first:
                 f.write(sentence)
-                first = False                
+                first = False
             else:
                 f.write("\n" + sentence)
             f.write("\n" + self.convert_tree_to_encoded_list(gold_tree))
