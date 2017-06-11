@@ -430,8 +430,10 @@ if args.mode == 'spv_train':
 elif args.mode == 'uspv_train':
     unsupervised()
 elif args.mode == 'test':
+    model.parsing_setup()
     test()
 elif args.mode == 'parse':
+    model.parsing_setup()
     print "Please enter sentences to parse, one per newline (press \"Enter\" to quit):"
     while True:
         sentence = raw_input()

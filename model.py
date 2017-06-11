@@ -152,6 +152,13 @@ class LCNPModel(nn.Module):
     def encoder_t(self, seq):
         return self.word2vec_plus(seq) + self.word2vec(seq)
 
+    def parsing_setup(self):
+        # since for lexicon, Pr(x | P) = logsoftmax(A(Wx + b)). We
+        # precompute AW (as ut_w) and Ab (as ut_b) here to speed up the computation
+        w2v_w = self.word2vec.weight + self.word2vec_plus.weight
+        self.ut_w = w2v_w.mm(self.ut.weight).t()
+        self.ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
+
     def parse(self, sentence, sen):
         # sen is a torch.LongTensor object, containing fake BOS index
         # along with indices of the words
@@ -238,19 +245,13 @@ class LCNPModel(nn.Module):
             )
         )
 
-        # since for lexicon, Pr(x | P) = logsoftmax(A(Wx + b)). We
-        # precompute AW (as ut_w) and Ab (as ut_b) here to speed up the computation
-        w2v_w = self.word2vec.weight + self.word2vec_plus.weight
-        ut_w = w2v_w.mm(self.ut.weight).t()
-        ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
-
         preterminal = np.empty((n, self.nnt), dtype=np.float32)
         preterminal.fill(-1000000)
         # append one level preterminal symbols
         for i in xrange(n):
             c = sen[i]
             for p in self.lexicon[c]:
-                preterminal[i,p] = self.preterm_prob(ut_w, ut_b, p, c, output[i]).data[0]
+                preterminal[i,p] = self.preterm_prob(p, c, output[i]).data[0]
 
         if self.use_cuda:
             return self.parser.viterbi_parse(
@@ -339,7 +340,7 @@ class LCNPModel(nn.Module):
 
         return Variable(torch.FloatTensor[1])
 
-    def preterm_prob(self, ut_w, ut_b, p, c, h):
+    def preterm_prob(self, p, c, h):
         pi = Variable(torch.LongTensor([p]))
         h = h.view(1, -1)
         if self.use_cuda:
@@ -347,7 +348,7 @@ class LCNPModel(nn.Module):
             h = h.cuda()
 
         cond = torch.cat((self.encoder_nt(pi), h), 1)
-        res = cond.mm(ut_w) + ut_b
+        res = cond.mm(self.ut_w) + self.ut_b
         UT_idx = 0  # UT_idx = the index for unary terminal symbol
         return self.lsm(self.p2l(cond))[0][UT_idx] + self.lsm(res)[0][c]
 
