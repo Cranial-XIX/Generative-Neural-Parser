@@ -78,7 +78,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--learning-rate', default=0.05, help="learning rate"
+    '--learning-rate', default=0.01, help="learning rate"
 )
 
 argparser.add_argument(
@@ -204,6 +204,7 @@ def supervised():
 
     try:
         for epoch in range(args.epochs):
+            p.shuffle()
             idx = 0
             batch = 0
             tot_loss = 0

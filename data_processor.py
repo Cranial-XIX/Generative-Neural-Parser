@@ -2,6 +2,7 @@ import constants
 import nltk
 import numpy as np
 import os
+import random
 import time
 import torch
 
@@ -270,6 +271,15 @@ class Processor(object):
             if sentence[i].lower() not in self.w2idx:
                 return True
         return False
+
+    def shuffle(self):
+        sens = self.lines[::2]
+        rules = self.lines[1::2]
+        c = list(zip(sens, rules))
+        random.shuffle(c)
+        sens, rules = zip(*c)
+        self.lines[::2] = sens
+        self.lines[1::2] = rules
 
     def next(self, idx, bsz=None):
         '''
