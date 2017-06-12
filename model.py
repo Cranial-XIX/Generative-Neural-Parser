@@ -67,7 +67,7 @@ class LCNPModel(nn.Module):
         # The LSTM and some linear transformation layers
         self.LSTM = nn.LSTM(
                 self.dt, self.dhid, self.nlayers,
-                batch_first=True, bias=True
+                batch_first=True, bias=True, dropout=0.6
             )
 
         self.dp2l = self.dnt + self.dhid
@@ -103,31 +103,31 @@ class LCNPModel(nn.Module):
         lstm_weight_range = 0.2
 
         self.LSTM.weight_ih_l0.data.uniform_(-lstm_weight_range, lstm_weight_range)
-        '''
+
         self.LSTM.weight_ih_l1.data.uniform_(-lstm_weight_range, lstm_weight_range)
 
-        self.LSTM.weight_ih_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)
-        '''
+        #self.LSTM.weight_ih_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)
+
 
         self.LSTM.weight_hh_l0.data.uniform_(-lstm_weight_range, lstm_weight_range)
-        '''      
+    
         self.LSTM.weight_hh_l1.data.uniform_(-lstm_weight_range, lstm_weight_range)
-  
-        self.LSTM.weight_hh_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)
-        '''
+
+        #self.LSTM.weight_hh_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)
+
 
         size = len(self.LSTM.bias_ih_l0)
         section = size / 4
         for i in xrange(section, 2*section):
             self.LSTM.bias_ih_l0.data[i] = 1.0
             self.LSTM.bias_hh_l0.data[i] = 1.0
-            '''
+            
             self.LSTM.bias_ih_l1.data[i] = 1.0
-            self.LSTM.bias_ih_l2.data[i] = 1.0
+            #self.LSTM.bias_ih_l2.data[i] = 1.0
 
             self.LSTM.bias_hh_l1.data[i] = 1.0
-            self.LSTM.bias_hh_l2.data[i] = 1.0
-            '''
+            #self.LSTM.bias_hh_l2.data[i] = 1.0
+            
         self.p2l.bias.data.fill_(0)
         self.p2l.weight.data.uniform_(-initrange, initrange)
 

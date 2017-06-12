@@ -205,7 +205,7 @@ class Processor(object):
             self.lines = data.readlines()    
 
     def make_trainset(self):
-        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH,n=50)
+        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH)
         train_trees = list(examples)
 
         f = open(self.train_file, 'w')
