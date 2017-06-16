@@ -70,24 +70,22 @@ class LCNPModel(nn.Module):
                 batch_first=True, bias=True
             )
 
-        self.dp2l = self.dnt + self.dhid
-        self.dpl2r = 2 * (self.dnt + self.dhid)
-        self.dunt = self.dnt + self.dhid
-        self.dut = self.dnt + self.dhid
+        dp2l = dunt = dut = self.dnt + self.dhid
+        dpl2r = 2 * (self.dnt + self.dhid)
 
         self.lsm = nn.LogSoftmax()
         self.sm = nn.Softmax()
         self.relu = nn.ReLU()
 
         # parent to left
-        self.p2l = nn.Linear(self.dp2l, self.nnt)
+        self.p2l = nn.Linear(dp2l, self.nnt)
         # parent left to right
-        self.pl2r = nn.Linear(self.dpl2r, 250)
+        self.pl2r = nn.Linear(dpl2r, 250)
         self.pl2r_out = nn.Linear(250, self.nnt)
         # unary nonterminal
-        self.unt = nn.Linear(self.dunt, self.nnt)
+        self.unt = nn.Linear(dunt, self.nnt)
         # unary terminal
-        self.ut = nn.Linear(self.dut, self.dt)
+        self.ut = nn.Linear(dut, self.dt)
 
         self.init_weights(args['initrange'])
 
@@ -103,16 +101,11 @@ class LCNPModel(nn.Module):
         lstm_weight_range = 0.2
 
         self.LSTM.weight_ih_l0.data.uniform_(-lstm_weight_range, lstm_weight_range)
-        '''
-        self.LSTM.weight_ih_l1.data.uniform_(-lstm_weight_range, lstm_weight_range)
-
-        self.LSTM.weight_ih_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)
-        '''
-
         self.LSTM.weight_hh_l0.data.uniform_(-lstm_weight_range, lstm_weight_range)
-        '''      
+        self.LSTM.weight_ih_l1.data.uniform_(-lstm_weight_range, lstm_weight_range)
         self.LSTM.weight_hh_l1.data.uniform_(-lstm_weight_range, lstm_weight_range)
-  
+        '''
+        self.LSTM.weight_ih_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)  
         self.LSTM.weight_hh_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)
         '''
 
@@ -121,11 +114,11 @@ class LCNPModel(nn.Module):
         for i in xrange(section, 2*section):
             self.LSTM.bias_ih_l0.data[i] = 1.0
             self.LSTM.bias_hh_l0.data[i] = 1.0
-            '''
-            self.LSTM.bias_ih_l1.data[i] = 1.0
-            self.LSTM.bias_ih_l2.data[i] = 1.0
 
+            self.LSTM.bias_ih_l1.data[i] = 1.0
             self.LSTM.bias_hh_l1.data[i] = 1.0
+            '''
+            self.LSTM.bias_ih_l2.data[i] = 1.0
             self.LSTM.bias_hh_l2.data[i] = 1.0
             '''
         self.p2l.bias.data.fill_(0)
@@ -133,6 +126,8 @@ class LCNPModel(nn.Module):
 
         self.pl2r.bias.data.fill_(0)
         self.pl2r.weight.data.uniform_(-initrange, initrange)
+        self.pl2r_out.bias.data.fill_(0)
+        self.pl2r_out.weight.data.uniform_(-initrange, initrange)
 
         self.unt.bias.data.fill_(0)
         self.unt.weight.data.uniform_(-initrange, initrange)
@@ -429,4 +424,4 @@ class LCNPModel(nn.Module):
 
         # pass to a single layer neural net for nonlinearity
         m_pl2r = self.relu(self.pl2r(pl2r_cond))
-        return self.sm(self.pl2r_out(m_pl2r)).gather(1, pl2r_t.unsqueeze(1))
+        return self.sm(self.pl2r_out(m_pl2r))#.gather(1, pl2r_t.unsqueeze(1))

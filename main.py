@@ -52,15 +52,15 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--lstm-layer', default=1, help='# LSTM layer'
+    '--lstm-layer', default=2, help='# LSTM layer'
 )
 
 argparser.add_argument(
-    '--lstm-dim', default=150, help='LSTM hidden dimension'
+    '--lstm-dim', default=300, help='LSTM hidden dimension'
 )
 
 argparser.add_argument(
-    '--l2-coef', default=0.02, help='l2 norm coefficient'
+    '--l2-coef', default=0.01, help='l2 norm coefficient'
 )
 
 argparser.add_argument(
@@ -129,6 +129,7 @@ args.lstm_coef = float(args.lstm_coef)
 args.lstm_layer = int(args.lstm_layer)
 args.lstm_dim = int(args.lstm_dim)
 args.l2_coef = float(args.l2_coef)
+args.learning_rate = float(args.learning_rate)
 args.epochs = int(args.epochs)
 args.batch_size = int(args.batch_size)
 args.verbose = (args.verbose == 'yes')
@@ -340,7 +341,7 @@ def parse(sentence):
 def test():
     # parsing
     start = time.time()
-    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH,n=50)
+    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH,n=100)
     test = list(instances)
     cumul_accuracy = 0
     num_trees_with_parse = 0
@@ -420,7 +421,10 @@ def KLD():
         sm = model.pl2r_test(p_array[0], p_array[1], p_array[2],
             p_array[3], p_array[4], p_array[5])
         for i in xrange(len(p.pl2r_p)):
-            print "(", p.pl2r_p[i] , " ", p.pl2r_l[i], " ", p.pl2r_t[i], ") = ", sm.data[i][0]
+            if sm.data[i][0] < 0.98:
+                print "(", p.pl2r_p[i] , " ", p.pl2r_l[i], " ", p.pl2r_t[i], " @ ", p.pl2r_pi[i], ", ", p.pl2r_ci[i], ") = ", sm.data[i][p.pl2r_t[i]]
+            if p.pl2r_p[i] == 11 and p.pl2r_l[i] == 18 and p.pl2r_t[i] == 19:
+                print sm.data[i]
         if idx == -1:
             break
 

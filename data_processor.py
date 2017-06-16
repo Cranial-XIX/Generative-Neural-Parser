@@ -205,7 +205,7 @@ class Processor(object):
             self.lines = data.readlines()    
 
     def make_trainset(self):
-        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH,n=50)
+        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH,n=100)
         train_trees = list(examples)
 
         f = open(self.train_file, 'w')
@@ -329,17 +329,18 @@ class Processor(object):
                 # get the encoded sentence, exclude the last word
                 # since we only need left context
                 self.sens[num_sen] = self.get_idx_maxlength(self.lines[2*idx])
+
                 # deal with the rest of inputs
                 rest = self.lines[2*idx+1].split()
 
                 for j in xrange(len(rest)/5):
-                    lc = int(rest[5*j])       # left context position
-                    li = num_sen * m + lc     # left index in matrix
-                    p = int(rest[5*j+1])      # parent index
-                    symbol = rest[5*j+2]      # might be from: {
-                                              # 't'    (unary terminal rule)
-                                              # 'u'    (unary nontemrinal rule)
-                                              # number (the left sibling) }
+                    previous = num_sen * m
+                    li = previous + int(rest[5*j])      # left index in matrix
+                    p = int(rest[5*j+1])                # parent index
+                    symbol = rest[5*j+2]                # might be from: {
+                                                        # 't'    (unary terminal rule)
+                                                        # 'u'    (unary nontemrinal rule)
+                                                        # number (the left sibling) }
                     if symbol == 't':
                         # terminal rule found
                         word = rest[5*j+3].lower()
@@ -365,7 +366,7 @@ class Processor(object):
                         self.pl2r_l[num_pl2r] = l
                         self.pl2r_t[num_pl2r] = c
                         self.pl2r_pi[num_pl2r] = li
-                        self.pl2r_ci[num_pl2r] = int(rest[5*j+4])
+                        self.pl2r_ci[num_pl2r] = previous + int(rest[5*j+4])
                         num_pl2r += 1
 
                     self.p2l[num_p2l] = p
