@@ -67,7 +67,7 @@ class LCNPModel(nn.Module):
         # The LSTM and some linear transformation layers
         self.LSTM = nn.LSTM(
                 self.dt, self.dhid, self.nlayers,
-                batch_first=True, bias=True
+                batch_first=True, bias=True, dropout=0.6
             )
 
         dp2l = dunt = dut = self.dnt + self.dhid
