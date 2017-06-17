@@ -421,9 +421,9 @@ def KLD():
         sm = model.pl2r_test(p_array[0], p_array[1], p_array[2],
             p_array[3], p_array[4], p_array[5])
         for i in xrange(len(p.pl2r_p)):
-            if sm.data[i][0] < 0.98:
+            if sm.data[i][p.pl2r_t[i]] < 0.9:
                 print "(", p.pl2r_p[i] , " ", p.pl2r_l[i], " ", p.pl2r_t[i], " @ ", p.pl2r_pi[i], ", ", p.pl2r_ci[i], ") = ", sm.data[i][p.pl2r_t[i]]
-            if p.pl2r_p[i] == 11 and p.pl2r_l[i] == 18 and p.pl2r_t[i] == 19:
+            if p.pl2r_p[i] == 11 and p.pl2r_l[i] == 18 and p.pl2r_t[i] == 19 and p.pl2r_pi[i]== 0 and p.pl2r_ci[i] ==1:
                 print sm.data[i]
         if idx == -1:
             break
