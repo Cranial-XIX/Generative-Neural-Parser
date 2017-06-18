@@ -52,15 +52,15 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--lstm-layer', default=2, help='# LSTM layer'
+    '--lstm-layer', default=1, help='# LSTM layer'
 )
 
 argparser.add_argument(
-    '--lstm-dim', default=300, help='LSTM hidden dimension'
+    '--lstm-dim', default=120, help='LSTM hidden dimension'
 )
 
 argparser.add_argument(
-    '--l2-coef', default=0.01, help='l2 norm coefficient'
+    '--l2-coef', default=0, help='l2 norm coefficient'
 )
 
 argparser.add_argument(
@@ -341,7 +341,7 @@ def parse(sentence):
 def test():
     # parsing
     start = time.time()
-    instances = ptb("dev", minlength=3, maxlength=constants.MAX_SEN_LENGTH)
+    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=500)
     test = list(instances)
     cumul_accuracy = 0
     num_trees_with_parse = 0
@@ -428,6 +428,99 @@ def KLD():
         if idx == -1:
             break
 
+def test_p2l():
+    idx = 0
+    total = 0
+    no = 0
+    while True:
+        print "="*80
+        # get next training instances
+        idx = p.next(idx, args.batch_size)
+
+        # the parameters array
+        p_array = [
+            p.sens, p.p2l, p.p2l_t, p.p2l_i
+        ]
+
+        # create PyTorch Variables
+        if args.cuda:
+            p_array = [(Variable(x)).cuda() for x in p_array]
+        else:
+            p_array = [Variable(x) for x in p_array]
+
+        sm = model.p2l_test(p_array[0], p_array[1], p_array[2], p_array[3])
+
+        for i in xrange(len(p.p2l)):
+            total += 1
+            if sm.data[i][p.p2l_t[i]] < 0.9:
+                no += 1
+            print "(", p.p2l[i] , " ", p.p2l_i[i] % 30 , " ", p.p2l_t[i] ,") = ", sm.data[i][p.p2l_t[i]]
+        if idx == -1:
+            print no / float(total)
+            break
+
+def test_unt():
+    idx = 0
+    total = 0
+    no = 0
+    while True:
+        print "="*80
+        # get next training instances
+        idx = p.next(idx, args.batch_size)
+
+        # the parameters array
+        p_array = [
+            p.sens, p.unt, p.unt_t, p.unt_i
+        ]
+
+        # create PyTorch Variables
+        if args.cuda:
+            p_array = [(Variable(x)).cuda() for x in p_array]
+        else:
+            p_array = [Variable(x) for x in p_array]
+
+        sm = model.unt_test(p_array[0], p_array[1], p_array[2], p_array[3])
+
+        for i in xrange(len(p.unt)):
+            total += 1
+            if sm.data[i][p.unt_t[i]] < 0.9:
+                no += 1
+            print "(", p.unt[i] , " ", p.unt_i[i] % 30 , " ", p.unt_t[i] ,") = ", sm.data[i][p.unt_t[i]]
+        if idx == -1:
+            print no / float(total)
+            break
+
+def test_ut():
+    idx = 0
+    total = 0
+    no = 0
+    while True:
+        print "="*80
+        # get next training instances
+        idx = p.next(idx, args.batch_size)
+
+        # the parameters array
+        p_array = [
+            p.sens, p.ut, p.ut_t, p.ut_i
+        ]
+
+        # create PyTorch Variables
+        if args.cuda:
+            p_array = [(Variable(x)).cuda() for x in p_array]
+        else:
+            p_array = [Variable(x) for x in p_array]
+
+        sm = model.ut_test(p_array[0], p_array[1], p_array[2], p_array[3])
+
+        for i in xrange(len(p.ut)):
+            total += 1
+            if sm.data[i][p.ut_t[i]] < 0.9:
+                no += 1
+                print "(", p.ut[i] , " ", p.ut_i[i] % 30 , " ", p.ut_t[i] ,") = ", sm.data[i][p.ut_t[i]]
+        if idx == -1:
+            print no / float(total)
+            break
+
 ## run the model
 if args.mode == 'spv_train':
     supervised()
@@ -445,7 +538,8 @@ elif args.mode == 'parse':
             break
         parse(sentence)
 elif args.mode == 'KLD':
-    KLD()
+    #KLD()
+    test_ut()
 else:
     print "Cannot recognize the mode, allowed modes are: " \
         "spv_train, uspv_train, parse, test"

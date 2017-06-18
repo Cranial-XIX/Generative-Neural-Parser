@@ -78,15 +78,16 @@ class LCNPModel(nn.Module):
         self.relu = nn.ReLU()
 
         # parent to left
-        self.p2l = nn.Linear(dp2l, self.nnt)
+        self.p2l = nn.Linear(dp2l, 200)
+        self.p2l_out = nn.Linear(200, self.nnt)
         # parent left to right
         self.pl2r = nn.Linear(dpl2r, 250)
         self.pl2r_out = nn.Linear(250, self.nnt)
         # unary nonterminal
-        self.unt = nn.Linear(dunt, self.nnt)
+        self.unt = nn.Linear(dunt, 200)
+        self.unt_out = nn.Linear(200, self.nnt)
         # unary terminal
         self.ut = nn.Linear(dut, self.dt)
-
         self.init_weights(args['initrange'])
 
     def init_weights(self, initrange=1.0):
@@ -102,9 +103,10 @@ class LCNPModel(nn.Module):
 
         self.LSTM.weight_ih_l0.data.uniform_(-lstm_weight_range, lstm_weight_range)
         self.LSTM.weight_hh_l0.data.uniform_(-lstm_weight_range, lstm_weight_range)
+        '''
         self.LSTM.weight_ih_l1.data.uniform_(-lstm_weight_range, lstm_weight_range)
         self.LSTM.weight_hh_l1.data.uniform_(-lstm_weight_range, lstm_weight_range)
-        '''
+
         self.LSTM.weight_ih_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)  
         self.LSTM.weight_hh_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)
         '''
@@ -114,10 +116,10 @@ class LCNPModel(nn.Module):
         for i in xrange(section, 2*section):
             self.LSTM.bias_ih_l0.data[i] = 1.0
             self.LSTM.bias_hh_l0.data[i] = 1.0
-
+            '''
             self.LSTM.bias_ih_l1.data[i] = 1.0
             self.LSTM.bias_hh_l1.data[i] = 1.0
-            '''
+
             self.LSTM.bias_ih_l2.data[i] = 1.0
             self.LSTM.bias_hh_l2.data[i] = 1.0
             '''
@@ -213,8 +215,8 @@ class LCNPModel(nn.Module):
 
         # parent to unary child
         # * unt_pr (num_nt * sen_length * num_nt) -> (parent, position i, child)
-        unt_pr = self.lsm(self.unt(unt_cond.view(-1, sz[2]))).view(sz[0], sz[1], -1)
-        p2l_pr = self.lsm(self.p2l(p2l_cond.view(-1, sz[2]))).view(sz[0], sz[1], -1)
+        unt_pr = self.lsm(self.unt_out(self.relu(self.unt(unt_cond.view(-1, sz[2]))))).view(sz[0], sz[1], -1)
+        p2l_pr = self.lsm(self.p2l_out(self.relu(self.p2l(p2l_cond.view(-1, sz[2]))))).view(sz[0], sz[1], -1)
 
         # preprocess
         pl2r_p, pl2r_l, pl2r_pi, pl2r_ci = self.parser.preprocess(sen)
@@ -363,7 +365,7 @@ class LCNPModel(nn.Module):
         ), 1)
 
         nll_p2l = -torch.sum(
-            self.lsm(self.p2l(p2l_cond)).gather(1, p2l_t.unsqueeze(1))
+            self.lsm(self.p2l_out(self.relu(self.p2l(p2l_cond)))).gather(1, p2l_t.unsqueeze(1))
         )
 
         # compute the log probability of unary nonterminal rules
@@ -373,7 +375,7 @@ class LCNPModel(nn.Module):
         ), 1)
 
         nll_unt = -torch.sum(
-            self.lsm(self.unt(unt_cond)).gather(1, unt_t.unsqueeze(1))
+            self.lsm(self.unt_out(self.relu(self.unt(unt_cond)))).gather(1, unt_t.unsqueeze(1))
         )
 
         # compute the log probability of terminal rules
@@ -409,7 +411,6 @@ class LCNPModel(nn.Module):
         return nll_p2l + nll_pl2r + nll_unt + nll_ut
 
     def pl2r_test(self, sens, pl2r_p, pl2r_l, pl2r_t, pl2r_pi, pl2r_ci):
-
         # run the LSTM to extract features from left context
         output, hidden = self.LSTM(self.encoder_t(sens), self.h0)
         output = self.lstm_coef * output.contiguous().view(-1, output.size(2))
@@ -425,3 +426,47 @@ class LCNPModel(nn.Module):
         # pass to a single layer neural net for nonlinearity
         m_pl2r = self.relu(self.pl2r(pl2r_cond))
         return self.sm(self.pl2r_out(m_pl2r))#.gather(1, pl2r_t.unsqueeze(1))
+
+    def p2l_test(self, sens, p2l, p2l_t, p2l_i):
+
+        # run the LSTM to extract features from left context
+        output, hidden = self.LSTM(self.encoder_t(sens), self.h0)
+        output = self.lstm_coef * output.contiguous().view(-1, output.size(2))
+
+        # compute the log probability of p2l rules
+        p2l_cond = torch.cat((
+            self.encoder_nt(p2l), 
+            torch.index_select(output, 0, p2l_i)
+        ), 1)
+
+        return self.sm(self.p2l_out(self.relu(self.p2l(p2l_cond))))
+
+    def unt_test(self, sens, unt, unt_t, unt_i):
+
+        # run the LSTM to extract features from left context
+        output, hidden = self.LSTM(self.encoder_t(sens), self.h0)
+        output = self.lstm_coef * output.contiguous().view(-1, output.size(2))
+
+        # compute the log probability of unary nonterminal rules
+        unt_cond = torch.cat((
+            self.encoder_nt(unt), 
+            torch.index_select(output, 0, unt_i)
+        ), 1)
+
+        return self.sm(self.unt_out(self.relu(self.unt(unt_cond))))
+
+    def ut_test(self, sens, ut, ut_t, ut_i):
+
+        # run the LSTM to extract features from left context
+        output, hidden = self.LSTM(self.encoder_t(sens), self.h0)
+        output = self.lstm_coef * output.contiguous().view(-1, output.size(2))
+
+        # compute the log probability of terminal rules
+        ut_cond = torch.cat((
+            self.encoder_nt(ut),
+            torch.index_select(output, 0, ut_i)
+        ), 1)
+
+        m_ut = self.ut(ut_cond).mm((self.word2vec.weight + self.word2vec_plus.weight).t())
+
+        return self.sm(m_ut)
