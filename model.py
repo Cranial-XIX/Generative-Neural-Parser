@@ -67,7 +67,7 @@ class LCNPModel(nn.Module):
         # The LSTM and some linear transformation layers
         self.LSTM = nn.LSTM(
                 self.dt, self.dhid, self.nlayers,
-                batch_first=True, bias=True, dropout=0.6
+                batch_first=True, bias=True, dropout=0.5
             )
 
         dp2l = dunt = dut = self.dnt + self.dhid
@@ -224,6 +224,11 @@ class LCNPModel(nn.Module):
         pl2r_l = Variable(torch.LongTensor(pl2r_l))
         pl2r_pi = Variable(torch.LongTensor(pl2r_pi))
         pl2r_ci = Variable(torch.LongTensor(pl2r_ci))
+        if self.use_cuda:
+            pl2r_p = pl2r_p.cuda()
+            pl2r_l = pl2r_l.cuda()
+            pl2r_pi = pl2r_pi.cuda()
+            pl2r_ci = pl2r_ci.cuda()
 
         output = output.view(n, -1)
         # compute the log probability of pl2r rules
