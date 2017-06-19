@@ -156,10 +156,11 @@ class LCNPModel(nn.Module):
         self.ut_w = w2v_w.mm(self.ut.weight).t()
         self.ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
 
-    def parse(self, sentence, sen):
+    def parse(self, sentence, sen, viterbi=True):
         # sen is a torch.LongTensor object, containing fake BOS index
         # along with indices of the words
 
+        t0 = time.time()
         # get left context hidden units with a trained h0 (start hidden state)
         output, hidden = self.LSTM(self.encoder_t(sen), self.h0)
         # get rid of the initial BOS symbol, since you need fake BOS 
@@ -171,34 +172,7 @@ class LCNPModel(nn.Module):
         # * output (batch_size * sen_length * hidden dimension)
         output = output.narrow(1, 0, n)
 
-        '''
-        # first do the precomputation for preprocessing -- without left context
-        # * unt_i (num_nt * sen_length * parent_emb_size)
-
-        # parent to unary child
-        # * unt_pr (num_nt * sen_length * num_nt) -> (parent, position i, child)
-        unt_pr = self.lsm(
-            unt_pre.mm(
-                self.unt.weight.narrow(1, 0, self.nnt).t()
-            )
-        )
-        # parent to left
-        p2l_pr = self.lsm(
-            p2l_pre.mm(
-                self.p2l.weight.narrow(1, 0, self.nnt).t()
-            )
-        )
-        # parent left to right
-        pl2r_pr = self.lsm(
-            self.pl2r_out(
-                self.relu(
-                    pl2r_pre.view(-1, 2*self.nnt).mm(
-                        self.pl2r.weight.narrow(1, 0, 2*self.nnt).t()
-                    )
-                )
-            )
-        ).view(self.nnt, self.nnt, -1)
-        '''
+        softmax = self.lsm if viterbi else self.sm
 
         # * h1 (num_nt * sen_length * hidden dimension)
         h1 = output.repeat(self.nnt, 1, 1)
@@ -215,24 +189,50 @@ class LCNPModel(nn.Module):
 
         # parent to unary child
         # * unt_pr (num_nt * sen_length * num_nt) -> (parent, position i, child)
-        unt_pr = self.lsm(self.unt_out(self.relu(self.unt(unt_cond.view(-1, sz[2]))))).view(sz[0], sz[1], -1)
-        p2l_pr = self.lsm(self.p2l_out(self.relu(self.p2l(p2l_cond.view(-1, sz[2]))))).view(sz[0], sz[1], -1)
+        unt_pr = softmax(self.unt_out(self.relu(self.unt(unt_cond.view(-1, sz[2]))))).view(sz[0], sz[1], -1)
+        p2l_pr = softmax(self.p2l_out(self.relu(self.p2l(p2l_cond.view(-1, sz[2]))))).view(sz[0], sz[1], -1)
 
+        output = output.view(n, -1)
+        if viterbi:
+            preterminal = np.empty((n, self.nnt), dtype=np.float32)
+            preterminal.fill(-1000000)
+        else:
+            preterminal = np.zeros((n, self.nnt), dtype=np.float32)
+
+        U_NTM = 0
+        t1= time.time()
+        # append one level preterminal symbols
+        for i in xrange(n):
+            c = sen[i]
+            for p in self.lexicon[c]:
+                pi = Variable(torch.LongTensor([p]))
+                h = output[i].view(1, -1)
+                if self.use_cuda:
+                    pi = pi.cuda()
+                    h = h.cuda()
+                cond = torch.cat((self.encoder_nt(pi), h), 1)
+                res = cond.mm(self.ut_w) + self.ut_b
+
+                preterminal[i,p] = (softmax(self.p2l(cond))[0][U_NTM] + softmax(res)[0][c]).data[0]
+
+        t2 = time.time()
         # preprocess
-        pl2r_p, pl2r_l, pl2r_pi, pl2r_ci = self.parser.preprocess(sen)
+        pl2r_p, pl2r_l, pl2r_pi, pl2r_ci = self.parser.preprocess(n, preterminal)
+
         pl2r_p = Variable(torch.LongTensor(pl2r_p))
         pl2r_l = Variable(torch.LongTensor(pl2r_l))
         pl2r_pi = Variable(torch.LongTensor(pl2r_pi))
         pl2r_ci = Variable(torch.LongTensor(pl2r_ci))
+
         if self.use_cuda:
             pl2r_p = pl2r_p.cuda()
             pl2r_l = pl2r_l.cuda()
             pl2r_pi = pl2r_pi.cuda()
             pl2r_ci = pl2r_ci.cuda()
 
-        output = output.view(n, -1)
+        t3 = time.time()
         # compute the log probability of pl2r rules
-        pl2r_pr = self.lsm(
+        pl2r_pr = softmax(
             self.pl2r_out(
                 self.relu(
                     self.pl2r(
@@ -247,32 +247,42 @@ class LCNPModel(nn.Module):
             )
         )
 
-        preterminal = np.empty((n, self.nnt), dtype=np.float32)
-        preterminal.fill(-1000000)
-        # append one level preterminal symbols
-        for i in xrange(n):
-            c = sen[i]
-            for p in self.lexicon[c]:
-                preterminal[i,p] = self.preterm_prob(p, c, output[i]).data[0]
-
+        t4 = time.time()
+        print " - "*10, t4-t3, t3-t2, t2-t1, t1-t0
         if self.use_cuda:
-            return self.parser.viterbi_parse(
-                    sentence,
-                    sen.cpu().numpy(),
-                    preterminal,
-                    unt_pr.cpu().data.numpy(),
-                    p2l_pr.cpu().data.numpy(),
-                    pl2r_pr.cpu().data.numpy()
+            if viterbi:
+                return self.parser.viterbi(
+                        sentence,
+                        preterminal,
+                        unt_pr.cpu().data.numpy(),
+                        p2l_pr.cpu().data.numpy(),
+                        pl2r_pr.cpu().data.numpy()
+                )
+            else:
+                return self.parser.mbr(
+                        sentence,
+                        preterminal,
+                        unt_pr.cpu().data.numpy(),
+                        p2l_pr.cpu().data.numpy(),
+                        pl2r_pr.cpu().data.numpy()
                 )
         else:
-            return self.parser.viterbi_parse(
+            if viterbi:
+                return self.parser.viterbi(
+                        sentence,
+                        preterminal,
+                        unt_pr.data.numpy(),
+                        p2l_pr.data.numpy(),
+                        pl2r_pr.data.numpy()
+                )
+            else:
+                return self.parser.mbr(
                     sentence,
-                    sen.numpy(),
                     preterminal,
                     unt_pr.data.numpy(),
                     p2l_pr.data.numpy(),
                     pl2r_pr.data.numpy()
-                )
+                )               
 
     def unsupervised(self, sen):
         # sen is a torch.LongTensor object, containing fake BOS index
@@ -341,18 +351,6 @@ class LCNPModel(nn.Module):
                 preterminal[i,p] = self.preterm_prob(lsm, ut_w, ut_b, p, c, output[0, i]).data[0]
 
         return Variable(torch.FloatTensor[1])
-
-    def preterm_prob(self, p, c, h):
-        pi = Variable(torch.LongTensor([p]))
-        h = h.view(1, -1)
-        if self.use_cuda:
-            pi = pi.cuda()
-            h = h.cuda()
-
-        cond = torch.cat((self.encoder_nt(pi), h), 1)
-        res = cond.mm(self.ut_w) + self.ut_b
-        UT_idx = 0  # UT_idx = the index for unary terminal symbol
-        return self.lsm(self.p2l(cond))[0][UT_idx] + self.lsm(res)[0][c]
 
     def supervised(self, sens,
         p2l, pl2r_p, pl2r_l, unt, ut,

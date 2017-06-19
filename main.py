@@ -341,7 +341,7 @@ def parse(sentence):
 def test():
     # parsing
     start = time.time()
-    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=500)
+    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=50)
     test = list(instances)
     cumul_accuracy = 0
     num_trees_with_parse = 0
