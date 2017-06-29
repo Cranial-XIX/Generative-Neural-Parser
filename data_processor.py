@@ -143,7 +143,7 @@ class Processor(object):
                 npt += 1
                 lex = line.strip().split()
                 nt_idx = self.nt2idx[lex[0]]
-                w = lex[1]
+                w = lex[1].lower()
                 if w in self.w2idx:
                     w_idx = self.w2idx[w]
                 else:  # if word is OOV
@@ -152,7 +152,7 @@ class Processor(object):
                     self.lexicon[w_idx] = []
                 if w_idx == constants.OOV_IDX:
                     oov_set.add(nt_idx)
-                else:
+                elif nt_idx not in self.lexicon[w_idx]:
                     self.lexicon[w_idx].append(nt_idx)
         self.lexicon[constants.OOV_IDX] = list(oov_set)
         end_time = time.time()
@@ -205,7 +205,7 @@ class Processor(object):
             self.lines = data.readlines()    
 
     def make_trainset(self):
-        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=500)
+        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
         train_trees = list(examples)
 
         f = open(self.train_file, 'w')

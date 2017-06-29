@@ -142,6 +142,7 @@ if args.make_train:
 p = Processor(args.train, args.make_train, args.read_data, args.verbose)
 p.process_data()
 
+print p.lexicon[p.w2idx['securities']]
 # create a grammar object
 parser = GrammarObject(p)
 parser.read_gr_file(constants.GR_FILE)
@@ -341,7 +342,7 @@ def parse(sentence):
 def test():
     # parsing
     start = time.time()
-    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=50)
+    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
     test = list(instances)
     cumul_accuracy = 0
     num_trees_with_parse = 0
