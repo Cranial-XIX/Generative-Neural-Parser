@@ -31,9 +31,12 @@ class Processor(object):
 
         ## Lexicon and grammar
         self.lexicon = {}               # (int -> [int])
-        self.unary = {}                 # (int -> [int])
+        self.idx2u = []
+        self.unary = {}
+        self.nunary = 0
+        self.unary_prefix = []
+        self.unary_suffix = []
         self.binary = {}                # ((int,int) -> [int])
-
 
     def check_file_exists(self, filename, file_type):
         '''
@@ -52,7 +55,8 @@ class Processor(object):
     def read_w2v_file(self, w2v_file):
         '''
         Reads in word embeddings from the Word2vec file 
-        and store them into a hash map.    
+        and store them into a hash map.
+        @param w2v_file the file name of word2vec embedding
         '''
         if not self.check_file_exists(w2v_file, "word2vec"):
             return
@@ -93,6 +97,7 @@ class Processor(object):
     def read_nt_file(self, nt_file):
         '''
         Reads and creates the nonterminal embeddings
+        @param nt_file the file name of nonterminals
         '''
         if not self.check_file_exists(nt_file, "nonterminal embeddings"):
              return
@@ -162,7 +167,7 @@ class Processor(object):
                 % round(end_time - begin_time, 5)
             print "   # preterminal rules: ", npt
         return
-    
+
     def read_gr_file(self, gr_file):
         if not self.check_file_exists(gr_file, "grammar"):
              return
@@ -182,12 +187,6 @@ class Processor(object):
                     if not tpl in self.binary:
                         self.binary[tpl] = []
                     self.binary[tpl].append(p)
-                if len(rule) == 4:                     # unary rule
-                    if p != l:                         # Do not allow self-recurring X -> X rules
-                        nu += 1
-                        if not l in self.unary:
-                            self.unary[l] = []
-                        self.unary[l].append(p)
         end_time = time.time()
 
         if self.verbose:
@@ -205,7 +204,7 @@ class Processor(object):
             self.lines = data.readlines()    
 
     def make_trainset(self):
-        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
+        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=9)
         train_trees = list(examples)
 
         f = open(self.train_file, 'w')
@@ -220,20 +219,45 @@ class Processor(object):
             else:
                 f.write("\n" + sentence)
             f.write("\n" + self.convert_tree_to_encoded_list(gold_tree))
+        print self.idx2u
+        print self.nunary
+        for ur in self.idx2u:
+            reverse = list(reversed(ur))
+            tmp = reverse[:-1]
+            pre = " (".join([self.idx2nt[x] for x in tmp])
+            self.unary_prefix.append("(" + pre + " ")
+            self.unary_suffix.append(")" * len(tmp))
+
         # DEBUG: print self.convert_tree_to_encoded_list(nltk.Tree.fromstring("(ROOT (S (@S (NP I) (VP (VBP live)))(. .)))"))
         end_time = time.time()
         print "-- Making trainset takes %.4f s" \
             % round(end_time - begin_time, 5)
         f.close()
-                
+
     def convert_tree_to_encoded_list(self, tree):       
         self.encoded_list = [""]
         self.wi = -1 # word index
-        self.traverseTree(tree)
+        position, child, prev = self.traverseTree(tree)
+        if len(prev) > 1 and prev not in self.idx2u:
+            self.add_unary_chain(prev)
+        self.encoded_list.append(str(position))
+        self.encoded_list.append("2") # ROOT
+        self.encoded_list.append("u")
+        self.encoded_list.append(str(self.idx2u.index(prev)))
+        self.encoded_list.append("_")
         return " ".join(self.encoded_list)
 
+    def add_unary_chain(self, prev):     
+        self.idx2u.append(prev)
+        bottom = prev[0]
+        if bottom not in self.unary:
+            self.unary[bottom] = []
+        self.unary[bottom].append(self.nunary)
+        self.nunary += 1
+
     def traverseTree(self, tree):
-        p = str(self.nt2idx[tree.label()])
+        current_nonterminal = self.nt2idx[tree.label()]
+        p = str(current_nonterminal)
         if tree.height() == 2:  # is leaf
             child = tree.leaves()[0]
             self.wi += 1
@@ -242,28 +266,38 @@ class Processor(object):
             self.encoded_list.append("t")
             self.encoded_list.append(child)
             self.encoded_list.append("_")
-            return self.wi, p
+            return self.wi, p, [current_nonterminal]
         else:
             nchild = 0
+            previous = []
             for subtree in tree:
                 if nchild == 0:
-                    position, child = self.traverseTree(subtree)
+                    position, child, prev = self.traverseTree(subtree)
                 else:
-                    mid, right = self.traverseTree(subtree)
+                    mid, right, prev = self.traverseTree(subtree)
+                previous.append(prev)
                 nchild += 1
-            self.encoded_list.append(str(position))
-            self.encoded_list.append(p)
+
             if nchild == 1:
-                # unary rule
-                self.encoded_list.append("u")
-                self.encoded_list.append(child)
-                self.encoded_list.append("_")
+                previous[0].append(current_nonterminal)
+                return position, p, previous[0]
             else:
                 # binary rule
+                self.encoded_list.append(str(position))
+                self.encoded_list.append(p)
                 self.encoded_list.append(child)
                 self.encoded_list.append(right)
                 self.encoded_list.append(str(mid))
-            return position, p
+                for prev in previous:
+                    if len(prev) > 1:
+                        if prev not in self.idx2u:
+                            self.add_unary_chain(prev)
+                        self.encoded_list.append(str(position))
+                        self.encoded_list.append(child)
+                        self.encoded_list.append("u")
+                        self.encoded_list.append(str(self.idx2u.index(prev)))
+                        self.encoded_list.append("_")
+                return position, p, [current_nonterminal]
 
     def containOOV(self, sentence):
         sentence = sentence.strip().split()
@@ -442,11 +476,9 @@ class Processor(object):
     def create_precomputed_matrix(self):
         self.unt_pre = torch.FloatTensor(self.nnt, self.nnt).zero_()
         self.p2l_pre = torch.FloatTensor(self.nnt, self.nnt).zero_()
-        self.pl2r_pre = torch.FloatTensor(self.nnt, self.nnt, 2*self.nnt).zero_()
 
         unt_p = set()
         p2l_p = set()
-        pl2r_p = set()
 
         for child in self.unary:
             for parent in self.unary[child]:
@@ -462,10 +494,6 @@ class Processor(object):
                 if not parent in p2l_p:
                     p2l_p.add(parent)
                     self.p2l_pre[parent] = self.nonterm_emb[parent]
-                if not (parent, key[0]) in pl2r_p:
-                    pl2r_p.add((parent, key[0]))
-                    self.pl2r_pre[parent][key[0]] = \
-                        torch.cat((self.nonterm_emb[parent], self.nonterm_emb[key[0]]), 0).view(1, -1)
 
     def process_data(self):
         if self.read_data:
@@ -498,17 +526,20 @@ class Processor(object):
                     'dt': self.dt,
                     'nnt': self.nnt,
                     'dnt': self.dnt,
+                    'nunary': self.nunary,
                     'w2idx': self.w2idx,
                     'idx2w': self.idx2w,
                     'nt2idx': self.nt2idx,
                     'idx2nt': self.idx2nt,
+                    'idx2u': self.idx2u,
                     'lexicon': self.lexicon,
                     'unary': self.unary,
+                    'unary_prefix': self.unary_prefix,
+                    'unary_suffix': self.unary_suffix,
                     'binary': self.binary,
                     'lines': self.lines,
                     'unt_pre': self.unt_pre,
                     'p2l_pre': self.p2l_pre,
-                    'pl2r_pre': self.pl2r_pre
                 }, constants.CORPUS_INFO_FILE)
         else:
             # read existing data, so we don't need to process again
@@ -525,17 +556,20 @@ class Processor(object):
             self.dt = d['dt']
             self.nnt = d['nnt']
             self.dnt = d['dnt']
+            self.nunary = d['nunary']
             self.w2idx = d['w2idx']
             self.idx2w = d['idx2w']
             self.nt2idx = d['nt2idx']
             self.idx2nt = d['idx2nt']
+            self.idx2u = d['idx2u']
             self.lines = d['lines']
             self.lexicon = d['lexicon']
             self.unary = d['unary']
+            self.unary_prefix = d['unary_prefix']
+            self.unary_suffix = d['unary_suffix']
             self.binary = d['binary']
             self.unt_pre = d['unt_pre']
             self.p2l_pre = d['p2l_pre']
-            self.pl2r_pre = d['pl2r_pre']
             #self.print_rules()
             end = time.time()
         if self.verbose:

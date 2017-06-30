@@ -142,7 +142,6 @@ if args.make_train:
 p = Processor(args.train, args.make_train, args.read_data, args.verbose)
 p.process_data()
 
-print p.lexicon[p.w2idx['securities']]
 # create a grammar object
 parser = GrammarObject(p)
 parser.read_gr_file(constants.GR_FILE)
@@ -172,12 +171,13 @@ inputs = {
     'nlayers': args.lstm_layer,
     'bsz': args.batch_size,
     'dhid': args.lstm_dim,
+    'initrange': 1,
+
+    'nunary': p.nunary,
     'lexicon': p.lexicon,
     'parser': parser,
     'unt_pre': p.unt_pre,
     'p2l_pre': p.p2l_pre,
-    'pl2r_pre': p.pl2r_pre,
-    'initrange': 1,
 }
 
 model = LCNPModel(inputs)
@@ -342,7 +342,7 @@ def parse(sentence):
 def test():
     # parsing
     start = time.time()
-    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
+    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=9)
     test = list(instances)
     cumul_accuracy = 0
     num_trees_with_parse = 0
@@ -351,6 +351,7 @@ def test():
         if p.containOOV(sentence):
             continue
         total += 1
+
         parse_string = parse(sentence)
         if parse_string != "":
             parse_tree = Tree.fromstring(parse_string)
@@ -362,6 +363,46 @@ def test():
             num_trees_with_parse += 1
             if not tree_accruacy == 1.0:            
                 print tree_accruacy
+                '''
+                for sub in parse_tree:
+                    for sub1 in sub:
+                        count = 0
+                        for sub2 in sub1:
+                            if count == 0:
+                                count += 1
+                                continue 
+                            count1 = 0
+                            for sub3 in sub2:
+                                if count1 == 0:
+                                    count1 += 1
+                                    continue
+                                count2 = 0
+                                for sub4 in sub3:
+                                    if count2 == 0:
+                                        count2 += 1
+                                        continue
+                                    print sub4.pretty_print()
+                                    break
+                for sub in gold_tree:
+                    for sub1 in sub:
+                        count = 0
+                        for sub2 in sub1:
+                            if count == 0:
+                                count += 1
+                                continue 
+                            count1 = 0
+                            for sub3 in sub2:
+                                if count1 == 0:
+                                    count1 += 1
+                                    continue
+                                count2 = 0
+                                for sub4 in sub3:
+                                    if count2 == 0:
+                                        count2 += 1
+                                        continue
+                                    print sub4.pretty_print()
+                                    break
+                '''
                 print parse_tree.pretty_print()
                 print gold_tree.pretty_print()
             print "-"*80
@@ -455,7 +496,7 @@ def test_p2l():
             total += 1
             if sm.data[i][p.p2l_t[i]] < 0.9:
                 no += 1
-            print "(", p.p2l[i] , " ", p.p2l_i[i] % 30 , " ", p.p2l_t[i] ,") = ", sm.data[i][p.p2l_t[i]]
+                print "(", p.p2l[i] , " ", p.p2l_i[i] % 30 , " ", p.p2l_t[i] ,") = ", sm.data[i][p.p2l_t[i]]
         if idx == -1:
             print no / float(total)
             break
@@ -517,7 +558,7 @@ def test_ut():
             total += 1
             if sm.data[i][p.ut_t[i]] < 0.9:
                 no += 1
-                print "(", p.ut[i] , " ", p.ut_i[i] % 30 , " ", p.ut_t[i] ,") = ", sm.data[i][p.ut_t[i]]
+            print "(", p.idx2nt[p.ut[i]] , " ", p.ut_i[i] % 30 , " ", p.idx2w[p.ut_t[i]] ,") = ", sm.data[i][p.ut_t[i]]
         if idx == -1:
             print no / float(total)
             break
@@ -540,7 +581,7 @@ elif args.mode == 'parse':
         parse(sentence)
 elif args.mode == 'KLD':
     #KLD()
-    test_ut()
+    test_p2l()
 else:
     print "Cannot recognize the mode, allowed modes are: " \
         "spv_train, uspv_train, parse, test"

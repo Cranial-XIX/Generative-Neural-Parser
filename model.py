@@ -34,6 +34,8 @@ class LCNPModel(nn.Module):
         self.lstm_coef = args['lstm_coef'] # coefficient of LSTM
         self.bsz = args['bsz']             # the batch size
         self.dhid = args['dhid']           # LSTM hidden dimension size
+
+        self.nunary = args['nunary']
         self.nlayers = args['nlayers']     # number of layers in neural net
         self.lexicon = args['lexicon']     # dictionary for lexicon
         self.parser = args['parser']       # the parser, written in Cython
@@ -43,9 +45,9 @@ class LCNPModel(nn.Module):
             Variable(torch.zeros(self.nlayers, self.bsz, self.dhid)),
             Variable(torch.zeros(self.nlayers, self.bsz, self.dhid))
         )
-        self.unt_pre = Variable(args['unt_pre'])
+
+        self.unt_pre = Variable(torch.eye(self.nnt, self.nnt))
         self.p2l_pre = Variable(args['p2l_pre'])
-        self.pl2r_pre = Variable(args['pl2r_pre'])
 
         if self.use_cuda:
             # the initial states for h0 and c0 of LSTM
@@ -56,7 +58,6 @@ class LCNPModel(nn.Module):
             # initialize precomputed matrix
             self.unt_pre = self.unt_pre.cuda()
             self.p2l_pre = self.p2l_pre.cuda()
-            self.pl2r_pre = self.pl2r_pre.cuda()
 
         # nonterminal embedding and w2v embedding, w2v_plus 
         # is the deviation from w2v
@@ -85,7 +86,7 @@ class LCNPModel(nn.Module):
         self.pl2r_out = nn.Linear(250, self.nnt)
         # unary nonterminal
         self.unt = nn.Linear(dunt, 200)
-        self.unt_out = nn.Linear(200, self.nnt)
+        self.unt_out = nn.Linear(200, self.nunary)
         # unary terminal
         self.ut = nn.Linear(dut, self.dt)
         self.init_weights(args['initrange'])
@@ -199,7 +200,7 @@ class LCNPModel(nn.Module):
         else:
             preterminal = np.zeros((n, self.nnt), dtype=np.float32)
 
-        U_NTM = 0
+        U_TM = 0
         t1= time.time()
         # append one level preterminal symbols
         for i in xrange(n):
@@ -213,7 +214,7 @@ class LCNPModel(nn.Module):
                 cond = torch.cat((self.encoder_nt(pi), h), 1)
                 res = cond.mm(self.ut_w) + self.ut_b
 
-                preterminal[i,p] = (softmax(self.p2l(cond))[0][U_NTM] + softmax(res)[0][c]).data[0]
+                preterminal[i,p] = (softmax(self.p2l(cond))[0][U_TM] + softmax(res)[0][c]).data[0]
 
         t2 = time.time()
         # preprocess
@@ -285,72 +286,7 @@ class LCNPModel(nn.Module):
                 )               
 
     def unsupervised(self, sen):
-        # sen is a torch.LongTensor object, containing fake BOS index
-        # along with indices of the words
-        start = time.time()
-
-        # translate to sequence of vectors
-        emb_inp = self.encoder_t(sen)
-        # get left context hidden units with a trained h0 (start hidden state)
-        output, hidden = self.LSTM(emb_inp, self.h0)
-        # get rid of the initial BOS symbol, since you need fake BOS 
-        # to make sure everyone gets their cup of left context
-        sen = sen.view(-1).data[1:]
-        n = len(sen)
-        # truncate the last left context out, since we need to ensure the
-        # matrix is of length n
-        # * output (batch_size * sen_length * hidden dimension)
-        output = output.narrow(1, 0, n)
-
-        # * h1 (num_nt * sen_length * hidden dimension)
-        h1 = output.repeat(self.nnt, 1, 1)
-        # * h2 (num_nt * num_nt * sen_length * hidden dimension)
-        h2 = output.unsqueeze(0).repeat(self.nnt, self.nnt, 1, 1)
-
-        lsm = nn.LogSoftmax()
-
-        ## pre-compute all probabilities
-
-        # with context probabilities
-        unt_i = self.unt_pre.unsqueeze(1).repeat(1, n, 1)
-        # * p2l_i (num_nt * sen_length * parent_emb_size) 
-        p2l_i = self.p2l_pre.unsqueeze(1).repeat(1, n, 1)
-        pl2r_i = self.pl2r_pre.unsqueeze(2).repeat(1, 1, n, 1)
-
-        unt_cond = torch.cat((unt_i, h1), 2)
-        p2l_cond = torch.cat((p2l_i, h1), 2)
-        pl2r_cond = torch.cat((pl2r_i, h2), 3)
-
-        size = unt_cond.size()
-        size2 = pl2r_cond.size()
-
-        # parent to unary child
-        # * unt_pr (num_nt * sen_length * num_nt) -> (parent, position i, child)
-        unt_pr = lsm(self.unt(unt_cond.view(-1, size[2]))).view(size[0], size[1], -1)
-        # parent to left
-        p2l_pr = lsm(self.p2l(p2l_cond.view(-1, size[2]))).view(size[0], size[1], -1)
-        # parent left to right
-        pl2r_pr = lsm(self.pl2r(pl2r_cond.view(-1, size2[3]))).view(size2[0], size2[1], size2[2], -1)
-
-        # since for lexicon, Pr(x | P) = logsoftmax(A(Wx + b)). We
-        # precompute AW (as ut_w) and Ab (as ut_b) here to speed up the computation
-        w2v_w = self.word2vec.weight + self.word2vec_plus.weight
-        ut_w = w2v_w.mm(self.ut.weight).t()
-        ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
-
-        preterminal = np.empty((n,self.nnt), dtype=np.float32)
-        preterminal.fill(-1000000)
-
-        # append one level preterminal symbols
-        for i in xrange(n):
-            c = sen[i]
-            #TODO temporal hack that should be fixed
-            if c not in self.lexicon:
-                return ""
-            for p in self.lexicon[c]:
-                preterminal[i,p] = self.preterm_prob(lsm, ut_w, ut_b, p, c, output[0, i]).data[0]
-
-        return Variable(torch.FloatTensor[1])
+        pass
 
     def supervised(self, sens,
         p2l, pl2r_p, pl2r_l, unt, ut,

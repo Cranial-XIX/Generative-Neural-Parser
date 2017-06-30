@@ -39,18 +39,16 @@ Cell_dt = np.dtype([('score', Vt), ('y', Dt), ('z', Dt), ('j', Dt)])
 cdef packed struct BR:
     D_t right
     D_t parent
-    V_t weight
 
 # parent forward indexed binary rule
 cdef packed struct BRF:
     D_t left
     D_t right
-    V_t weight
 
 # left-child indexed binary rule
 cdef packed struct UR:
     D_t parent
-    V_t weight
+    D_t idx
 
 # new school
 ctypedef vector[BR]    BRvv
@@ -89,6 +87,8 @@ cdef class GrammarObject(object):
     cdef object prune_chart
     cdef object sen
     cdef object sentence
+    cdef object unary_prefix
+    cdef object unary_suffix
 
     cdef int num_nt, num_words, N
 
@@ -117,8 +117,10 @@ cdef class GrammarObject(object):
             self.idx2w = processor.idx2w
             self.num_nt = processor.nnt
             self.num_words = processor.nt
+            self.unary_prefix = processor.unary_prefix
+            self.unary_suffix = processor.unary_suffix
 
-        self._initialize()
+        self._initialize(processor)
 
     def check_files_exist(self, file_list):
         for file_name in file_list:
@@ -126,9 +128,10 @@ cdef class GrammarObject(object):
                 print 'Error! The file ', file_name, ' does not exist.'
                 sys.exit()
 
-    def _initialize(self):
+    def _initialize(self, processor):
         cdef:
-            int nt, t
+            int nt, t, index
+            UR ur
 
         for nt in xrange(self.num_nt):
             self.rule_y_x.push_back(new URvv())
@@ -137,7 +140,17 @@ cdef class GrammarObject(object):
 
         for t in xrange(self.num_words):
             self.lexicon.push_back(new URvv())
-            
+
+        if not processor == None:
+            index = -1
+            for chain in processor.idx2u:
+                index += 1
+                bot = chain[0]
+                top = chain[-1]
+                ur.parent = top
+                ur.idx = index
+                self.rule_y_x[bot].push_back(ur)
+
     def read_data_from_files(self, file_prefix, threshold=1e-7):
         nt_file = file_prefix + ".nonterminals"
         word_file = file_prefix + ".words"
@@ -191,12 +204,10 @@ cdef class GrammarObject(object):
                 else: # if word is OOV
                     word = 0
                 ur.parent = nt
-                ur.weight = float(lexicon[2].strip('[]'))
                 self.lexicon[word].push_back(ur)
 
     def read_gr_file(self, gr_file):
         cdef:
-            UR ur
             BR br
             BRF brf
 
@@ -210,17 +221,10 @@ cdef class GrammarObject(object):
                     r = self.nt2idx[rule[3][:-2]]
                     br.right = r
                     br.parent = p
-                    br.weight = float(rule[4])
                     self.rule_y_xz[l].push_back(br)
                     brf.left = l
                     brf.right = r
-                    brf.weight = float(rule[4])
                     self.rule_x_yz[p].push_back(brf)
-                if len(rule) == 4:                     # unary rule
-                    if p != l:                         # Do not allow self-recurring X -> X rules
-                        ur.parent = p
-                        ur.weight = float(rule[3])
-                        self.rule_y_x[l].push_back(ur)
 
     def __dealloc__(self):
         for x in self.spandex:
@@ -234,7 +238,7 @@ cdef class GrammarObject(object):
         np.ndarray[np.float32_t, ndim=2] pl2r):
 
         cdef:
-            int i, j, k, w, n, ik
+            int i, j, k, w, n, ik, index
             int tag, l, r, p, c
             double parent, left, right, child, score
             UR ur
@@ -276,17 +280,14 @@ cdef class GrammarObject(object):
                 child = chart[i,k,c].score
                 for ur in deref(self.rule_y_x[c]):
                     p = ur.parent
-                    score = child + p2l[p,i,U_NTM] + unt[p,i,c]
+                    index = ur.idx
+                    score = child + p2l[p,i,U_NTM] + unt[p,i,index]
                     if score > chart[i,k,p].score:
-                        if chart[i,k,c].z == -1 and chart[i,k,c].y != -1:  # prev is unary
-                            if (chart[i,k,chart[i,k,c].y].z == -1 and
-                                chart[i,k,chart[i,k,c].y].y != -1):        # prev-prev is unary
-                                continue
                         if chart[i,k,p].score == LOG_ZERO:
                             cell.push_back(p)
                         chart[i,k,p].score = score
                         chart[i,k,p].y = c
-                        chart[i,k,p].z = -1
+                        chart[i,k,p].z = -index-1
             tmp.clear()
 
         for w in xrange(2, n+1):  # wider constituents
@@ -319,13 +320,14 @@ cdef class GrammarObject(object):
                     child = chart[i,k,c].score
                     for ur in deref(self.rule_y_x[c]):
                         p = ur.parent
-                        score = child + p2l[p,i,U_NTM] + unt[p,i,c]
-                        if score > chart[i,k,p].score and chart[i,k,c].z != -1:
+                        index = ur.idx
+                        score = child + p2l[p,i,U_NTM] + unt[p,i,index]
+                        if score > chart[i,k,p].score:
                             if chart[i,k,p].score == LOG_ZERO:
                                 cell.push_back(p)
                             chart[i,k,p].score = score
                             chart[i,k,p].y = c
-                            chart[i,k,p].z = -1
+                            chart[i,k,p].z = -index-1
                 tmp.clear()
 
         parse_end = time.time()
@@ -780,10 +782,9 @@ cdef class GrammarObject(object):
         if y == -1:
             # is terminal rule
             return "(" + self.idx2nt[nt] + " " + self.sentence[i] + ")"
-        elif z == -1:
+        elif z < 0:
             # unary rule
-            return  "(" + self.idx2nt[nt] + " "  \
-                + self.print_parse(i, k, y) + ")" 
+            return  self.unary_prefix[-z-1] + self.print_parse(i, k, y) + self.unary_suffix[-z-1] 
         else:
             # binary rule
             return  "(" + self.idx2nt[nt] + " " \
