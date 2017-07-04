@@ -204,23 +204,27 @@ class Processor(object):
             self.lines = data.readlines()    
 
     def make_trainset(self):
-        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=9)
+        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
         train_trees = list(examples)
 
         f = open(self.train_file, 'w')
         begin_time = time.time()
         first = True
+        count = 0
         for (sentence, gold_tree) in train_trees:
             if self.containOOV(sentence):
                 continue
+            count += 1
+            #if not count == 22:
+            #    continue
             if first:
                 f.write(sentence)
                 first = False
             else:
                 f.write("\n" + sentence)
             f.write("\n" + self.convert_tree_to_encoded_list(gold_tree))
-        print self.idx2u
-        print self.nunary
+        print " # sentences ", count
+
         for ur in self.idx2u:
             reverse = list(reversed(ur))
             tmp = reverse[:-1]
@@ -234,7 +238,7 @@ class Processor(object):
             % round(end_time - begin_time, 5)
         f.close()
 
-    def convert_tree_to_encoded_list(self, tree):       
+    def convert_tree_to_encoded_list(self, tree):
         self.encoded_list = [""]
         self.wi = -1 # word index
         position, child, prev = self.traverseTree(tree)
@@ -247,7 +251,7 @@ class Processor(object):
         self.encoded_list.append("_")
         return " ".join(self.encoded_list)
 
-    def add_unary_chain(self, prev):     
+    def add_unary_chain(self, prev):
         self.idx2u.append(prev)
         bottom = prev[0]
         if bottom not in self.unary:
@@ -288,15 +292,23 @@ class Processor(object):
                 self.encoded_list.append(child)
                 self.encoded_list.append(right)
                 self.encoded_list.append(str(mid))
-                for prev in previous:
+                for prev_idx in xrange(len(previous)):
+                    prev = previous[prev_idx]
                     if len(prev) > 1:
                         if prev not in self.idx2u:
                             self.add_unary_chain(prev)
-                        self.encoded_list.append(str(position))
-                        self.encoded_list.append(child)
-                        self.encoded_list.append("u")
-                        self.encoded_list.append(str(self.idx2u.index(prev)))
-                        self.encoded_list.append("_")
+                        if prev_idx == 0:
+                            self.encoded_list.append(str(position))
+                            self.encoded_list.append(child)
+                            self.encoded_list.append("u")
+                            self.encoded_list.append(str(self.idx2u.index(prev)))
+                            self.encoded_list.append("_")
+                        else:
+                            self.encoded_list.append(str(mid))
+                            self.encoded_list.append(right)
+                            self.encoded_list.append("u")
+                            self.encoded_list.append(str(self.idx2u.index(prev)))
+                            self.encoded_list.append("_")                           
                 return position, p, [current_nonterminal]
 
     def containOOV(self, sentence):

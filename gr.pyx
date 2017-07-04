@@ -240,7 +240,7 @@ cdef class GrammarObject(object):
         cdef:
             int i, j, k, w, n, ik, index
             int tag, l, r, p, c
-            double parent, left, right, child, score
+            double parent, left, right, child, score, coef
             UR ur
             BR br
             intvec tmp
@@ -784,7 +784,7 @@ cdef class GrammarObject(object):
             return "(" + self.idx2nt[nt] + " " + self.sentence[i] + ")"
         elif z < 0:
             # unary rule
-            return  self.unary_prefix[-z-1] + self.print_parse(i, k, y) + self.unary_suffix[-z-1] 
+            return self.unary_prefix[-z-1] + self.print_parse(i, k, y) + self.unary_suffix[-z-1]
         else:
             # binary rule
             return  "(" + self.idx2nt[nt] + " " \

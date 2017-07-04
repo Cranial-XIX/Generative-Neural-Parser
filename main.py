@@ -340,9 +340,11 @@ def parse(sentence):
     return model.parse(sentence, sen)
 
 def test():
+    for x in p.idx2u:
+        print [p.idx2nt[y] for y in x]
     # parsing
     start = time.time()
-    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=9)
+    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
     test = list(instances)
     cumul_accuracy = 0
     num_trees_with_parse = 0
@@ -351,7 +353,8 @@ def test():
         if p.containOOV(sentence):
             continue
         total += 1
-
+        #if not total == 22:
+        #    continue
         parse_string = parse(sentence)
         if parse_string != "":
             parse_tree = Tree.fromstring(parse_string)
@@ -405,6 +408,7 @@ def test():
                 '''
                 print parse_tree.pretty_print()
                 print gold_tree.pretty_print()
+
             print "-"*80
         else:
             print "No parse!"
@@ -463,10 +467,8 @@ def KLD():
         sm = model.pl2r_test(p_array[0], p_array[1], p_array[2],
             p_array[3], p_array[4], p_array[5])
         for i in xrange(len(p.pl2r_p)):
-            if sm.data[i][p.pl2r_t[i]] < 0.9:
-                print "(", p.pl2r_p[i] , " ", p.pl2r_l[i], " ", p.pl2r_t[i], " @ ", p.pl2r_pi[i], ", ", p.pl2r_ci[i], ") = ", sm.data[i][p.pl2r_t[i]]
-            if p.pl2r_p[i] == 11 and p.pl2r_l[i] == 18 and p.pl2r_t[i] == 19 and p.pl2r_pi[i]== 0 and p.pl2r_ci[i] ==1:
-                print sm.data[i]
+            #if sm.data[i][p.pl2r_t[i]] < 0.9:
+            print "(", p.pl2r_p[i] , " ", p.pl2r_l[i], " ", p.pl2r_t[i], " @ ", p.pl2r_pi[i], ", ", p.pl2r_ci[i], ") = ", sm.data[i][p.pl2r_t[i]]
         if idx == -1:
             break
 
@@ -582,6 +584,9 @@ elif args.mode == 'parse':
 elif args.mode == 'KLD':
     #KLD()
     test_p2l()
+    KLD()
+    test_ut()
+    test_unt()
 else:
     print "Cannot recognize the mode, allowed modes are: " \
         "spv_train, uspv_train, parse, test"
