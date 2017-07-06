@@ -6,7 +6,8 @@ TRAIN_FILE = "data/train_small.txt"
 
 PRE_TRAINED_FILE = "output/default_cpu/model_dict"
 CORPUS_INFO_FILE = "corpus_info.tar"
-MAX_SEN_LENGTH = 30                  # maximum lenght of a sentence
+MAX_SEN_LENGTH = 100                  # maximum lenght of a sentence
+MAX_TEST_SEN_LENGTH = 30
 C_UNT = 20
 C_P2L = 50
 DIMENSION_OF_MODEL = 100

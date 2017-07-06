@@ -78,15 +78,21 @@ class LCNPModel(nn.Module):
         self.sm = nn.Softmax()
         self.relu = nn.ReLU()
 
+        zeta = 0.4
+
+        hp2l = int(zeta * dp2l + (1-zeta) * self.nnt)
+        hpl2r = int(zeta * dpl2r + (1-zeta) * self.nnt)
+        hunt = int(zeta * dunt + (1-zeta) * self.nunary)
+
         # parent to left
-        self.p2l = nn.Linear(dp2l, 200)
-        self.p2l_out = nn.Linear(200, self.nnt)
+        self.p2l = nn.Linear(dp2l, hp2l)
+        self.p2l_out = nn.Linear(hp2l, self.nnt)
         # parent left to right
-        self.pl2r = nn.Linear(dpl2r, 250)
-        self.pl2r_out = nn.Linear(250, self.nnt)
+        self.pl2r = nn.Linear(dpl2r, hpl2r)
+        self.pl2r_out = nn.Linear(hpl2r, self.nnt)
         # unary nonterminal
-        self.unt = nn.Linear(dunt, 200)
-        self.unt_out = nn.Linear(200, self.nunary)
+        self.unt = nn.Linear(dunt, hunt)
+        self.unt_out = nn.Linear(hunt, self.nunary)
         # unary terminal
         self.ut = nn.Linear(dut, self.dt)
         self.init_weights(args['initrange'])

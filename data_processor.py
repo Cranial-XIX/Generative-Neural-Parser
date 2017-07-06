@@ -204,7 +204,7 @@ class Processor(object):
             self.lines = data.readlines()    
 
     def make_trainset(self):
-        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
+        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=1000)
         train_trees = list(examples)
 
         f = open(self.train_file, 'w')
@@ -212,8 +212,8 @@ class Processor(object):
         first = True
         count = 0
         for (sentence, gold_tree) in train_trees:
-            if self.containOOV(sentence):
-                continue
+            #if self.containOOV(sentence):
+            #    continue
             count += 1
             #if not count == 22:
             #    continue
@@ -486,17 +486,8 @@ class Processor(object):
             print "Binary rules in total : ", nb
 
     def create_precomputed_matrix(self):
-        self.unt_pre = torch.FloatTensor(self.nnt, self.nnt).zero_()
         self.p2l_pre = torch.FloatTensor(self.nnt, self.nnt).zero_()
-
-        unt_p = set()
         p2l_p = set()
-
-        for child in self.unary:
-            for parent in self.unary[child]:
-                if not parent in unt_p:
-                    self.unt_pre[parent] = self.nonterm_emb[parent]
-                    unt_p.add(parent)
 
         self.p2l_pre[0] = self.nonterm_emb[0]
         self.p2l_pre[1] = self.nonterm_emb[1]
@@ -550,7 +541,6 @@ class Processor(object):
                     'unary_suffix': self.unary_suffix,
                     'binary': self.binary,
                     'lines': self.lines,
-                    'unt_pre': self.unt_pre,
                     'p2l_pre': self.p2l_pre,
                 }, constants.CORPUS_INFO_FILE)
         else:
@@ -580,7 +570,6 @@ class Processor(object):
             self.unary_prefix = d['unary_prefix']
             self.unary_suffix = d['unary_suffix']
             self.binary = d['binary']
-            self.unt_pre = d['unt_pre']
             self.p2l_pre = d['p2l_pre']
             #self.print_rules()
             end = time.time()

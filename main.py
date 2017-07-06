@@ -176,7 +176,6 @@ inputs = {
     'nunary': p.nunary,
     'lexicon': p.lexicon,
     'parser': parser,
-    'unt_pre': p.unt_pre,
     'p2l_pre': p.p2l_pre,
 }
 
@@ -344,7 +343,7 @@ def test():
         print [p.idx2nt[y] for y in x]
     # parsing
     start = time.time()
-    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
+    instances = ptb("dev", minlength=3, maxlength=constants.MAX_TEST_SEN_LENGTH, n=100)
     test = list(instances)
     cumul_accuracy = 0
     num_trees_with_parse = 0
