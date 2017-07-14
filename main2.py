@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from processor import Processor
+from data_processor import Processor
 from gr import GrammarObject
 from model import LCNPModel
 from nltk import Tree
@@ -56,7 +56,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--lstm-dim', default=250, help='LSTM hidden dimension'
+    '--lstm-dim', default=120, help='LSTM hidden dimension'
 )
 
 argparser.add_argument(
@@ -135,6 +135,8 @@ args.batch_size = int(args.batch_size)
 args.verbose = (args.verbose == 'yes')
 args.read_data = (args.read_data == 'yes')
 args.make_train = (args.make_train == 'yes')
+if args.make_train:
+    args.read_data = True
 
 # let the processor read in data
 p = Processor(args.train, args.make_train, args.read_data, args.verbose)
@@ -155,7 +157,7 @@ inputs = {
     'cuda': args.cuda,
 
     # terminals
-    'word_emb': p.word_emb,
+    'term_emb': p.term_emb,
     'nt': p.nt,
     'dt': p.dt,
 
@@ -174,6 +176,7 @@ inputs = {
     'nunary': p.nunary,
     'lexicon': p.lexicon,
     'parser': parser,
+    'p2l_pre': p.p2l_pre,
 }
 
 model = LCNPModel(inputs)
@@ -191,14 +194,12 @@ def supervised():
     parameters = itertools.ifilter(
         lambda x: x.requires_grad, model.parameters()
     )
-
     # define the optimizer to use; currently use Adam
     optimizer = optim.Adam(
         parameters, lr=args.learning_rate, weight_decay=args.l2_coef
     )
 
-    total = p.trainset_length
-
+    total = len(p.lines) / 2
     template = "Epoch {} Batch {} [{}/{} ({:.1f}%)] Loss: {:.4f}" \
         + " Forward: {:.4f} Backward: {:.4f} Optimize: {:.4f}"
 
@@ -249,8 +250,8 @@ def supervised():
                                 round(t1 - t0, 5),
                                 round(end - t1, 5)
                             )
-                        break
-                    else:
+                        break                      
+                    else: 
                         print template.format(
                                 epoch, batch, idx, total,
                                 float(idx)/total * 100.,
@@ -271,7 +272,62 @@ def supervised():
         print "Finish supervised training"
 
 def unsupervised():
-    pass
+    # get model paramters
+    parameters = itertools.ifilter(
+        lambda x: x.requires_grad, model.parameters()
+    )
+    # define the optimizer to use; currently use Adam
+    optimizer = optim.Adam(
+        parameters, lr=args.learning_rate, weight_decay=args.l2_coef
+    )
+
+    total = len(p.lines)
+    template = "Epoch {} Batch {} [{}/{} ({:.1f}%)] Loss: {:.4f}" \
+        + " Forward: {:.4f} Backward: {:.4f} Optimize: {:.4f}"
+    try:
+        for epoch in range(args.epochs):
+            idx = 0
+            batch = 0
+            while not idx == -1:
+                idx = p.next(idx)
+                if not idx == -1:
+                    batch += 1
+                    start = time.time()
+                    optimizer.zero_grad()
+                    # create PyTorch Variables
+                    if args.cuda:
+                        p_sen = Variable(p.sen).cuda()
+                    else:
+                        p_sen = Variable(p.sen)
+                    # compute the loss
+                    loss = model(p_sen)
+
+                    if loss.data[0] > 0:
+                        # there is a parse
+                        t0 = time.time()
+                        loss.backward()
+                        t1 = time.time()
+
+                        optimizer.step()
+                        end = time.time()
+                        if args.verbose:
+                            print template.format(
+                                    epoch, batch, idx, total,
+                                    float(idx)/total * 100., 
+                                    loss.data[0],
+                                    round(t0 - start, 5),
+                                    round(t1 - t0, 5),
+                                    round(end - t1, 5)
+                                )
+        torch.save( {'state_dict': model.state_dict()}, file_save )
+
+    except KeyboardInterrupt:
+        if args.verbose:
+            print " - Exiting from training early"
+        torch.save( {'state_dict': model.state_dict()}, file_save )
+
+    if args.verbose:
+        print "Finish unsupervised training"
 
 def parse(sentence):
     indices = p.get_idx(sentence)
@@ -285,17 +341,18 @@ def parse(sentence):
 def test():
     # parsing
     start = time.time()
-    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=10)
+    instances = ptb("train", minlength=3, maxlength=constants.MAX_TEST_SEN_LENGTH, n=100)
     test = list(instances)
     cumul_accuracy = 0
     num_trees_with_parse = 0
     total = 0
     for (sentence, gold_tree) in test:
-        total += 1
-        if total < 5:
+        if p.containOOV(sentence):
             continue
+        total += 1
+        #if not total == 22:
+        #    continue
         parse_string = parse(sentence)
-        #print parse_string
         if parse_string != "":
             parse_tree = Tree.fromstring(parse_string)
             tree_accruacy = evalb.evalb(
@@ -366,7 +423,27 @@ def is_digit(n):
     except ValueError:
         return False
 
-def test_pl2r():
+def KLD():
+    lines = p.lines
+    num_sen = len(lines)/2
+    dict = {}
+    for i in xrange(num_sen):
+        line = lines[2*i+1].strip().split()
+        for j in xrange(len(line)/5):
+            if is_digit(line[5*j+2]):
+                pos, parent, l, c, mid = line[5*j:5*j+5]
+                tpl = (int(parent), int(l))
+                c = int(c)
+                if tpl not in dict:
+                    dict[tpl] = [0 for x in xrange(102)]
+                dict[tpl][c] += 1
+                dict[tpl][101] += 1
+    for key in dict:
+        for x in xrange(101):
+            if dict[key][x] > 0:
+                dict[key][x] /= float(dict[key][101])
+                print "(", key[0], " ", key[1], " ", x, ") = ", dict[key][x]
+
 
     idx = 0
     while True:
@@ -387,9 +464,6 @@ def test_pl2r():
         sm = model.pl2r_test(p_array[0], p_array[1], p_array[2],
             p_array[3], p_array[4], p_array[5])
         for i in xrange(len(p.pl2r_p)):
-            if p.pl2r_p[i] == 11 and p.pl2r_t[i] == 10:
-                print "(", p.pl2r_p[i] , " ", p.pl2r_l[i], " ", p.pl2r_t[i], " @ ", p.pl2r_pi[i], ", ", p.pl2r_ci[i], ") = ", sm.data[i][p.pl2r_t[i]]
-                print sm.data[i][12]
             if sm.data[i][p.pl2r_t[i]] < 0.9:
                 print "(", p.pl2r_p[i] , " ", p.pl2r_l[i], " ", p.pl2r_t[i], " @ ", p.pl2r_pi[i], ", ", p.pl2r_ci[i], ") = ", sm.data[i][p.pl2r_t[i]]
         if idx == -1:
@@ -452,7 +526,7 @@ def test_unt():
             total += 1
             if sm.data[i][p.unt_t[i]] < 0.9:
                 no += 1
-                print "(", p.unt[i] , " ", p.unt_i[i] % 30 , " ", p.unt_t[i] ,") = ", sm.data[i][p.unt_t[i]]
+            print "(", p.unt[i] , " ", p.unt_i[i] % 30 , " ", p.unt_t[i] ,") = ", sm.data[i][p.unt_t[i]]
         if idx == -1:
             print no / float(total)
             break
@@ -483,7 +557,7 @@ def test_ut():
             total += 1
             if sm.data[i][p.ut_t[i]] < 0.9:
                 no += 1
-                print "(", p.idx2nt[p.ut[i]] , " ", p.ut_i[i] % 30 , " ", p.idx2w[p.ut_t[i]] ,") = ", sm.data[i][p.ut_t[i]]
+            print "(", p.idx2nt[p.ut[i]] , " ", p.ut_i[i] % 30 , " ", p.idx2w[p.ut_t[i]] ,") = ", sm.data[i][p.ut_t[i]]
         if idx == -1:
             print no / float(total)
             break
@@ -507,9 +581,9 @@ elif args.mode == 'parse':
 elif args.mode == 'KLD':
     #KLD()
     #test_p2l()
-    test_pl2r()
+    #KLD()
     #test_ut()
-    #test_unt()
+    test_unt()
 else:
     print "Cannot recognize the mode, allowed modes are: " \
         "spv_train, uspv_train, parse, test"

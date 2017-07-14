@@ -54,7 +54,7 @@ class Processor(object):
 
     def read_w2v_file(self, w2v_file):
         '''
-        Reads in word embeddings from the Word2vec file 
+        Read in word embeddings from the Word2vec file 
         and store them into a hash map.
         @param w2v_file the file name of word2vec embedding
         '''
@@ -72,7 +72,6 @@ class Processor(object):
         self.term_emb[0] = torch.ones(self.dt)  # for OOV
         self.term_emb[1] = torch.zeros(self.dt) # for BOS
 
-  
         begin_time = time.time()        
         with open(w2v_file, 'r') as w2v_f:
             w_idx = 2
@@ -93,7 +92,7 @@ class Processor(object):
             print "-- Reading word2vec takes %.4f s" % round(end_time - begin_time, 5)
             print "   # words: ", self.nt
         return
- 
+
     def read_nt_file(self, nt_file):
         '''
         Reads and creates the nonterminal embeddings
@@ -122,7 +121,7 @@ class Processor(object):
             self.nt2idx[constants.U_NTM] = 1
             self.idx2nt.append(constants.U_TM)
             self.idx2nt.append(constants.U_NTM)
-            
+
             idx = 2
             for line in nt_f: 
                 nt = line.strip()
@@ -204,7 +203,7 @@ class Processor(object):
             self.lines = data.readlines()    
 
     def make_trainset(self):
-        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=1000)
+        examples = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
         train_trees = list(examples)
 
         f = open(self.train_file, 'w')
@@ -212,8 +211,8 @@ class Processor(object):
         first = True
         count = 0
         for (sentence, gold_tree) in train_trees:
-            #if self.containOOV(sentence):
-            #    continue
+            if self.containOOV(sentence):
+                continue
             count += 1
             #if not count == 22:
             #    continue

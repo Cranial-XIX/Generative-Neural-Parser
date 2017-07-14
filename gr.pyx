@@ -668,7 +668,7 @@ cdef class GrammarObject(object):
             k = i+1
             cell = self.spandex[tri(i, k)]
             for tag in xrange(self.num_nt):
-                if preterm[i,tag] == 0:
+                if preterm[i,tag] == LOG_ZERO:
                     continue
                 if betas[i,k,tag,0] == 0:
                     cell.push_back(tag)
@@ -702,6 +702,7 @@ cdef class GrammarObject(object):
                                 continue
                             p = br.parent
                             hsh = pl2rhash(p,l,i,j)
+
                             if self.pl2r_map.count(hsh) == 0:
                                 size += 1
                                 pl2r_p.push_back(p)
@@ -731,6 +732,8 @@ cdef class GrammarObject(object):
         np_l = np.zeros((size,), dtype=int)
         np_pi = np.zeros((size,), dtype=int)
         np_ci = np.zeros((size,), dtype=int)
+
+        print "size is ", size
 
         for i in xrange(size):
             np_p[i] = pl2r_p.at(i)

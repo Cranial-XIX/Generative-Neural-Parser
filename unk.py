@@ -1,20 +1,7 @@
-"""
-Port of Berkeley parsers unknown word tools
+import constants
+import torch
 
-Taken from the 2009-12-17 version of Slav Petrov's
-edu.berkeley.nlp.PCFGLG.SophisticatedLexicon.java of the BerkeleyParser
-(downloaded from http://code.google.com/p/berkeleyparser)
-
-WARNINGS:
- - Has not been regression-tested against the original.
- - Only implements unknown level 5
-
-"""
-
-__author__ = 'Tim Vieira (http://timvieira.github.io)'
-
-
-def signature(word, loc, lowercase_known):
+def signature(word, freq):
     """
     This routine returns a String that is the "signature" of the class of a
     word. For, example, it might represent whether it is a number of ends in -s. The
@@ -27,17 +14,18 @@ def signature(word, loc, lowercase_known):
 
     @param word
                 The word to make a signature for
-    @param loc
-                Its position in the sentence (mainly so sentence-initial capitalized
-                words can be treated differently)
+    @param freq
+                The frequency of the word in training set
     @return
                 A String that is its signature (equivalence class)
     """
 
-    sb = ["UNK"]
+    emb = torch.zeros(14)
 
-    if len(word) == 0:
-        return ''.join(sb)
+    if freq >= constants.UNCOMMON_THRESHOLD:
+        return emb, word
+
+    sb = ["UNK"]
 
     # Reformed Mar 2004 (cdm); hopefully much better now.
     # { -CAPS, -INITC ap, -LC lowercase, 0 } +
@@ -69,25 +57,24 @@ def signature(word, loc, lowercase_known):
     ch0 = word[0]
     lowered = word.lower()
     if ch0.isupper() or ch0.istitle():
-        if loc == 0 and numCaps == 1:
-            sb.append("-INITC")
-            if lowercase_known:
-                sb.append("-KNOWNLC")
-        else:
-            sb.append("-CAPS")
+        sb.append("-CAPS")
+        emb[0] = 1
 
     elif not ch0.isalpha() and numCaps > 0:
         sb.append("-CAPS")
+        emb[0] = 1
 
     elif hasLower:
         sb.append("-LC")
+        emb[1] = 1
 
     if hasDigit:
         sb.append("-NUM")
+        emb[2] = 1
 
     if hasDash:
         sb.append("-DASH")
-
+        emb[3] = 1
     if lowered.endswith('s') and wlen >= 3:
         # here length 3, so you don't miss out on ones like 80s
         ch2 = lowered[wlen - 2]
@@ -95,27 +82,36 @@ def signature(word, loc, lowercase_known):
         # not -ess suffixes or greek/latin -us, -is
         if ch2 != 's' and ch2 != 'i' and ch2 != 'u':
             sb.append("-s")
-
+            emb[4] = 1
     elif len(word) >= 5 and not hasDash and not (hasDigit and numCaps > 0):
         # don't do for very short words
         # Implement common discriminating suffixes
         if lowered.endswith("ed"):
             sb.append("-ed")
+            emb[5] = 1
         elif lowered.endswith("ing"):
             sb.append("-ing")
+            emb[6] = 1
         elif lowered.endswith("ion"):
             sb.append("-ion")
+            emb[7] = 1
         elif lowered.endswith("er"):
             sb.append("-er")
+            emb[8] = 1
         elif lowered.endswith("est"):
             sb.append("-est")
+            emb[9] = 1
         elif lowered.endswith("ly"):
             sb.append("-ly")
+            emb[10] = 1
         elif lowered.endswith("ity"):
             sb.append("-ity")
+            emb[11] = 1
         elif lowered.endswith("y"):
             sb.append("-y")
+            emb[12] = 1
         elif lowered.endswith("al"):
             sb.append("-al")
+            emb[13] = 1
 
-    return ''.join(sb)
+    return emb, ''.join(sb)

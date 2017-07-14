@@ -21,12 +21,10 @@ class LCNPModel(nn.Module):
         self.use_cuda = args['cuda']
 
         # terminals
-        self.term_emb = args['term_emb']   # embeddings of terminals
         self.nt = args['nt']               # number of terminals
         self.dt = args['dt']               # dimension of terminals
 
         # nonterminals
-        self.nonterm_emb = args['nt_emb']  # embeddings of nonterminals
         self.nnt = args['nnt']             # number of nonterminals
         self.dnt = args['dnt']             # dimension of nonterminals
 
@@ -46,8 +44,7 @@ class LCNPModel(nn.Module):
             Variable(torch.zeros(self.nlayers, self.bsz, self.dhid))
         )
 
-        self.unt_pre = Variable(torch.eye(self.nnt, self.nnt))
-        self.p2l_pre = Variable(args['p2l_pre'])
+        self.unt_pre = self.p2l_pre = Variable(torch.eye(self.nnt, self.nnt))
 
         if self.use_cuda:
             # the initial states for h0 and c0 of LSTM
@@ -61,15 +58,14 @@ class LCNPModel(nn.Module):
 
         # nonterminal embedding and w2v embedding, w2v_plus 
         # is the deviation from w2v
-        self.encoder_nt = nn.Embedding(self.nnt, self.dnt)
-        self.word2vec_plus = nn.Embedding(self.nt, self.dt)
-        self.word2vec = nn.Embedding(self.nt, self.dt)
+        self.nt_emb = nn.Embedding(self.nnt, self.dnt)
+        self.word_emb = nn.Embedding(self.nt, self.dt)
 
         # The LSTM and some linear transformation layers
         self.LSTM = nn.LSTM(
-                self.dt, self.dhid, self.nlayers,
-                batch_first=True, bias=True, dropout=0.5
-            )
+            self.dt, self.dhid, self.nlayers,
+            batch_first=True, bias=True, dropout=0.5
+        )
 
         dp2l = dunt = dut = self.dnt + self.dhid
         dpl2r = 2 * (self.dnt + self.dhid)
@@ -78,7 +74,7 @@ class LCNPModel(nn.Module):
         self.sm = nn.Softmax()
         self.relu = nn.ReLU()
 
-        zeta = 0.4
+        zeta = 0.6
 
         hp2l = int(zeta * dp2l + (1-zeta) * self.nnt)
         hpl2r = int(zeta * dpl2r + (1-zeta) * self.nnt)
@@ -95,15 +91,14 @@ class LCNPModel(nn.Module):
         self.unt_out = nn.Linear(hunt, self.nunary)
         # unary terminal
         self.ut = nn.Linear(dut, self.dt)
-        self.init_weights(args['initrange'])
 
-    def init_weights(self, initrange=1.0):
-        self.word2vec_plus.weight.data.fill_(0)
-        self.word2vec.weight.data = self.term_emb
-        self.encoder_nt.weight.data = self.nonterm_emb      
+        self.init_weights(args['initrange'], args['word_emb'], args['nt_emb'])
 
-        self.word2vec.weight.requires_grad = False
-        self.encoder_nt.weight.requires_grad = False 
+    def init_weights(self, initrange, word_emb, nt_emb):
+        self.word_emb.weight.data = word_emb
+        self.nt_emb.weight.data = nt_emb
+        self.word_emb.weight.requires_grad = False
+        self.nt_emb.weight.requires_grad = False
 
         # Below are initial setup for LSTM
         lstm_weight_range = 0.2
@@ -113,7 +108,6 @@ class LCNPModel(nn.Module):
         '''
         self.LSTM.weight_ih_l1.data.uniform_(-lstm_weight_range, lstm_weight_range)
         self.LSTM.weight_hh_l1.data.uniform_(-lstm_weight_range, lstm_weight_range)
-
         self.LSTM.weight_ih_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)  
         self.LSTM.weight_hh_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)
         '''
@@ -126,7 +120,6 @@ class LCNPModel(nn.Module):
             '''
             self.LSTM.bias_ih_l1.data[i] = 1.0
             self.LSTM.bias_hh_l1.data[i] = 1.0
-
             self.LSTM.bias_ih_l2.data[i] = 1.0
             self.LSTM.bias_hh_l2.data[i] = 1.0
             '''
@@ -153,13 +146,10 @@ class LCNPModel(nn.Module):
             print "Unrecognized train type!"
             return
 
-    def encoder_t(self, seq):
-        return self.word2vec_plus(seq) + self.word2vec(seq)
-
     def parsing_setup(self):
         # since for lexicon, Pr(x | P) = logsoftmax(A(Wx + b)). We
         # precompute AW (as ut_w) and Ab (as ut_b) here to speed up the computation
-        w2v_w = self.word2vec.weight + self.word2vec_plus.weight
+        w2v_w = self.word_emb.weight
         self.ut_w = w2v_w.mm(self.ut.weight).t()
         self.ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
 
@@ -169,10 +159,10 @@ class LCNPModel(nn.Module):
 
         t0 = time.time()
         # get left context hidden units with a trained h0 (start hidden state)
-        output, hidden = self.LSTM(self.encoder_t(sen), self.h0)
+        output, hidden = self.LSTM(self.word_emb(sen.view(1,-1)), self.h0)
         # get rid of the initial BOS symbol, since you need fake BOS 
         # to make sure everyone gets their cup of left context
-        sen = sen.view(-1).data[1:]
+        sen = sen.data[1:]
         n = len(sen)
         # truncate the last left context out, since we need to ensure the
         # matrix is of length n
@@ -217,10 +207,11 @@ class LCNPModel(nn.Module):
                 if self.use_cuda:
                     pi = pi.cuda()
                     h = h.cuda()
-                cond = torch.cat((self.encoder_nt(pi), h), 1)
+                cond = torch.cat((self.nt_emb(pi), h), 1)
                 res = cond.mm(self.ut_w) + self.ut_b
 
                 preterminal[i,p] = (softmax(self.p2l(cond))[0][U_TM] + softmax(res)[0][c]).data[0]
+        
 
         t2 = time.time()
         # preprocess
@@ -244,8 +235,8 @@ class LCNPModel(nn.Module):
                 self.relu(
                     self.pl2r(
                         torch.cat((
-                            self.encoder_nt(pl2r_p),
-                            self.encoder_nt(pl2r_l),
+                            self.nt_emb(pl2r_p),
+                            self.nt_emb(pl2r_l),
                             torch.index_select(output, 0, pl2r_pi),
                             torch.index_select(output, 0, pl2r_ci)
                         ), 1)
@@ -255,7 +246,7 @@ class LCNPModel(nn.Module):
         )
 
         t4 = time.time()
-        print " - "*10, t4-t3, t3-t2, t2-t1, t1-t0
+        #print " - "*10, t4-t3, t3-t2, t2-t1, t1-t0
         if self.use_cuda:
             if viterbi:
                 return self.parser.viterbi(
@@ -300,12 +291,13 @@ class LCNPModel(nn.Module):
         p2l_i, pl2r_pi, pl2r_ci, unt_i, ut_i):
 
         # run the LSTM to extract features from left context
-        output, hidden = self.LSTM(self.encoder_t(sens), self.h0)
+        output, hidden = self.LSTM(self.word_emb(sens), self.h0)
         output = self.lstm_coef * output.contiguous().view(-1, output.size(2))
 
         # compute the log probability of p2l rules
+
         p2l_cond = torch.cat((
-            self.encoder_nt(p2l), 
+            self.nt_emb(p2l), 
             torch.index_select(output, 0, p2l_i)
         ), 1)
 
@@ -315,7 +307,7 @@ class LCNPModel(nn.Module):
 
         # compute the log probability of unary nonterminal rules
         unt_cond = torch.cat((
-            self.encoder_nt(unt), 
+            self.nt_emb(unt), 
             torch.index_select(output, 0, unt_i)
         ), 1)
 
@@ -325,19 +317,19 @@ class LCNPModel(nn.Module):
 
         # compute the log probability of terminal rules
         ut_cond = torch.cat((
-            self.encoder_nt(ut),
+            self.nt_emb(ut),
             torch.index_select(output, 0, ut_i)
         ), 1)
 
-        m_ut = self.ut(ut_cond).mm((self.word2vec.weight + self.word2vec_plus.weight).t())
+        m_ut = self.ut(ut_cond).mm(self.word_emb.weight.t())
         nll_ut = -torch.sum(
             self.lsm(m_ut).gather(1, ut_t.unsqueeze(1))
         )
 
         # compute the log probability of pl2r rules
         pl2r_cond = torch.cat((
-            self.encoder_nt(pl2r_p),
-            self.encoder_nt(pl2r_l),
+            self.nt_emb(pl2r_p),
+            self.nt_emb(pl2r_l),
             torch.index_select(output, 0, pl2r_pi),
             torch.index_select(output, 0, pl2r_ci)
         ), 1)
@@ -354,16 +346,17 @@ class LCNPModel(nn.Module):
         )
 
         return nll_p2l + nll_pl2r + nll_unt + nll_ut
+        #return nll_ut
 
     def pl2r_test(self, sens, pl2r_p, pl2r_l, pl2r_t, pl2r_pi, pl2r_ci):
         # run the LSTM to extract features from left context
-        output, hidden = self.LSTM(self.encoder_t(sens), self.h0)
+        output, hidden = self.LSTM(self.word_emb(sens), self.h0)
         output = self.lstm_coef * output.contiguous().view(-1, output.size(2))
 
         # compute the log probability of pl2r rules
         pl2r_cond = torch.cat((
-            self.encoder_nt(pl2r_p),
-            self.encoder_nt(pl2r_l),
+            self.nt_emb(pl2r_p),
+            self.nt_emb(pl2r_l),
             torch.index_select(output, 0, pl2r_pi),
             torch.index_select(output, 0, pl2r_ci)
         ), 1)
@@ -375,12 +368,12 @@ class LCNPModel(nn.Module):
     def p2l_test(self, sens, p2l, p2l_t, p2l_i):
 
         # run the LSTM to extract features from left context
-        output, hidden = self.LSTM(self.encoder_t(sens), self.h0)
+        output, hidden = self.LSTM(self.word_emb(sens), self.h0)
         output = self.lstm_coef * output.contiguous().view(-1, output.size(2))
 
         # compute the log probability of p2l rules
         p2l_cond = torch.cat((
-            self.encoder_nt(p2l), 
+            self.nt_emb(p2l), 
             torch.index_select(output, 0, p2l_i)
         ), 1)
 
@@ -389,12 +382,12 @@ class LCNPModel(nn.Module):
     def unt_test(self, sens, unt, unt_t, unt_i):
 
         # run the LSTM to extract features from left context
-        output, hidden = self.LSTM(self.encoder_t(sens), self.h0)
+        output, hidden = self.LSTM(self.word_emb(sens), self.h0)
         output = self.lstm_coef * output.contiguous().view(-1, output.size(2))
 
         # compute the log probability of unary nonterminal rules
         unt_cond = torch.cat((
-            self.encoder_nt(unt), 
+            self.nt_emb(unt), 
             torch.index_select(output, 0, unt_i)
         ), 1)
 
@@ -403,15 +396,15 @@ class LCNPModel(nn.Module):
     def ut_test(self, sens, ut, ut_t, ut_i):
 
         # run the LSTM to extract features from left context
-        output, hidden = self.LSTM(self.encoder_t(sens), self.h0)
+        output, hidden = self.LSTM(self.word_emb(sens), self.h0)
         output = self.lstm_coef * output.contiguous().view(-1, output.size(2))
 
         # compute the log probability of terminal rules
         ut_cond = torch.cat((
-            self.encoder_nt(ut),
+            self.nt_emb(ut),
             torch.index_select(output, 0, ut_i)
         ), 1)
 
-        m_ut = self.ut(ut_cond).mm((self.word2vec.weight + self.word2vec_plus.weight).t())
+        m_ut = self.ut(ut_cond).mm(self.word_emb.weight.t())
 
         return self.sm(m_ut)
