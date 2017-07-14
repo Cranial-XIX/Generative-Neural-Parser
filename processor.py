@@ -244,7 +244,7 @@ class Processor(object):
         begin_time = time.time()
 
         train_trees = list(
-            ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=10)
+            ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=10000)
         )
 
         f = open(self.train_file, 'w')
@@ -253,10 +253,6 @@ class Processor(object):
         counter = 0
         for (sentence, gold_tree) in train_trees:
             counter += 1
-            if counter < 5:
-                continue
-            print "="*100
-            print sentence
 
             d = self.encode_tree(gold_tree)
             d["s"] = sentence
@@ -346,6 +342,7 @@ class Processor(object):
         if bsz == None:
             ## unsupervised
             print "Not implemented yet"
+
         else:
             ## supervised
 

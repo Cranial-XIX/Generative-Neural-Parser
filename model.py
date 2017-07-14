@@ -68,7 +68,7 @@ class LCNPModel(nn.Module):
         )
 
         dp2l = dunt = dut = self.dnt + self.dhid
-        dpl2r = 2 * (self.dnt + self.dhid)
+        dpl2r = 2 * self.dnt + self.dhid
 
         self.lsm = nn.LogSoftmax()
         self.sm = nn.Softmax()
@@ -78,14 +78,16 @@ class LCNPModel(nn.Module):
 
         hp2l = int(zeta * dp2l + (1-zeta) * self.nnt)
         hpl2r = int(zeta * dpl2r + (1-zeta) * self.nnt)
+        hpl2r_2 = int(zeta * (hpl2r + self.dhid) + (1-zeta) * self.nnt)
         hunt = int(zeta * dunt + (1-zeta) * self.nunary)
 
         # parent to left
         self.p2l = nn.Linear(dp2l, hp2l)
         self.p2l_out = nn.Linear(hp2l, self.nnt)
         # parent left to right
-        self.pl2r = nn.Linear(dpl2r, hpl2r)
-        self.pl2r_out = nn.Linear(hpl2r, self.nnt)
+        self.pl2r_base = nn.Linear(dpl2r, hpl2r)
+        self.pl2r = nn.Linear(hpl2r+self.dhid, hpl2r_2)
+        self.pl2r_out = nn.Linear(hpl2r_2, self.nnt)
         # unary nonterminal
         self.unt = nn.Linear(dunt, hunt)
         self.unt_out = nn.Linear(hunt, self.nunary)
@@ -101,6 +103,7 @@ class LCNPModel(nn.Module):
         self.nt_emb.weight.requires_grad = False
 
         # Below are initial setup for LSTM
+
         lstm_weight_range = 0.2
 
         self.LSTM.weight_ih_l0.data.uniform_(-lstm_weight_range, lstm_weight_range)
@@ -117,25 +120,27 @@ class LCNPModel(nn.Module):
         for i in xrange(section, 2*section):
             self.LSTM.bias_ih_l0.data[i] = 1.0
             self.LSTM.bias_hh_l0.data[i] = 1.0
-            '''
+        '''
             self.LSTM.bias_ih_l1.data[i] = 1.0
             self.LSTM.bias_hh_l1.data[i] = 1.0
             self.LSTM.bias_ih_l2.data[i] = 1.0
             self.LSTM.bias_hh_l2.data[i] = 1.0
-            '''
+
+        '''
         self.p2l.bias.data.fill_(0)
-        self.p2l.weight.data.uniform_(-initrange, initrange)
+        #self.p2l.weight.data.uniform_(-initrange, initrange)
 
         self.pl2r.bias.data.fill_(0)
-        self.pl2r.weight.data.uniform_(-initrange, initrange)
+        #self.pl2r.weight.data.uniform_(-initrange, initrange)
+
         self.pl2r_out.bias.data.fill_(0)
-        self.pl2r_out.weight.data.uniform_(-initrange, initrange)
+        #self.pl2r_out.weight.data.uniform_(-initrange, initrange)
 
         self.unt.bias.data.fill_(0)
-        self.unt.weight.data.uniform_(-initrange, initrange)
+        #self.unt.weight.data.uniform_(-initrange, initrange)
 
         self.ut.bias.data.fill_(0)
-        self.ut.weight.data.uniform_(-initrange, initrange)
+        #self.ut.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, train_type, args):
         if train_type == 'supervised':
@@ -229,17 +234,28 @@ class LCNPModel(nn.Module):
             pl2r_ci = pl2r_ci.cuda()
 
         t3 = time.time()
+
+        parent_lc = torch.index_select(output, 0, pl2r_pi)
+        sibling_lc = torch.index_select(output, 0, pl2r_ci)
+        pl2r_cond = torch.cat((
+            self.relu(
+                self.pl2r_base(
+                    torch.cat((
+                        self.nt_emb(pl2r_p),
+                        self.nt_emb(pl2r_l),
+                        parent_lc,
+                    ), 1)
+                )
+            ),
+            sibling_lc - parent_lc
+        ), 1)
+
         # compute the log probability of pl2r rules
         pl2r_pr = softmax(
             self.pl2r_out(
                 self.relu(
                     self.pl2r(
-                        torch.cat((
-                            self.nt_emb(pl2r_p),
-                            self.nt_emb(pl2r_l),
-                            torch.index_select(output, 0, pl2r_pi),
-                            torch.index_select(output, 0, pl2r_ci)
-                        ), 1)
+                        pl2r_cond
                     )
                 )
             )
@@ -283,7 +299,112 @@ class LCNPModel(nn.Module):
                 )               
 
     def unsupervised(self, sen):
-        pass
+        # sen is a torch.LongTensor object, containing fake BOS index
+        # along with indices of the words
+
+        t0 = time.time()
+        # get left context hidden units with a trained h0 (start hidden state)
+        output, hidden = self.LSTM(self.word_emb(sen.view(1,-1)), self.h0)
+        # get rid of the initial BOS symbol, since you need fake BOS 
+        # to make sure everyone gets their cup of left context
+        sen = sen.data[1:]
+        n = len(sen)
+        # truncate the last left context out, since we need to ensure the
+        # matrix is of length n
+        # * output (batch_size * sen_length * hidden dimension)
+        output = output.narrow(1, 0, n)
+
+        softmax = self.lsm if viterbi else self.sm
+
+        # * h1 (num_nt * sen_length * hidden dimension)
+        h1 = output.repeat(self.nnt, 1, 1)
+
+        ## pre-compute all probabilities
+
+        # with context probabilities
+        # * unt_i (num_nt * sen_length * parent_emb_size) 
+        unt_i = self.unt_pre.unsqueeze(1).repeat(1, n, 1)
+        p2l_i = self.p2l_pre.unsqueeze(1).repeat(1, n, 1)
+        unt_cond = torch.cat((unt_i, h1), 2)
+        p2l_cond = torch.cat((p2l_i, h1), 2)
+        sz = unt_cond.size()
+
+        # parent to unary child
+        # * unt_pr (num_nt * sen_length * num_nt) -> (parent, position i, child)
+        unt_pr = softmax(self.unt_out(self.relu(self.unt(unt_cond.view(-1, sz[2]))))).view(sz[0], sz[1], -1)
+        p2l_pr = softmax(self.p2l_out(self.relu(self.p2l(p2l_cond.view(-1, sz[2]))))).view(sz[0], sz[1], -1)
+
+        output = output.view(n, -1)
+        if viterbi:
+            preterminal = np.empty((n, self.nnt), dtype=np.float32)
+            preterminal.fill(-1000000)
+        else:
+            preterminal = np.zeros((n, self.nnt), dtype=np.float32)
+
+        U_TM = 0
+        t1= time.time()
+        # append one level preterminal symbols
+        for i in xrange(n):
+            c = sen[i]
+            for p in self.lexicon[c]:
+                pi = Variable(torch.LongTensor([p]))
+                h = output[i].view(1, -1)
+                if self.use_cuda:
+                    pi = pi.cuda()
+                    h = h.cuda()
+                cond = torch.cat((self.nt_emb(pi), h), 1)
+                res = cond.mm(self.ut_w) + self.ut_b
+
+                preterminal[i,p] = (softmax(self.p2l(cond))[0][U_TM] + softmax(res)[0][c]).data[0]
+        
+
+        t2 = time.time()
+        # preprocess
+        pl2r_p, pl2r_l, pl2r_pi, pl2r_ci = self.parser.preprocess(n, preterminal)
+
+        pl2r_p = Variable(torch.LongTensor(pl2r_p))
+        pl2r_l = Variable(torch.LongTensor(pl2r_l))
+        pl2r_pi = Variable(torch.LongTensor(pl2r_pi))
+        pl2r_ci = Variable(torch.LongTensor(pl2r_ci))
+
+        if self.use_cuda:
+            pl2r_p = pl2r_p.cuda()
+            pl2r_l = pl2r_l.cuda()
+            pl2r_pi = pl2r_pi.cuda()
+            pl2r_ci = pl2r_ci.cuda()
+
+        t3 = time.time()
+
+        parent_lc = torch.index_select(output, 0, pl2r_pi)
+        sibling_lc = torch.index_select(output, 0, pl2r_ci)
+        pl2r_cond = torch.cat((
+            self.relu(
+                self.pl2r_base(
+                    torch.cat((
+                        self.nt_emb(pl2r_p),
+                        self.nt_emb(pl2r_l),
+                        parent_lc,
+                    ), 1)
+                )
+            ),
+            sibling_lc - parent_lc
+        ), 1)
+
+        # compute the log probability of pl2r rules
+        pl2r_pr = softmax(
+            self.pl2r_out(
+                self.relu(
+                    self.pl2r(
+                        pl2r_cond
+                    )
+                )
+            )
+        )
+
+        t4 = time.time()
+        #print " - "*10, t4-t3, t3-t2, t2-t1, t1-t0
+
+        
 
     def supervised(self, sens,
         p2l, pl2r_p, pl2r_l, unt, ut,
@@ -327,11 +448,19 @@ class LCNPModel(nn.Module):
         )
 
         # compute the log probability of pl2r rules
+        parent_lc = torch.index_select(output, 0, pl2r_pi)
+        sibling_lc = torch.index_select(output, 0, pl2r_ci)
         pl2r_cond = torch.cat((
-            self.nt_emb(pl2r_p),
-            self.nt_emb(pl2r_l),
-            torch.index_select(output, 0, pl2r_pi),
-            torch.index_select(output, 0, pl2r_ci)
+            self.relu(
+                self.pl2r_base(
+                    torch.cat((
+                        self.nt_emb(pl2r_p),
+                        self.nt_emb(pl2r_l),
+                        parent_lc,
+                    ), 1)
+                )
+            ),
+            sibling_lc - parent_lc
         ), 1)
 
         # pass to a single layer neural net for nonlinearity

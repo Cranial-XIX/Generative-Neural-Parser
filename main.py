@@ -56,11 +56,11 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--lstm-dim', default=250, help='LSTM hidden dimension'
+    '--lstm-dim', default=300, help='LSTM hidden dimension'
 )
 
 argparser.add_argument(
-    '--l2-coef', default=0, help='l2 norm coefficient'
+    '--l2-coef', default=0.02, help='l2 norm coefficient'
 )
 
 argparser.add_argument(
@@ -271,9 +271,61 @@ def supervised():
         print "Finish supervised training"
 
 def unsupervised():
-    pass
+    # get model paramters
+    parameters = itertools.ifilter(
+        lambda x: x.requires_grad, model.parameters()
+    )
+
+    # define the optimizer to use; currently use Adam
+    optimizer = optim.Adam(
+        parameters, lr=args.learning_rate, weight_decay=args.l2_coef
+    )
+
+    total = 10
+
+    template = "Epoch {} Batch {} [{}/{} ({:.1f}%)] Loss: {:.4f}" \
+        + " Forward: {:.4f} Backward: {:.4f} Optimize: {:.4f}"
+
+    uspv_train_data = list(ptb("train", maxlength=constants.MAX_SEN_LENGTH, n=total))
+
+    for epoch in range(args.epochs):
+        total_loss = 0
+        batch = 0
+        for (sentence, _) in uspv_train_data:
+            batch += 1
+            indices = p.get_idx(sentence)
+            sen = Variable(indices)
+            if args.cuda:
+                sen = sen.cuda()
+            start = time.time()
+            optimizer.zero_grad()
+
+            # compute loss
+            loss = model('unsupervised', sen)
+            tot_loss += loss
+            # back propagation
+            t0 = time.time()
+            loss.backward()
+            t1 = time.time()
+            # take an optimization step
+            optimizer.step()
+            end = time.time()
+            if args.verbose:
+                print template.format(
+                        epoch, batch, batch, total,
+                        float(batch)/total * 100.,
+                        loss.data[0],
+                        round(t0 - start, 5),
+                        round(t1 - t0, 5),
+                        round(end - t1, 5)
+                    )
+
+        print "\n Total loss of the trainset ", tot_loss.data[0]
+
+
 
 def parse(sentence):
+
     indices = p.get_idx(sentence)
     if args.cuda:
         sen = Variable(indices).cuda()
@@ -285,15 +337,14 @@ def parse(sentence):
 def test():
     # parsing
     start = time.time()
-    instances = ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=10)
+    instances = ptb("dev", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
     test = list(instances)
     cumul_accuracy = 0
     num_trees_with_parse = 0
     total = 0
     for (sentence, gold_tree) in test:
         total += 1
-        if total < 5:
-            continue
+
         parse_string = parse(sentence)
         #print parse_string
         if parse_string != "":

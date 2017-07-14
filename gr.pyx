@@ -90,6 +90,11 @@ cdef class GrammarObject(object):
     cdef object unary_prefix
     cdef object unary_suffix
 
+    cdef object preterm_grad
+    cdef object unt_grad
+    cdef object p2l_grad
+    cdef object pl2r_grad
+
     cdef int num_nt, num_words, N
 
     cdef vector[BRv] rule_y_xz              # [NP] -> [(S,VP,log(0.5)), ...]
@@ -639,6 +644,202 @@ cdef class GrammarObject(object):
     cdef inline int pkey(self, int i, int p) nogil:
         return i*self.num_nt + p
 
+    cpdef uspv_inside_gradient(self,
+                int n,
+                np.ndarray[np.float32_t, ndim=2] preterm,
+                np.ndarray[np.float32_t, ndim=3] unt,
+                np.ndarray[np.float32_t, ndim=3] p2l,
+                np.ndarray[np.float32_t, ndim=2] pl2r):
+        '''
+        Compute the gradient of inside algorithm with respect to the input matrix.
+        The gradient of inside score is proportional to the outside score.
+        '''
+
+        self.preterm_grad = np.zeros_like(preterm)
+        self.unt_grad = np.zeros_like(unt)
+        self.p2l_grad = np.zeros_like(p2l)
+        self.pl2r_grad = np.zeros_like(pl2r)
+
+        cdef:
+            int i, j, k, w, ik
+            int tag, l, r, p, c, hsh, index
+            double parent, left, right, child, score, p2l_p, unt_p, pl2r_p
+            double d, d_times_left, d_times_right
+            UR ur
+            BR br
+            BRF brf
+            intvec tmp
+            intvec* cell
+
+        for ik in xrange(n*(n+1)//2):
+            self.spandex.push_back(new intvec())
+
+        # Do inside algorithm
+        self.betas = np.zeros((n, n+1, self.num_nt, 2))
+        t0 = time.time()
+        # initialization
+        for i in xrange(n):  # w-1 constituents
+            k = i + 1
+            cell = self.spandex[tri(i, k)]
+            for tag in xrange(self.num_nt):
+                score = preterm[i,tag]
+                if score == 0:
+                    continue
+                cell.push_back(tag)
+                self.betas[i,k,tag,0] = score
+
+            # unary appending
+            for c in deref(cell):
+                self.betas[i,k,c,1] += self.betas[i,k,c,0]
+
+            for c in deref(cell):
+                for ur in deref(self.rule_y_x[c]):
+                    p = ur.parent
+                    index = ur.index
+                    if self.betas[i,k,p,1] == 0:
+                        tmp.push_back(p)
+                    self.betas[i,k,p,1] += \
+                        self.betas[i,k,c,0] * p2l[p,i,U_NTM] * unt[p,i,index]
+            for p in tmp:
+                cell.push_back(p)
+            tmp.clear()
+
+        for w in xrange(2, n+1):  # wider constituents
+            for i in xrange(n-w+1):
+                k = i + w
+                cell = self.spandex[tri(i, k)]
+                for j in xrange(i+1, k):
+                    for l in deref(self.spandex[tri(i, j)]):
+                        left = self.betas[i,j,l,1] 
+                        for br in deref(self.rule_y_xz[l]):
+                            r = br.right
+                            right = self.betas[j,k,r,1]
+                            if right == 0:
+                                continue
+                            p = br.parent
+                            if self.betas[i,k,p,0] == 0:
+                                cell.push_back(p)
+                            self.betas[i,k,p,0] += p2l[p,i,l] * pl2r[self.pl2r_map[pl2rhash(p,l,i,j)],r] * left * right
+                # unary appending
+                for c in deref(cell):
+                    self.betas[i,k,c,1] += self.betas[i,k,c,0]
+
+                for c in deref(cell):
+                    for ur in deref(self.rule_y_x[c]):
+                        p = ur.parent
+                        index = ur.idx
+                        if self.betas[i,k,p,1] == 0:
+                            tmp.push_back(p)
+                        self.betas[i,k,p,1] += self.betas[i,k,c,0] * p2l[p,i,U_NTM] * unt[p,i,index]
+                for p in tmp:
+                    cell.push_back(p)
+                tmp.clear()
+
+        t1 = time.time()
+        print "inside ",t1 - t0
+
+        # Do outside algorithm
+        self.alphas = np.zeros((n, n+1, self.num_nt, 2))
+        self.alphas[0,n,RI,1] = 1.0
+
+        for w in reversed(xrange(2, n+1)): # wide to narrow
+            for i in xrange(n-w+1):
+                k = i + w
+
+                # unary
+                for c in deref(self.spandex[tri(i, k)]):
+                    child = self.betas[i,k,c,0]
+                    if child == 0:
+                        continue
+
+                    for ur in deref(self.rule_y_x[c]):
+                        p = ur.parent
+                        index = ur.idx
+                        parent = self.alphas[i,k,p,1]
+
+                        if parent == 0:
+                            continue
+
+                        score = parent * child
+                        p2l_p = p2l[p,i,U_NTM]
+                        unt_p = unt[p,i,index]
+                        d = parent * p2l_p * unt_p
+                        self.alphas[i,k,c,0] += d
+
+                        self.self.p2l_grad[p,i,U_NTM] += score * unt_p
+                        self.self.unt_grad[p,i,index] += score * p2l_p
+
+                for c in deref(self.spandex[tri(i, k)]):
+                    self.alphas[i,k,c,0] += self.alphas[i,k,c,1]
+
+                # binary
+                for p in deref(self.spandex[tri(i, k)]):
+
+                    parent = self.alphas[i,k,p,0]
+                    if parent == 0:
+                        continue
+
+                    for j in xrange(i+1, k):
+                        for brf in deref(self.rule_x_yz[p]):
+                            l = brf.left
+                            r = brf.right
+                            left = self.betas[i,j,l,1]
+                            if left == 0:
+                                continue
+                            right = self.betas[j,k,r,1]
+                            if right == 0:
+                                continue
+
+                            p2l_p = p2l[p,i,l]
+
+                            hsh = self.pl2r_map[pl2rhash(p,l,i,j)]
+                            pl2r_p = pl2r[hsh,r]
+
+                            d = parent * p2l_p * pl2r_p
+                            d_times_left = d * left
+                            d_times_right = d * right
+                            self.alphas[j,k,r,1] += d_times_left
+                            self.alphas[i,j,l,1] += d_times_right
+                            score = parent * left * right
+                            self.self.p2l_grad[p,i,l] += score * pl2r_p
+                            self.self.pl2r_grad[hsh,r] += score * p2l_p
+
+        for i in xrange(n):
+            k = i+1
+            for c in deref(self.spandex[tri(i, k)]):
+
+                child = self.betas[i,k,c,0]
+                if child == 0:
+                    continue
+
+                for ur in deref(self.rule_y_x[c]):
+                    p = ur.parent
+                    parent = self.alphas[i,k,p,1]
+                    if parent == 0:
+                        continue
+                    index = ur.idx
+                    p2l_p = p2l[p,i,U_NTM]
+                    unt_p = unt[p,i,index]
+                    d = parent * p2l_p * unt_p
+                    self.alphas[i,k,c,0] += d
+
+                    score = parent * child
+                    self.self.p2l_grad[p,i,U_NTM] += score * unt_p
+                    self.self.unt_grad[p,i,index] += score * p2l_p
+
+            for c in deref(self.spandex[tri(i, k)]):
+                self.alphas[i,k,c,0] += self.alphas[i,k,c,1]
+
+            for tag in xrange(self.num_nt):
+                if preterm[i, tag] == 0:
+                    continue
+                self.self.preterm_grad[i, tag] += self.alphas[i,k,tag,0]
+
+        print "outside ", time.time() - t1
+        self.spandex.clear()
+
+        return self.betas[0,n,RI,1]
+
     cpdef preprocess(self, int n, np.ndarray[np.float32_t, ndim=2] preterm):
         cdef:
             int i, j, k, w, ik
@@ -732,8 +933,6 @@ cdef class GrammarObject(object):
         np_l = np.zeros((size,), dtype=int)
         np_pi = np.zeros((size,), dtype=int)
         np_ci = np.zeros((size,), dtype=int)
-
-        print "size is ", size
 
         for i in xrange(size):
             np_p[i] = pl2r_p.at(i)
