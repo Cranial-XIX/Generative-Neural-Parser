@@ -842,8 +842,9 @@ cdef class GrammarObject(object):
 
     cpdef preprocess(self, int n, np.ndarray[np.float32_t, ndim=2] preterm):
         cdef:
-            int i, j, k, w, ik
+            int i, j, k, w, ik, hsh, size
             int tag, l, r, p, c
+
             UR ur
             BR br
             intvec* cell
@@ -898,8 +899,7 @@ cdef class GrammarObject(object):
                     for l in deref(self.spandex[tri(i, j)]):
                         for br in deref(self.rule_y_xz[l]):
                             r = br.right
-                            right = betas[j,k,r,1]
-                            if right == 0:
+                            if betas[j,k,r,1] == 0:
                                 continue
                             p = br.parent
                             hsh = pl2rhash(p,l,i,j)
@@ -914,6 +914,7 @@ cdef class GrammarObject(object):
                             if betas[i,k,p,0] == 0:
                                 cell.push_back(p)
                             betas[i,k,p,0] = 1
+
                 # unary appending
                 for c in deref(cell):
                     betas[i,k,c,1] = 1
@@ -927,6 +928,7 @@ cdef class GrammarObject(object):
                 for p in tmp:
                     cell.push_back(p)
                 tmp.clear()
+
         t2 = time.time()
         size += 1
         np_p = np.zeros((size,), dtype=int)
@@ -947,7 +949,7 @@ cdef class GrammarObject(object):
         pl2r_ci.clear()
         preprocess_end = time.time()
 
-        print "preprocess takes ", preprocess_end - t2, t2 - t1, t1 -preprocess_start
+        #print "preprocess takes ", preprocess_end - t2, t2 - t1, t1 -preprocess_start
         return np_p, np_l, np_pi, np_ci
 
     cpdef prune(self, prob_sen, posterior_threshold):

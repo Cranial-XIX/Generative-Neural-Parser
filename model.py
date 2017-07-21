@@ -27,7 +27,7 @@ class LCNPModel(nn.Module):
         # nonterminals
         self.nnt = args['nnt']             # number of nonterminals
         self.dnt = args['dnt']             # dimension of nonterminals
-
+        self.dnt = 50
         # model
         self.lstm_coef = args['lstm_coef'] # coefficient of LSTM
         self.bsz = args['bsz']             # the batch size
@@ -44,8 +44,6 @@ class LCNPModel(nn.Module):
             Variable(torch.zeros(self.nlayers, self.bsz, self.dhid))
         )
 
-        self.unt_pre = self.p2l_pre = Variable(torch.eye(self.nnt, self.nnt))
-
         if self.use_cuda:
             # the initial states for h0 and c0 of LSTM
             self.h0 = (
@@ -53,8 +51,9 @@ class LCNPModel(nn.Module):
                 Variable(torch.zeros(self.nlayers, self.bsz, self.dhid).cuda())
             )
             # initialize precomputed matrix
-            self.unt_pre = self.unt_pre.cuda()
-            self.p2l_pre = self.p2l_pre.cuda()
+
+        self.h0[0].requires_grad = False
+        self.h0[1].requires_grad = False
 
         # nonterminal embedding and w2v embedding, w2v_plus 
         # is the deviation from w2v
@@ -68,39 +67,37 @@ class LCNPModel(nn.Module):
         )
 
         dp2l = dunt = dut = self.dnt + self.dhid
-        dpl2r = 2 * self.dnt + self.dhid
+        dpl2r = 2 * (self.dnt + self.dhid)
 
         self.lsm = nn.LogSoftmax()
         self.sm = nn.Softmax()
         self.relu = nn.ReLU()
 
-        zeta = 0.6
+        zeta = 0.55
 
         hp2l = int(zeta * dp2l + (1-zeta) * self.nnt)
         hpl2r = int(zeta * dpl2r + (1-zeta) * self.nnt)
-        hpl2r_2 = int(zeta * (hpl2r + self.dhid) + (1-zeta) * self.nnt)
         hunt = int(zeta * dunt + (1-zeta) * self.nunary)
 
         # parent to left
         self.p2l = nn.Linear(dp2l, hp2l)
         self.p2l_out = nn.Linear(hp2l, self.nnt)
         # parent left to right
-        self.pl2r_base = nn.Linear(dpl2r, hpl2r)
-        self.pl2r = nn.Linear(hpl2r+self.dhid, hpl2r_2)
-        self.pl2r_out = nn.Linear(hpl2r_2, self.nnt)
+        self.pl2r = nn.Linear(dpl2r, hpl2r)
+        self.pl2r_out = nn.Linear(hpl2r, self.nnt)
         # unary nonterminal
         self.unt = nn.Linear(dunt, hunt)
         self.unt_out = nn.Linear(hunt, self.nunary)
         # unary terminal
-        self.ut = nn.Linear(dut, self.dt)
-
+        self.ut = nn.Linear(dut, 300)
+        self.ut_out = nn.Linear(300, self.nt)
         self.init_weights(args['initrange'], args['word_emb'], args['nt_emb'])
 
     def init_weights(self, initrange, word_emb, nt_emb):
         self.word_emb.weight.data = word_emb
-        self.nt_emb.weight.data = nt_emb
+        #self.nt_emb.weight.data = nt_emb
         self.word_emb.weight.requires_grad = False
-        self.nt_emb.weight.requires_grad = False
+        #self.nt_emb.weight.requires_grad = False
 
         # Below are initial setup for LSTM
 
@@ -127,7 +124,9 @@ class LCNPModel(nn.Module):
             self.LSTM.bias_hh_l2.data[i] = 1.0
 
         '''
+
         self.p2l.bias.data.fill_(0)
+        self.p2l_out.bias.data.fill_(0)
         #self.p2l.weight.data.uniform_(-initrange, initrange)
 
         self.pl2r.bias.data.fill_(0)
@@ -137,6 +136,7 @@ class LCNPModel(nn.Module):
         #self.pl2r_out.weight.data.uniform_(-initrange, initrange)
 
         self.unt.bias.data.fill_(0)
+        self.unt_out.bias.data.fill_(0)
         #self.unt.weight.data.uniform_(-initrange, initrange)
 
         self.ut.bias.data.fill_(0)
@@ -154,9 +154,10 @@ class LCNPModel(nn.Module):
     def parsing_setup(self):
         # since for lexicon, Pr(x | P) = logsoftmax(A(Wx + b)). We
         # precompute AW (as ut_w) and Ab (as ut_b) here to speed up the computation
-        w2v_w = self.word_emb.weight
-        self.ut_w = w2v_w.mm(self.ut.weight).t()
-        self.ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
+        #w2v_w = self.word_emb.weight
+        #self.ut_w = w2v_w.mm(self.ut.weight).t()
+        #self.ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
+        self.precomputed = self.nt_emb.weight
 
     def parse(self, sentence, sen, viterbi=True):
         # sen is a torch.LongTensor object, containing fake BOS index
@@ -176,23 +177,38 @@ class LCNPModel(nn.Module):
 
         softmax = self.lsm if viterbi else self.sm
 
-        # * h1 (num_nt * sen_length * hidden dimension)
-        h1 = output.repeat(self.nnt, 1, 1)
-
         ## pre-compute all probabilities
 
         # with context probabilities
-        # * unt_i (num_nt * sen_length * parent_emb_size) 
-        unt_i = self.unt_pre.unsqueeze(1).repeat(1, n, 1)
-        p2l_i = self.p2l_pre.unsqueeze(1).repeat(1, n, 1)
-        unt_cond = torch.cat((unt_i, h1), 2)
-        p2l_cond = torch.cat((p2l_i, h1), 2)
-        sz = unt_cond.size()
+        # * unt_i (num_nt * sen_length * parent_emb_size)
+        cond = torch.cat((
+            self.precomputed.unsqueeze(1).repeat(1, n, 1),
+            output.repeat(self.nnt, 1, 1) # (num_nt * sen_length * hidden dimension)
+        ), 2)
+
+        sz = cond.size()
 
         # parent to unary child
         # * unt_pr (num_nt * sen_length * num_nt) -> (parent, position i, child)
-        unt_pr = softmax(self.unt_out(self.relu(self.unt(unt_cond.view(-1, sz[2]))))).view(sz[0], sz[1], -1)
-        p2l_pr = softmax(self.p2l_out(self.relu(self.p2l(p2l_cond.view(-1, sz[2]))))).view(sz[0], sz[1], -1)
+        unt_pr = softmax(
+            self.unt_out(
+                self.relu(
+                    self.unt(
+                        cond.view(-1, sz[2])
+                    )
+                )
+            )
+        ).view(sz[0], sz[1], -1)
+
+        p2l_pr = softmax(
+            self.p2l_out(
+                self.relu(
+                    self.p2l(
+                        cond.view(-1, sz[2])
+                    )
+                )
+            )
+        ).view(sz[0], sz[1], -1)
 
         output = output.view(n, -1)
         if viterbi:
@@ -202,10 +218,15 @@ class LCNPModel(nn.Module):
             preterminal = np.zeros((n, self.nnt), dtype=np.float32)
 
         U_TM = 0
+
         t1= time.time()
+
+        self.pos = []
         # append one level preterminal symbols
         for i in xrange(n):
             c = sen[i]
+            max = -1000000
+            idx = -1
             for p in self.lexicon[c]:
                 pi = Variable(torch.LongTensor([p]))
                 h = output[i].view(1, -1)
@@ -213,9 +234,15 @@ class LCNPModel(nn.Module):
                     pi = pi.cuda()
                     h = h.cuda()
                 cond = torch.cat((self.nt_emb(pi), h), 1)
-                res = cond.mm(self.ut_w) + self.ut_b
+                #res = cond.mm(self.ut_w) + self.ut_b
+                res = self.ut_out(self.relu(self.ut(cond)))
 
-                preterminal[i,p] = (softmax(self.p2l(cond))[0][U_TM] + softmax(res)[0][c]).data[0]
+                x = (softmax(self.p2l(cond))[0][U_TM] + softmax(res)[0][c]).data[0]
+                if x > max:
+                    idx = p
+                    max = x
+                preterminal[i,p] = x
+            self.pos.append(idx)
         
 
         t2 = time.time()
@@ -238,15 +265,9 @@ class LCNPModel(nn.Module):
         parent_lc = torch.index_select(output, 0, pl2r_pi)
         sibling_lc = torch.index_select(output, 0, pl2r_ci)
         pl2r_cond = torch.cat((
-            self.relu(
-                self.pl2r_base(
-                    torch.cat((
-                        self.nt_emb(pl2r_p),
-                        self.nt_emb(pl2r_l),
-                        parent_lc,
-                    ), 1)
-                )
-            ),
+            self.nt_emb(pl2r_p),
+            self.nt_emb(pl2r_l),
+            parent_lc,
             sibling_lc - parent_lc
         ), 1)
 
@@ -442,24 +463,20 @@ class LCNPModel(nn.Module):
             torch.index_select(output, 0, ut_i)
         ), 1)
 
-        m_ut = self.ut(ut_cond).mm(self.word_emb.weight.t())
+        #m_ut = self.ut(ut_cond).mm(self.word_emb.weight.t())
         nll_ut = -torch.sum(
-            self.lsm(m_ut).gather(1, ut_t.unsqueeze(1))
+            self.lsm(
+                self.ut_out(self.relu(self.ut(ut_cond)))
+            ).gather(1, ut_t.unsqueeze(1))
         )
 
         # compute the log probability of pl2r rules
         parent_lc = torch.index_select(output, 0, pl2r_pi)
         sibling_lc = torch.index_select(output, 0, pl2r_ci)
         pl2r_cond = torch.cat((
-            self.relu(
-                self.pl2r_base(
-                    torch.cat((
-                        self.nt_emb(pl2r_p),
-                        self.nt_emb(pl2r_l),
-                        parent_lc,
-                    ), 1)
-                )
-            ),
+            self.nt_emb(pl2r_p),
+            self.nt_emb(pl2r_l),
+            parent_lc,
             sibling_lc - parent_lc
         ), 1)
 

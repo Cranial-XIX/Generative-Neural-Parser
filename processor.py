@@ -179,7 +179,7 @@ class Processor(object):
         self.nunary = 0
         self.unary_prefix = []
         self.unary_suffix = []
-        self.lexicon = {}
+        self.lexicon = [[] for x in xrange(self.nt)]
 
         for (_, gold_tree) in all_trees:
             unary_chain = self.find_unary(gold_tree)
@@ -209,8 +209,6 @@ class Processor(object):
             word = tree.leaves()[0]
             word_idx = self.get_word_idx(word)
 
-            if word_idx not in self.lexicon:
-                self.lexicon[word_idx] = []
             if current_nonterminal not in self.lexicon[word_idx]:
                 self.lexicon[word_idx].append(current_nonterminal)
 
@@ -244,7 +242,7 @@ class Processor(object):
         begin_time = time.time()
 
         train_trees = list(
-            ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=10000)
+            ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=2000)
         )
 
         f = open(self.train_file, 'w')

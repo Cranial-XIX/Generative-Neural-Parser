@@ -56,7 +56,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--lstm-dim', default=300, help='LSTM hidden dimension'
+    '--lstm-dim', default=200, help='LSTM hidden dimension'
 )
 
 argparser.add_argument(
@@ -337,7 +337,7 @@ def parse(sentence):
 def test():
     # parsing
     start = time.time()
-    instances = ptb("dev", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
+    instances = ptb("dev", minlength=3, maxlength=constants.MAX_SEN_LENGTH)
     test = list(instances)
     cumul_accuracy = 0
     num_trees_with_parse = 0
@@ -355,52 +355,13 @@ def test():
             )
             cumul_accuracy += tree_accruacy
             num_trees_with_parse += 1
-            if not tree_accruacy == 1.0:            
-                print tree_accruacy
-                '''
-                for sub in parse_tree:
-                    for sub1 in sub:
-                        count = 0
-                        for sub2 in sub1:
-                            if count == 0:
-                                count += 1
-                                continue 
-                            count1 = 0
-                            for sub3 in sub2:
-                                if count1 == 0:
-                                    count1 += 1
-                                    continue
-                                count2 = 0
-                                for sub4 in sub3:
-                                    if count2 == 0:
-                                        count2 += 1
-                                        continue
-                                    print sub4.pretty_print()
-                                    break
-                for sub in gold_tree:
-                    for sub1 in sub:
-                        count = 0
-                        for sub2 in sub1:
-                            if count == 0:
-                                count += 1
-                                continue 
-                            count1 = 0
-                            for sub3 in sub2:
-                                if count1 == 0:
-                                    count1 += 1
-                                    continue
-                                count2 = 0
-                                for sub4 in sub3:
-                                    if count2 == 0:
-                                        count2 += 1
-                                        continue
-                                    print sub4.pretty_print()
-                                    break
-                '''
+            if tree_accruacy < 0.7:            
+                print "Parsing accuracy: ", tree_accruacy
+                print [p.idx2nt[x] for x in model.pos]
                 print parse_tree.pretty_print()
                 print gold_tree.pretty_print()
 
-            print "-"*80
+                print "-"*80
         else:
             print "No parse!"
 
@@ -558,9 +519,9 @@ elif args.mode == 'parse':
 elif args.mode == 'KLD':
     #KLD()
     #test_p2l()
-    test_pl2r()
+    #test_pl2r()
     #test_ut()
-    #test_unt()
+    test_unt()
 else:
     print "Cannot recognize the mode, allowed modes are: " \
         "spv_train, uspv_train, parse, test"
