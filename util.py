@@ -34,6 +34,60 @@ def remove_trace(t):
     return Tree(label, new)
 
 
+def head_binarize(t):
+    """
+    Head-binarization
+
+      >>> print head_binarize(Tree.fromstring('(A (^A a) (B b) (C c))'))
+      (A (@A (^A a) (B b)) (C c))
+
+      >>> print head_binarize(Tree.fromstring('(A (B b) (C c) (^D d) (E e) (F f) )'))
+      (A (@A a (B (@B (@B b c) (D d)) e)) f)
+
+
+      >>> print head_binarize(Tree.fromstring('(A (B b) (C c) (D d) (E e) (^F f) )'))
+      (A a (@A (B (@B (@B b c) (D d)) e) f))
+
+    """
+
+    if is_terminal(t):
+        return t
+
+    label = t.label()
+
+    children = list(t)
+    new = [head_binarize(c) for c in children]
+
+    if len(children) <= 2:
+        return Tree(label, new)
+
+    else:
+
+        if label[0] == '^':
+            intermediate = label[1:]
+        else:
+            intermediate = label
+
+        intermediate = '@' + intermediate
+
+        index = -1
+        for child in new:
+            index += 1
+            if child.label()[0] == "^":
+                break
+
+        curr = new[index]
+
+        for c in new[index+1:]:
+            curr = Tree( intermediate, [curr, c] )
+
+        for c in reversed(new[0:index]):
+            curr = Tree( intermediate, [c, curr] )
+
+        curr.set_label(label)
+        return curr
+
+
 def binarize(t, right=False):
     """
     Left-binarization by default
@@ -154,6 +208,7 @@ def item_tree(t, i=0, terminals=True):
     Tree(('A', 0, 3), ['a', Tree(('B', 1, 2), ['b']), 'c'])
 
     """
+
     if is_terminal(t):
         if terminals:
             return (t, i, i+1)
