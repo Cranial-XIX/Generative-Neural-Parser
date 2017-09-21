@@ -1,2 +1,2 @@
-rm -r output/PID*
+rm -r output/*
 

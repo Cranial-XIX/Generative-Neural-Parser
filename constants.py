@@ -17,8 +17,6 @@ DIMENSION_OF_MODEL = 100
 DIM_TERMINAL = 314
 MAX_VOCAB_SIZE = 500000
 
-HEADIFY_COMMAND = "perl treebank-scripts-master/headify treebank-scripts-master/newmarked.mrk data/trees.txt > data/head.txt"
-
 UNCOMMON_THRESHOLD = 20
 RARE_THRESHOLD = 10
 OOV_IDX = 0

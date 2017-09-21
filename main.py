@@ -9,10 +9,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from processor import Processor, ProcessorOfHeadedTree
-from gr import GrammarObject
-from model import LCNPModel, BLCNP
+from model import BLN, LN, BSN, BS
 from nltk import Tree
+from processor import Processor, PBLN, PLN
 from ptb import ptb
 from torch.autograd import Variable
 from util import unbinarize, oneline
@@ -30,21 +29,25 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--make-train', default="no", help='Whether to make a new train file'
+    '--make-train', default="no", help='Whether to make new training instances'
 )
 
 argparser.add_argument(
-    '--read-data', default="no", help='Whether read data'
+    '--read-data', default="no", help='Whether to read in and preprocess training data'
 )
 
 # Below are variables associated with model
 # =========================================================================
 argparser.add_argument(
-    '--mode', default="parse", help='mode: spv_train, uspv_train, test, parse'
+    '--model', default="BLN", help='Model: BLN, LN, BSN, BS'
 )
 
 argparser.add_argument(
-    '--seed', default=419, help='random seed'
+    '--mode', default="parse", help='Mode: spv_train, uspv_train, test, parse'
+)
+
+argparser.add_argument(
+    '--seed', default=419, help='Random seed'
 )
 
 argparser.add_argument(
@@ -64,10 +67,6 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--headify', default="yes", help='include head word'
-)
-
-argparser.add_argument(
     '--verbose', default="yes", help='use verbose mode'
 )
 
@@ -78,7 +77,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--batch-size', default=10, help='# instances in a batch'
+    '--batch-size', default=15, help='# instances in a batch'
 )
 
 argparser.add_argument(
@@ -100,12 +99,21 @@ if torch.cuda.is_available():
 
 # Create folder to save model and log files
 file_save = ""
+save_template = "TIME={}_MDL={}_EPCH={}_BSIZE={}_HD={}_LY={}"
+
 if args.mode == 'spv_train' or args.mode == 'uspv_train':
-    id_process = os.getpid()
-    #time_current = datetime.datetime.now().isoformat()
-    name = 'PID='+str(id_process)#+'_TIME='+time_current
+
+    name = save_template.format(
+        time.strftime("%d-%m-%Y-%H:%M:%S"),
+        args.model,
+        args.epochs,
+        args.batch_size, 
+        args.lstm_dim,
+        args.lstm_layer
+    )
+
     os.makedirs('./output/' + name + '/')
-    file_save = os.path.abspath('./output/' + name + '/' + 'model_dict')
+    file_save = os.path.abspath('./output/' + name + '/' + 'model')
 
 ## show values ##
 if args.verbose == 'yes':
@@ -116,57 +124,51 @@ if args.verbose == 'yes':
     print template.format(" pretrained file :", args.pretrain)
     print template.format(" whether to read new data :", args.read_data)
     print "- Model:"
+    print template.format(" model :", args.model)
     print template.format(" model mode :", args.mode)
-    print template.format(" seed is :", args.seed)
     print template.format(" LSTM coefficient :", args.lstm_coef)
     print template.format(" LSTM # of layer :", args.lstm_layer)
     print template.format(" LSTM dimension :", args.lstm_dim)
     print template.format(" l2 coefficient :", args.l2_coef)
-    print template.format(" use head word :", args.headify)
     print "- Train:"
     print template.format(" # of epochs is :", args.epochs)
     print template.format(" batch size is :", args.batch_size)
     print template.format(" learning rate is :", args.learning_rate)
     print "="*80
 
-args.seed = int(args.seed)
+
+args.batch_size = int(args.batch_size)
+args.epochs = int(args.epochs)
+args.learning_rate = float(args.learning_rate)
 args.lstm_coef = float(args.lstm_coef)
 args.lstm_layer = int(args.lstm_layer)
 args.lstm_dim = int(args.lstm_dim)
 args.l2_coef = float(args.l2_coef)
-args.learning_rate = float(args.learning_rate)
-args.epochs = int(args.epochs)
-args.batch_size = int(args.batch_size)
-args.verbose = (args.verbose == 'yes')
-args.read_data = (args.read_data == 'yes')
 args.make_train = (args.make_train == 'yes')
-args.headify = (args.headify == 'yes')
+args.read_data = (args.read_data == 'yes')
+args.seed = int(args.seed)
+args.verbose = (args.verbose == 'yes')
+
 
 # let the processor read in data
-if args.headify:
-    p = ProcessorOfHeadedTree(
-        args.train, 
-        args.make_train, 
-        args.read_data,
-        args.verbose
-    )
+# Model: BLN, LN, BSN, BS
+if args.model == 'BLN':
+    dp = PBLN(args.train, args.make_train, args.read_data, args.verbose)
+
+elif args.model == 'LN':
+    dp = PLN(args.train, args.make_train, args.read_data, args.verbose)
+
+elif args.model == 'BSN' or args.model == 'BS':
+    dp = Processor(args.train, args.make_train, args.read_data, args.verbose)
+
 else:
-    p = Processor(
-        args.train, 
-        args.make_train, 
-        args.read_data,
-        args.verbose
-    )
+    print "Cannot recognize the model!"
+    sys.exit()
 
-p.process_data()
-
-# create a grammar object
-#parser = GrammarObject(p)
-#parser.read_gr_file(constants.GR_FILE)
-#parser.read_lexicon_file(constants.LEX_FILE)
+dp.process_data()
 
 # set batch size for unsupervised learning and parsing
-if not (args.mode == 'spv_train' or args.mode == 'KLD' or args.mode == 'auto'):
+if not (args.mode == 'spv_train'):
     args.batch_size = 1
 
 # input arguments for model
@@ -174,38 +176,24 @@ inputs = {
     'verbose': args.verbose,
     'cuda': args.cuda,
 
-    # terminals
-    #'word_emb': p.word_emb,
-    'nt': p.nt,
-    'dt': p.dt,
-
-    # nonterminals
-    #'nt_emb': p.nonterm_emb,
-    'nnt': p.nnt,
-    'dnt': p.dnt,
-
-    'B_AC': p.B_AC,
-    'B_A': p.unary,
-
-    'w_U':p.w_U,
-
     # model
     'lstm_coef': args.lstm_coef,
     'nlayers': args.lstm_layer,
     'bsz': args.batch_size,
     'dhid': args.lstm_dim,
-    #'initrange': 1,
 
-    'nunary': p.nunary,
-    'prefix': p.unary_prefix,
-    'suffix': p.unary_suffix,
-    #'lexicon': p.lexicon,
-    #'parser': parser,
-
-    'idx2nt': p.idx2nt
+    'dp': dp,
 }
 
-model = BLCNP(inputs) if args.headify else LCNPModel(inputs) 
+if args.model == 'BLN':
+    model = BLN(inputs)
+elif args.model == 'LN':
+    model = LN(inputs)
+elif args.model == 'BSN':
+    model = BSN(inputs)
+elif args.model == 'BS':
+    model = BS(inputs)
+
 if args.cuda:
     model.cuda()
 
@@ -214,121 +202,6 @@ if not args.pretrain == "":
         print " - use pretrained model from ", args.pretrain
     pretrain = torch.load(args.pretrain)
     model.load_state_dict(pretrain['state_dict'])
-
-
-
-
-def head_supervised():
-    # get model paramters
-    parameters = itertools.ifilter(
-        lambda x: x.requires_grad, model.parameters()
-    )
-
-    # define the optimizer to use; currently use Adam
-    optimizer = optim.Adam(
-        parameters, lr=args.learning_rate, weight_decay=args.l2_coef
-    )
-
-    total = p.trainset_length
-
-    template = "Epoch {} Batch {} [{}/{} ({:.1f}%)] NLL: {:.2f}" \
-        + " Fwd: {:.2f} Bckwd: {:.2f} Opt: {:.2f}"
-
-    try:
-        for epoch in range(args.epochs):
-            p.shuffle()
-            idx = 0
-            batch = 0
-            tot_loss = 0
-            while True:
-                start = time.time()
-                # get next training instances
-                idx = p.next(idx, args.batch_size)
-
-                batch += 1
-                optimizer.zero_grad()
-                # the parameters array
-                p_array = [
-                    p.sens,
-                    p.B_A, p.B_B, p.B_C, p.B_BH, p.B_CH, p.B_Bi, p.B_Ci, 
-                    p.C_A, p.C_B, p.C_C, p.C_BH, p.C_CH, p.C_Bi, p.C_Ci,
-                    p.U, p.U_A, p.U_Ai, p.U_H
-                ]
-
-                # create PyTorch Variables
-                if args.cuda:
-                    p_array = [(Variable(torch.LongTensor(x))).cuda() for x in p_array]
-                else:
-                    p_array = [Variable(torch.LongTensor(x)) for x in p_array]
-
-                # compute loss
-                loss = model('supervised', p_array)
-                tot_loss += loss
-                # back propagation
-                t0 = time.time()
-                loss.backward()
-                t1 = time.time()
-                # take an optimization step
-                optimizer.step()
-                end = time.time()
-                if args.verbose:
-                    if idx == -1:
-                        print template.format(
-                                epoch, batch, total, total,
-                                100.,
-                                loss.data[0],
-                                round(t0 - start, 5),
-                                round(t1 - t0, 5),
-                                round(end - t1, 5)
-                            )
-                        break
-                    else:
-                        print template.format(
-                                epoch, batch, idx, total,
-                                float(idx)/total * 100.,
-                                loss.data[0],
-                                round(t0 - start, 5),
-                                round(t1 - t0, 5),
-                                round(end - t1, 5)
-                            )
-            print "\n Average log prob of sentence ", tot_loss.data[0] / total
-        torch.save( {'state_dict': model.state_dict()}, file_save )
-
-    except KeyboardInterrupt:
-        if args.verbose:
-            print " - Exiting from training early"
-        torch.save( {'state_dict': model.state_dict()}, file_save )
-
-    if args.verbose:
-        print "Finish supervised training"
-
-
-def head_test():
-    model.parse_setup()
-    test_data = list(ptb("dev", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=200))
-    cumul_accuracy = 0
-    num_sen = 0
-
-    for (sentence, gold) in test_data:
-        if len(sentence.split()) > 15:
-            continue
-
-        num_sen += 1
-
-        sen_idx = Variable(p.get_idx(sentence))
-        parse_string = model.parse(sentence, sen_idx)
-        parse_tree = Tree.fromstring(parse_string)
-        tree_accruacy = evalb.evalb(
-            oneline(unbinarize(gold)),
-            unbinarize(parse_tree)
-        )
-        cumul_accuracy += tree_accruacy
-        print " Accuracy : ", tree_accruacy
-        print " GOLD \n",unbinarize(gold).pretty_print()
-        print " PARSE \n",unbinarize(parse_tree).pretty_print()
-        print " PARSE \n",parse_tree.pretty_print()
-
-    print " # Sen: {} Accuracy: {}".format( num_sen, cumul_accuracy / float(num_sen) )
 
 
 def supervised():
@@ -342,436 +215,34 @@ def supervised():
         parameters, lr=args.learning_rate, weight_decay=args.l2_coef
     )
 
-    total = p.trainset_length
+    total = dp.trainset_length
 
-    template = "Epoch {} Batch {} [{}/{} ({:.1f}%)] Loss: {:.4f}" \
-        + " Forward: {:.4f} Backward: {:.4f} Optimize: {:.4f}"
-
-    try:
-        for epoch in range(args.epochs):
-            p.shuffle()
-            idx = 0
-            batch = 0
-            tot_loss = 0
-            while True:
-                start = time.time()
-                # get next training instances
-                idx = p.next(idx, args.batch_size)
-
-                batch += 1
-                optimizer.zero_grad()
-                # the parameters array
-                p_array = [
-                    p.sens,
-                    p.p2l, p.pl2r_p, p.pl2r_l, p.unt, p.ut,
-                    p.p2l_t, p.pl2r_t, p.unt_t, p.ut_t,
-                    p.p2l_i, p.pl2r_pi, p.pl2r_ci, p.unt_i, p.ut_i
-                ]
-
-                # create PyTorch Variables
-                if args.cuda:
-                    p_array = [(Variable(x)).cuda() for x in p_array]
-                else:
-                    p_array = [Variable(x) for x in p_array]
-
-                # compute loss
-                loss = model('supervised', p_array)
-                tot_loss += loss
-                # back propagation
-                t0 = time.time()
-                loss.backward()
-                t1 = time.time()
-                # take an optimization step
-                optimizer.step()
-                end = time.time()
-                if args.verbose:
-                    if idx == -1:
-                        print template.format(
-                                epoch, batch, total, total,
-                                100.,
-                                loss.data[0],
-                                round(t0 - start, 5),
-                                round(t1 - t0, 5),
-                                round(end - t1, 5)
-                            )
-                        break
-                    else:
-                        print template.format(
-                                epoch, batch, idx, total,
-                                float(idx)/total * 100.,
-                                loss.data[0],
-                                round(t0 - start, 5),
-                                round(t1 - t0, 5),
-                                round(end - t1, 5)
-                            )
-            print "\n Average log prob of sentence ", tot_loss.data[0] / total
-        torch.save( {'state_dict': model.state_dict()}, file_save )
-
-    except KeyboardInterrupt:
-        if args.verbose:
-            print " - Exiting from training early"
-        torch.save( {'state_dict': model.state_dict()}, file_save )
-
-    if args.verbose:
-        print "Finish supervised training"
-
-
-def unsupervised():
-    # get model paramters
-    parameters = itertools.ifilter(
-        lambda x: x.requires_grad, model.parameters()
-    )
-
-    # define the optimizer to use; currently use Adam
-    optimizer = optim.Adam(
-        parameters, lr=args.learning_rate, weight_decay=args.l2_coef
-    )
-
-    total = 10
-
-    template = "Epoch {} Batch {} [{}/{} ({:.1f}%)] Loss: {:.4f}" \
-        + " Forward: {:.4f} Backward: {:.4f} Optimize: {:.4f}"
-
-    uspv_train_data = list(ptb("train", maxlength=constants.MAX_SEN_LENGTH, n=total))
-
-    for epoch in range(args.epochs):
-        total_loss = 0
-        batch = 0
-        for (sentence, _) in uspv_train_data:
-            batch += 1
-            indices = p.get_idx(sentence)
-            sen = Variable(indices)
-            if args.cuda:
-                sen = sen.cuda()
-            start = time.time()
-            optimizer.zero_grad()
-
-            # compute loss
-            loss = model('unsupervised', sen)
-            tot_loss += loss
-            # back propagation
-            t0 = time.time()
-            loss.backward()
-            t1 = time.time()
-            # take an optimization step
-            optimizer.step()
-            end = time.time()
-            if args.verbose:
-                print template.format(
-                        epoch, batch, batch, total,
-                        float(batch)/total * 100.,
-                        loss.data[0],
-                        round(t0 - start, 5),
-                        round(t1 - t0, 5),
-                        round(end - t1, 5)
-                    )
-
-        print "\n Total loss of the trainset ", tot_loss.data[0]
-
-
-
-def parse(sentence, pos=None):
-    indices = p.get_idx(sentence)
-    if args.cuda:
-        sen = Variable(indices).cuda()
-    else:
-        sen = Variable(indices)
-
-    return model.parse(sentence, sen, pos)
-
-def tag_tree(tree, l):
-    if tree.height() == 2:
-        # is leaf
-        l.append(p.nt2idx[tree.label()])
-        return l
-    else:
-        for subtree in tree:
-            l = tag_tree(subtree, l)
-        return l
-
-def tag(tree):
-    return tag_tree(tree, [])
-
-def test():
-    # parsing
-    start = time.time()
-    instances = ptb("dev", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
-    test = list(instances)
-    cumul_accuracy = 0
-    num_trees_with_parse = 0
-    total = 0
-    pos_correct = 0
-    pos_total = 0
-    for (sentence, gold_tree) in test:
-        total += 1
-        pos_total = len(sentence.split())
-        pos = tag(gold_tree)
-        parse_string = parse(sentence, pos)
-        pos_correct = model.pos_correct
-        #print parse_string
-        if parse_string != "":
-            parse_tree = Tree.fromstring(parse_string)
-            tree_accruacy = evalb.evalb(
-                oneline(unbinarize(gold_tree)),
-                unbinarize(parse_tree)
-            )
-            cumul_accuracy += tree_accruacy
-            num_trees_with_parse += 1
-            if tree_accruacy < 0.7:            
-                print "Parsing accuracy: ", tree_accruacy
-                print "Tagging accuracy: (%d / %d) " % (pos_correct, pos_total)
-                #print [p.idx2nt[x] for x in model.pos]
-                print parse_tree.pretty_print()
-                print gold_tree.pretty_print()
-
-                print "-"*80
-        else:
-            print "No parse!"
-
-    end = time.time()
-    print "Parsing takes %.4f secs\n" % round(end - start, 5)
-    print "Fraction of trees with parse = %.4f\n" % round(float(num_trees_with_parse) / total, 5)
-    accuracy = cumul_accuracy / num_trees_with_parse
-    print "Parsing accuracy = %.4f\n" % round(accuracy, 5)
-
-def is_digit(n):
-    try:
-        int(n)
-        return True
-    except ValueError:
-        return False
-
-def test_pl2r():
-
-    idx = 0
-    while True:
-        print "="*80
-        # get next training instances
-        idx = p.next(idx, args.batch_size)
-
-        # the parameters array
-        p_array = [
-            p.sens, p.pl2r_p, p.pl2r_l, p.pl2r_t, p.pl2r_pi, p.pl2r_ci
-        ]
-
-        # create PyTorch Variables
-        if args.cuda:
-            p_array = [(Variable(x)).cuda() for x in p_array]
-        else:
-            p_array = [Variable(x) for x in p_array]
-        sm = model.pl2r_test(p_array[0], p_array[1], p_array[2],
-            p_array[3], p_array[4], p_array[5])
-        for i in xrange(len(p.pl2r_p)):
-            if p.pl2r_p[i] == 11 and p.pl2r_t[i] == 10:
-                print "(", p.pl2r_p[i] , " ", p.pl2r_l[i], " ", p.pl2r_t[i], " @ ", p.pl2r_pi[i], ", ", p.pl2r_ci[i], ") = ", sm.data[i][p.pl2r_t[i]]
-                print sm.data[i][12]
-            if sm.data[i][p.pl2r_t[i]] < 0.9:
-                print "(", p.pl2r_p[i] , " ", p.pl2r_l[i], " ", p.pl2r_t[i], " @ ", p.pl2r_pi[i], ", ", p.pl2r_ci[i], ") = ", sm.data[i][p.pl2r_t[i]]
-        if idx == -1:
-            break
-
-def test_p2l():
-    idx = 0
-    total = 0
-    no = 0
-    while True:
-        print "="*80
-        # get next training instances
-        idx = p.next(idx, args.batch_size)
-
-        # the parameters array
-        p_array = [
-            p.sens, p.p2l, p.p2l_t, p.p2l_i
-        ]
-
-        # create PyTorch Variables
-        if args.cuda:
-            p_array = [(Variable(x)).cuda() for x in p_array]
-        else:
-            p_array = [Variable(x) for x in p_array]
-
-        sm = model.p2l_test(p_array[0], p_array[1], p_array[2], p_array[3])
-
-        for i in xrange(len(p.p2l)):
-            total += 1
-            if sm.data[i][p.p2l_t[i]] < 0.9:
-                no += 1
-                print "(", p.p2l[i] , " ", p.p2l_i[i] % 30 , " ", p.p2l_t[i] ,") = ", sm.data[i][p.p2l_t[i]]
-        if idx == -1:
-            print no / float(total)
-            break
-
-def test_unt():
-    idx = 0
-    total = 0
-    no = 0
-    while True:
-        print "="*80
-        # get next training instances
-        idx = p.next(idx, args.batch_size)
-
-        # the parameters array
-        p_array = [
-            p.sens, p.unt, p.unt_t, p.unt_i
-        ]
-
-        # create PyTorch Variables
-        if args.cuda:
-            p_array = [(Variable(x)).cuda() for x in p_array]
-        else:
-            p_array = [Variable(x) for x in p_array]
-
-        sm = model.unt_test(p_array[0], p_array[1], p_array[2], p_array[3])
-
-        for i in xrange(len(p.unt)):
-            total += 1
-            if sm.data[i][p.unt_t[i]] < 0.9:
-                no += 1
-                print "(", p.unt[i] , " ", p.unt_i[i] % 30 , " ", p.unt_t[i] ,") = ", sm.data[i][p.unt_t[i]]
-        if idx == -1:
-            print no / float(total)
-            break
-
-def test_ut():
-    idx = 0
-    total = 0
-    no = 0
-
-    while True:
-        print "="*80
-        # get next training instances
-        idx = p.next(idx, args.batch_size)
-
-        # the parameters array
-        p_array = [
-            p.sens, p.ut, p.ut_t, p.ut_i
-        ]
-
-        # create PyTorch Variables
-        if args.cuda:
-            p_array = [(Variable(x)).cuda() for x in p_array]
-        else:
-            p_array = [Variable(x) for x in p_array]
-
-        sm = model.ut_test(p_array[0], p_array[1], p_array[2], p_array[3])
-
-        for i in xrange(len(p.ut)):
-            total += 1
-            if sm.data[i][p.ut_t[i]] < 0.9:
-                no += 1
-                print "(", p.idx2nt[p.ut[i]] , " ", p.ut_i[i] % 30 , " ", p.idx2w[p.ut_t[i]] ,") = ", sm.data[i][p.ut_t[i]]
-        if idx == -1:
-            print no / float(total)
-            break
-
-def check_spv():
-    idx = 0
-    total = 0
-    no = 0
-
-    test_data = list(ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=10))
-
-    while True:
-        print unbinarize(test_data[idx][1]).pretty_print()
-        #print Tree.fromstring("(ROOT (S (@S (NP (NNP Ms.) (NNP Haag)) (VP (VBZ plays) (NP (NNP Elianti)))) (. .)))").pretty_print()
-        print "="*80
-        # get next training instances
-        idx = p.next(idx, args.batch_size)
-
-        p_array = [
-            p.sens,
-            p.B_A, p.B_B, p.B_C, p.B_BH, p.B_CH, p.B_Bi, p.B_Ci, 
-            p.C_A, p.C_B, p.C_C, p.C_BH, p.C_CH, p.C_Bi, p.C_Ci,
-            p.U, p.U_A, p.U_Ai, p.U_H
-        ]
-
-        # create PyTorch Variables
-        if args.cuda:
-            p_array = [(Variable(torch.LongTensor(x))).cuda() for x in p_array]
-        else:
-            p_array = [Variable(torch.LongTensor(x)) for x in p_array]
-
-        smatB, smC, smH, smB, smH1, smC1, smU = model.check(
-            p_array[0],
-            p_array[1], p_array[2], p_array[3], p_array[4], p_array[5], p_array[6], p_array[7], 
-            p_array[8], p_array[9], p_array[10], p_array[11], p_array[12], p_array[13], p_array[14], 
-            p_array[15], p_array[16], p_array[17], p_array[18])
-
-        total = no = 0
-        for i in xrange(len(p.C_A)):
-            total += 1
-            no += 1
-            B = p.C_B[i]
-            Bstr = p.idx2nt[B]
-
-            print "({} ({}) at {} -> {} ({})  {} ) = B {} H1 {} C1 {}".format(
-                p.idx2nt[p.C_A[i]],
-                p.idx2w[p.C_CH[i]],
-                p.C_Bi[i],
-                p.idx2nt[p.C_B[i]],
-                p.idx2w[p.C_BH[i]],
-                p.idx2nt[p.C_C[i]],
-                smB.data[i][p.C_B[i]],
-                smH1.data[i][p.C_BH[i]],
-                smC1.data[i][p.C_C[i]]
-            )
-
-        print no / float(total)
-
-        break
-
-def auto():
-
-    model.parse_setup()
-    test_data = list(ptb("dev", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=200))
-
-    # get model paramters
-    parameters = itertools.ifilter(
-        lambda x: x.requires_grad, model.parameters()
-    )
-
-    # define the optimizer to use; currently use Adam
-    optimizer = optim.Adam(
-        parameters, lr=args.learning_rate, weight_decay=args.l2_coef
-    )
-
-    total = p.trainset_length
-
-    template = "Epoch {} Batch {} [{}/{} ({:.1f}%)] NLL: {:.2f}" \
+    template = "Epch {} Bch {} [{}/{} ({:.1f}%)] NLL: {:.2f}" \
         + " Fwd: {:.2f} Bckwd: {:.2f} Opt: {:.2f}"
 
+    max_accuracy = 0
+
     for epoch in range(args.epochs):
-        p.shuffle()
+        dp.shuffle()
         idx = 0
         batch = 0
         tot_loss = 0
         while True:
-            model.h0 = (
-                Variable(torch.zeros(args.lstm_layer, args.batch_size, args.lstm_dim)),
-                Variable(torch.zeros(args.lstm_layer, args.batch_size, args.lstm_dim))
-            )
-            start = time.time()
-            # get next training instances
-            idx = p.next(idx, args.batch_size)
-
             batch += 1
             optimizer.zero_grad()
-            # the parameters array
-            p_array = [
-                p.sens,
-                p.B_A, p.B_B, p.B_C, p.B_BH, p.B_CH, p.B_Bi, p.B_Ci, 
-                p.C_A, p.C_B, p.C_C, p.C_BH, p.C_CH, p.C_Bi, p.C_Ci,
-                p.U, p.U_A, p.U_Ai, p.U_H
-            ]
+
+            start = time.time()
+            # get next training instances
+            idx, next_bch = dp.next(idx, args.batch_size)
 
             # create PyTorch Variables
             if args.cuda:
-                p_array = [(Variable(torch.LongTensor(x))).cuda() for x in p_array]
+                next_bch = [(Variable(torch.LongTensor(x))).cuda() for x in next_bch]
             else:
-                p_array = [Variable(torch.LongTensor(x)) for x in p_array]
+                next_bch = [Variable(torch.LongTensor(x)) for x in next_bch]
 
             # compute loss
-            loss = model('supervised', p_array)
+            loss = model('supervised', next_bch)
             tot_loss += loss
             # back propagation
             t0 = time.time()
@@ -800,68 +271,84 @@ def auto():
                             round(t1 - t0, 5),
                             round(end - t1, 5)
                         )
-        print "\n Average log prob of sentence ", tot_loss.data[0] / total
-        
-        cumul_accuracy = 0
-        num_sen = 0
-        model.h0 = (
-            Variable(torch.zeros(args.lstm_layer, 1, args.lstm_dim)),
-            Variable(torch.zeros(args.lstm_layer, 1, args.lstm_dim))
+
+        print " -- E[ NLL(sentence) ]={}".format(tot_loss.data[0] / total)
+
+        if epoch < 5:
+            continue
+
+        avg_accuracy = test()
+        model.init_h0()
+        if avg_accuracy > max_accuracy:
+            torch.save( {'state_dict': model.state_dict()}, file_save )
+
+    if args.verbose:
+        print "Finish supervised training"
+
+
+def parse(sentence):
+    sen = Variable( dp.get_idx(sentence) )
+
+    if args.cuda:
+        sen = sen.cuda()
+
+    return model.parse(sentence, sen)
+
+
+def test():
+    model.parse_setup()
+    test_data = list(ptb("dev", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100))
+    cumul_accuracy = 0
+    num_sen = 0
+
+    for (sentence, gold) in test_data:
+        if len(sentence.split()) > 15:
+            continue
+
+        num_sen += 1
+
+        parse_string = parse(sentence)
+
+        parse_tree = Tree.fromstring(parse_string)
+        tree_accruacy = evalb.evalb(
+            oneline(unbinarize(gold)),
+            unbinarize(parse_tree)
         )
-        for (sentence, gold) in test_data:
-            if len(sentence.split()) > 20:
-                continue
+        cumul_accuracy += tree_accruacy
+        print " Accuracy : ", tree_accruacy
+        print " GOLD \n",unbinarize(gold).pretty_print()
+        print " PARSE \n",unbinarize(parse_tree).pretty_print()
+        print " PARSE \n",parse_tree.pretty_print()
 
-            num_sen += 1
+    avg_accuracy = cumul_accuracy / float(num_sen)
+    print " # Sen: {} Accuracy: {}".format( num_sen, avg_accuracy )
+    return avg_accuracy
 
-            sen_idx = Variable(p.get_idx(sentence))
-            parse_string = model.parse(sentence, sen_idx)
-            parse_tree = Tree.fromstring(parse_string)
-            tree_accruacy = evalb.evalb(
-                oneline(unbinarize(gold)),
-                unbinarize(parse_tree)
-            )
-            cumul_accuracy += tree_accruacy
-            print " Accuracy : ", tree_accruacy
-            print " GOLD \n",unbinarize(gold).pretty_print()
-            print " PARSE \n",unbinarize(parse_tree).pretty_print()
-            print " PARSE \n",parse_tree.pretty_print()
 
-        print " # Sen: {} Accuracy: {}".format( num_sen, cumul_accuracy / float(num_sen) )
-
+def check_spv():
+    pass
 
 ## run the model
 if args.mode == 'spv_train':
-    if not args.headify:
-        supervised()
-    else:
-        head_supervised()
+    supervised()
+
 elif args.mode == 'uspv_train':
     unsupervised()
+
 elif args.mode == 'test':
-    if not args.headify:
-        model.parsing_setup()
-        test()
-    else:
-        head_test()
+    test()
+
 elif args.mode == 'parse':
     model.parsing_setup()
-    print "Please enter sentences to parse, one per newline (press \"Enter\" to quit):"
+    print "Enter sentence, one per line (press \"Enter\" to quit):"
     while True:
         sentence = raw_input()
         if sentence == "":
             break
         parse(sentence)
-elif args.mode == 'KLD':
-    #KLD()
-    #test_p2l()
-    #test_pl2r()
-    #test_ut()
-    test_unt()
+
 elif args.mode == 'check_spv':
     check_spv()
-elif args.mode == 'auto':
-    auto()
+
 else:
-    print "Cannot recognize the mode, allowed modes are: " \
-        "spv_train, uspv_train, parse, test"
+    print "Unknown mode!"
