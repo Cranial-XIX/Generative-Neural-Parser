@@ -121,6 +121,9 @@ class BS(nn.Module):
         self.UNARY = nll_U.view(-1).data
 
 
+    def parse_end(self):
+        pass
+
     def parse(self, sentence, sen_idx):
         t0 = time.time()
         self.sentence = sentence.split()
@@ -132,28 +135,25 @@ class BS(nn.Module):
         PP = []
         WW = []
 
-        print sen_idx
         for i in xrange(1,n+1):
-            idx = sen_idx[i]
+            idx = sen_idx[i].data[0]
             for U, A, PT in self.w_U[idx]:
                 PP.append(PT)
-                WW.append(WW)
+                WW.append(idx)
 
         PPv = self.nt_emb((Variable(torch.LongTensor(PP))).view(1,-1)).squeeze(0)
 
-
-        nll_T = -torch.sum(
-            self.lsm(
-                self.A2T(PPv)
-            ).gather(1, (Variable(torch.LongTensor(WW))).unsqueeze(1))
-        ).view(-1).data
+        nll_T = self.lsm(
+            self.A2T(PPv)
+        ).gather(1, (Variable(torch.LongTensor(WW).unsqueeze(1)))).view(-1).data
 
         index = -1
         for i in xrange(1,n+1):
-            idx = sen_idx[i]
+            idx = sen_idx[i].data[0]
             for U, A, PT in self.w_U[idx]:
                 index += 1
                 score = nll_T[index] + self.UNARY[self.AU[A, U]]
+
                 if score > self.betas[i-1,i,A,1]:
                     self.betas[i-1,i,A,1] = score
                     self.Bp[i-1,i,A] = -1
@@ -293,43 +293,32 @@ class LN(nn.Module):
     def __init__(self, args):
         super(LN, self).__init__()
 
-        self.verbose = args['verbose']
         self.use_cuda = args['cuda']
-
-        # terminals
-        self.nt = args['nt']               # number of terminals
-        self.dt = args['dt']               # dimension of terminals
-        self.dt = 100
-
-        # nonterminals
-        self.nnt = args['nnt']             # number of nonterminals
-        self.dnt = args['dnt']             # dimension of nonterminals
-        self.dnt = 30
+        dp = args['dp']                    # the data processor
 
         # model
-        self.lstm_coef = args['lstm_coef'] # coefficient of LSTM
         self.bsz = args['bsz']             # the batch size
         self.dhid = args['dhid']           # LSTM hidden dimension size
-
-        self.nunary = args['nunary']
         self.nlayers = args['nlayers']     # number of layers in neural net
-        self.lexicon = args['lexicon']     # dictionary for lexicon
-        self.parser = args['parser']       # the parser, written in Cython
 
-        # the precomputed matrix that will be used in unsupervised learning
-        self.h0 = (
-            Variable(torch.zeros(self.nlayers, self.bsz, self.dhid)),
-            Variable(torch.zeros(self.nlayers, self.bsz, self.dhid))
-        )
+        # terminals
+        self.nt = dp.nt                    # number of terminals
+        self.dt = dp.dt                    # dimension of terminals
 
-        if self.use_cuda:
-            # the initial states for h0 and c0 of LSTM
-            self.h0 = (
-                Variable(torch.zeros(self.nlayers, self.bsz, self.dhid).cuda()),
-                Variable(torch.zeros(self.nlayers, self.bsz, self.dhid).cuda())
-            )
-            # initialize precomputed matrix
+        # nonterminals
+        self.nnt = dp.nnt                  # number of nonterminals
+        self.dnt = dp.dnt                  # dimension of nonterminals
 
+        self.nunary = dp.nunary            # details please look at processor.py
+        self.prefix = dp.unary_prefix
+        self.suffix = dp.unary_suffix
+
+        self.B_AC = dp.B_AC
+        self.B_A = dp.unary
+        self.w_U = dp.w_U
+        self.idx2nt = dp.idx2nt
+
+        self.init_h0()
         self.h0[0].requires_grad = False
         self.h0[1].requires_grad = False
 
@@ -344,80 +333,337 @@ class LN(nn.Module):
             batch_first=True, bias=True, dropout=0.6
         )
 
-        dp2l = dunt = dut = self.dnt + self.dhid
-        dpl2r = 2 * (self.dnt + self.dhid)
+        init = 0.01
+
+        self.LSTM.weight_ih_l0.data.uniform_(-init, init)
+        self.LSTM.weight_hh_l0.data.uniform_(-init, init)
+
+        self.LSTM.weight_ih_l1.data.uniform_(-init, init)
+        self.LSTM.weight_hh_l1.data.uniform_(-init, init)
+
+        #self.LSTM.weight_ih_l2.data.uniform_(-init, init)  
+        #self.LSTM.weight_hh_l2.data.uniform_(-init, init)
 
         self.lsm = nn.LogSoftmax()
         self.sm = nn.Softmax()
         self.relu = nn.ReLU()
 
-        zeta = 0.7
+        B_in = self.dnt + self.dhid
+        B_out = self.nnt
 
-        hp2l = int(zeta * dp2l + (1-zeta) * self.nnt)
-        hpl2r = int(zeta * dpl2r + (1-zeta) * self.nnt)
-        hunt = int(zeta * dunt + (1-zeta) * self.nunary)
+        C_in = self.dnt * 2 + self.dhid * 2
+        C_out = self.nnt
 
-        # parent to left
-        self.p2l = nn.Linear(dp2l, hp2l)
-        self.p2l_out = nn.Linear(hp2l, self.nnt)
-        # parent left to right
-        self.pl2r = nn.Linear(dpl2r, hpl2r)
-        self.pl2r_out = nn.Linear(hpl2r, self.nnt)
-        # unary nonterminal
-        self.unt = nn.Linear(dunt, hunt)
-        self.unt_out = nn.Linear(hunt, self.nunary)
-        # unary terminal
-        self.ut = nn.Linear(dut, 200)
-        self.ut_out = nn.Linear(200, self.nt)
-        self.init_weights(args['initrange'], args['word_emb'], args['nt_emb'])
+        U_in = self.dnt + self.dhid
+        U_out = self.nunary
 
-    def init_weights(self, initrange, word_emb, nt_emb):
-        #self.word_emb.weight.data = word_emb
-        #self.nt_emb.weight.data = nt_emb
-        #self.word_emb.weight.requires_grad = False
-        #self.nt_emb.weight.requires_grad = False
+        T_in = self.dnt + self.dhid
+        T_out = self.nt
 
-        # Below are initial setup for LSTM
-        lstm_weight_range = 0.01
+        zeta = 0.6
+        d_B = int( zeta * B_out + (1-zeta) * B_in )
+        d_C = int( zeta * C_out + (1-zeta) * C_in )
+        d_U = int( zeta * U_out + (1-zeta) * U_in )
+        d_T = int( T_in )
 
-        self.LSTM.weight_ih_l0.data.uniform_(-lstm_weight_range, lstm_weight_range)
-        self.LSTM.weight_hh_l0.data.uniform_(-lstm_weight_range, lstm_weight_range)
+        self.B_h1 = nn.Linear(B_in, d_B)
+        self.B_h2 = nn.Linear(d_B, B_out)
+        self.B_h1.weight.data.uniform_(-init, init)
+        self.B_h2.weight.data.uniform_(-init, init)
 
-        self.LSTM.weight_ih_l1.data.uniform_(-lstm_weight_range, lstm_weight_range)
-        self.LSTM.weight_hh_l1.data.uniform_(-lstm_weight_range, lstm_weight_range)
+        self.C_h1 = nn.Linear(C_in, d_C)
+        self.C_h2 = nn.Linear(d_C, C_out)
+        self.C_h1.weight.data.uniform_(-init, init)
+        self.C_h2.weight.data.uniform_(-init, init)
 
-        self.LSTM.weight_ih_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)  
-        self.LSTM.weight_hh_l2.data.uniform_(-lstm_weight_range, lstm_weight_range)
+        self.U_h1 = nn.Linear(U_in, d_U)
+        self.U_h2 = nn.Linear(d_U, U_out)
+        self.U_h1.weight.data.uniform_(-init, init)
+        self.U_h2.weight.data.uniform_(-init, init)
 
-        size = len(self.LSTM.bias_ih_l0)
-        section = size / 4
-        for i in xrange(section, 2*section):
-            self.LSTM.bias_ih_l0.data[i] = 1.0
-            self.LSTM.bias_hh_l0.data[i] = 1.0
+        self.T_h1 = nn.Linear(T_in, d_T)
+        self.T_h2 = nn.Linear(d_T, T_out)
+        self.T_h1.weight.data.uniform_(-init, init)
+        self.T_h2.weight.data.uniform_(-init, init)
 
-            self.LSTM.bias_ih_l1.data[i] = 1.0
-            self.LSTM.bias_hh_l1.data[i] = 1.0
 
-            self.LSTM.bias_ih_l2.data[i] = 1.0
-            self.LSTM.bias_hh_l2.data[i] = 1.0
+    def init_h0(self, bsz=None):
+        if bsz == None:
+            bsz = self.bsz
+        # the initial h for the LSTM
+        if self.use_cuda:
+            # the initial states for h0 and c0 of LSTM
+            self.h0 = (
+                Variable(torch.zeros(self.nlayers, bsz, self.dhid).cuda()),
+                Variable(torch.zeros(self.nlayers, bsz, self.dhid).cuda())
+            )
+        else:
+            self.h0 = (
+                Variable(torch.zeros(self.nlayers, bsz, self.dhid)),
+                Variable(torch.zeros(self.nlayers, bsz, self.dhid))
+            )
 
-        self.p2l.bias.data.fill_(0)
-        self.p2l_out.bias.data.fill_(0)
-        #self.p2l.weight.data.uniform_(-initrange, initrange)
 
-        self.pl2r.bias.data.fill_(0)
-        #self.pl2r.weight.data.uniform_(-initrange, initrange)
+    def parse_setup(self):
+        n = 30
+        self.init_h0(1)
+        self.betas = np.empty((n, n+1, self.nnt, 2))
+        self.Bp = np.zeros((n,n+1,self.nnt), dtype=np.int8)
+        self.Cp = np.zeros((n,n+1,self.nnt), dtype=int)
+        self.jp = np.zeros((n,n+1,self.nnt), dtype=np.int8)
+        self.H = np.zeros((n,n+1,self.nnt), dtype=int)
 
-        self.pl2r_out.bias.data.fill_(0)
-        #self.pl2r_out.weight.data.uniform_(-initrange, initrange)
 
-        self.unt.bias.data.fill_(0)
-        self.unt_out.bias.data.fill_(0)
-        #self.unt.weight.data.uniform_(-initrange, initrange)
+    def parse_end(self):
+        self.init_h0()
 
-        self.ut.bias.data.fill_(0)
-        self.ut_out.bias.data.fill_(0)
-        #self.ut.weight.data.uniform_(-initrange, initrange)
+
+    def pre_parse(self, sen_idx):
+        t0 = time.time()
+        V = self.word_emb(sen_idx)
+        alpha, _ = self.LSTM(V.unsqueeze(0), self.h0)
+        alpha = alpha.squeeze(0)
+        sen_idx = sen_idx.data[1:]
+        self.N = len(sen_idx)
+
+        self.betas.fill(0)
+
+        self.lex = {}
+        self.p2l = {}
+        self.pl2r = {}
+        self.p2u = {}
+        lex_i = -1
+        p2l_i = -1
+        pl2r_i = -1
+        p2u_i = -1
+
+        P_P = []
+        P_i = []
+        U_A = []
+        U_i = []
+        B_A = []
+        B_i = []
+        C_A = []
+        C_B = []
+        C_i = []
+        C_j = []
+
+        for i in xrange(self.N):
+            idx = sen_idx[i]
+            for U, A, P in self.w_U[idx]:
+                tpl1 = (i, P)
+                if tpl1 not in self.lex:
+                    lex_i += 1
+                    self.lex[tpl1] = lex_i
+                    P_P.append(P)
+                    P_i.append(i)
+                tpl2 = (i, A)
+                if tpl2 not in self.p2u:
+                    p2u_i += 1
+                    self.p2u[tpl2] = p2u_i
+                    U_A.append(A)
+                    U_i.append(i)
+                self.betas[i,i+1,A,1] = 1
+
+        for w in xrange(2, self.N+1):
+            for i in xrange(self.N-w+1):
+                k = i + w
+                for j in xrange(i+1, k):
+                    for B in self.B_AC:
+                        Bs = self.betas[i,j,B,1]
+                        if Bs == 0:
+                            continue
+                        for A, C in self.B_AC[B]:
+                            Cs = self.betas[j,k,C,1]
+                            if Cs == 0:
+                                continue
+                            tpl1 = (i, A)
+                            tpl2 = (i, j, A, B)
+                            if tpl1 not in self.p2l:
+                                p2l_i += 1
+                                self.p2l[tpl1] = p2l_i
+                                B_A.append(A)
+                                B_i.append(i)
+                            
+                            if tpl2 not in self.pl2r:
+                                pl2r_i += 1
+                                self.pl2r[tpl2] = pl2r_i
+                                C_A.append(A)
+                                C_B.append(B)
+                                C_i.append(i)
+                                C_j.append(j)
+
+                            self.betas[i,k,A,0] = 1
+
+            for i in xrange(self.N-w+1):
+                k = i + w
+                for A in xrange(self.nnt):
+                    As = self.betas[i,k,A,0]
+                    if As > 0:
+                        self.betas[i,k,A,1] = As
+
+            for i in xrange(self.N-w+1):
+                k = i + w
+                for B in self.B_A:
+                    Bs = self.betas[i,k,B,0]
+                    if Bs == 0:
+                        continue
+                    for U, A in self.B_A[B]:
+                        tpl = (i, A)
+                        if tpl not in self.p2u:
+                            p2u_i += 1
+                            self.p2u[tpl] = p2u_i
+                            U_A.append(A)
+                            U_i.append(i)
+                        self.betas[i,k,A,1] = 1
+
+        PP = self.nt_emb(Variable(torch.LongTensor(P_P)))
+        PI = torch.index_select(alpha, 0, Variable(torch.LongTensor(P_i)))
+
+        UA = self.nt_emb(Variable(torch.LongTensor(U_A)))
+        UI = torch.index_select(alpha, 0, Variable(torch.LongTensor(U_i)))
+
+        BA = self.nt_emb(Variable(torch.LongTensor(B_A)))
+        BI = torch.index_select(alpha, 0, Variable(torch.LongTensor(B_i)))
+
+        CA = self.nt_emb(Variable(torch.LongTensor(C_A)))
+        CB = self.nt_emb(Variable(torch.LongTensor(C_B)))
+        CI = torch.index_select(alpha, 0, Variable(torch.LongTensor(C_i)))
+        CJ = torch.index_select(alpha, 0, Variable(torch.LongTensor(C_j)))
+
+        self.BB = self.lsm(
+            self.B_h2(
+                self.relu(
+                    self.B_h1(
+                        torch.cat( (BA, BI), 1 )
+                    )
+                )
+            )
+        ).data
+
+        self.CC = self.lsm(
+            self.C_h2(
+                self.relu(
+                    self.C_h1(
+                        torch.cat( (CA, CB, CI, CJ-CI), 1 )
+                    )
+                )
+            )
+        ).data
+
+        self.UU = self.lsm(
+            self.U_h2(
+                self.relu(
+                    self.U_h1(
+                        torch.cat( (UA, UI), 1 )
+                    )
+                )
+            )
+        ).data
+
+        self.TT = self.lsm(
+            self.T_h2(
+                self.relu(
+                    self.T_h1(
+                        torch.cat( (PP, PI), 1 )
+                    )
+                )
+            )
+        ).data
+
+    def parse(self, sentence, sen_idx):
+
+        self.sentence = sentence.split()
+        
+        self.pre_parse(sen_idx)
+        sen_idx = sen_idx.data[1:]
+
+        ZERO = -10000
+        self.betas.fill(ZERO)
+
+        for i in xrange(self.N):
+            idx = sen_idx[i]
+            for U, A, PT in self.w_U[idx]:
+                score = self.TT[self.lex[(i, PT)]][idx] + self.UU[self.p2u[(i, A)]][U]
+
+                if score > self.betas[i,i+1,A,1]:
+                    self.betas[i,i+1,A,1] = score
+                    self.Bp[i,i+1,A] = -1
+                    self.Cp[i,i+1,A] = U
+
+        t1 = time.time()
+        #print " From start to initialization : ", t1 - t0
+
+        '''
+        For the CKY algorithm, for each layer of spans of certain width,
+        we collect all we need to compute, then we compute them all to save
+        time. Also, by doing this, we reduce the computation for next layer above
+        if we are sure certain spans are not possible (in viterbi algorithm, this saves
+        time)
+        '''
+        for w in xrange(2, self.N+1):
+            for i in xrange(self.N-w+1):
+                k = i + w
+                for j in xrange(i+1, k):
+                    for B in self.B_AC:
+                        Bs = self.betas[i,j,B,1]
+                        if Bs == ZERO:
+                            continue
+                        for A, C in self.B_AC[B]:
+                            Cs = self.betas[j,k,C,1]
+                            if Cs == ZERO:
+                                continue
+                            score = self.BB[self.p2l[(i,A)]][B] \
+                                +self.CC[self.pl2r[(i,j,A,B)]][C] + Bs + Cs
+                            if score > self.betas[i,k,A,0]:
+                                # print "Binary: ({}, {}, {}) {} ({})-> {} {} ({}) = {}".format(i,j,k, self.idx2nt[A], Bh, self.idx2nt[B], self.idx2nt[C], Ch, ikAB)
+                                self.betas[i,k,A,0] = score
+                                self.Bp[i,k,A] = B
+                                self.Cp[i,k,A] = C
+                                self.jp[i,k,A] = j
+
+            for i in xrange(self.N-w+1):
+                k = i + w
+                for A in xrange(self.nnt):
+                    As = self.betas[i,k,A,0]
+                    if As > ZERO:
+                        self.betas[i,k,A,1] = As
+
+            for i in xrange(self.N-w+1):
+                k = i + w
+                for B in self.B_A:
+                    Bs = self.betas[i,k,B,0]
+                    if Bs == ZERO:
+                        continue
+                    for U, A in self.B_A[B]:
+                        score = self.UU[self.p2u[(i, A)]][U] + Bs
+                        if score > self.betas[i,k,A,1]:
+                            self.betas[i,k,A,1] = score
+                            self.Bp[i,k,A] = B
+                            self.Cp[i,k,A] = U
+                            self.jp[i,k,A] = -1
+
+        return self.print_parse(0, self.N, 1)
+
+
+    def print_parse(self, i, k, A):
+
+        B = self.Bp[i,k,A]
+        C = self.Cp[i,k,A]
+        j = self.jp[i,k,A]
+
+        if B == -1:
+            # is terminal rule
+            return self.prefix[C] + " " + self.sentence[i] + self.suffix[C]
+        elif j == -1:
+            # unary rule
+            return self.prefix[C] + self.print_parse(i, k, B) + self.suffix[C]
+        else:
+            # binary rule
+            #print i, j, k, self.idx2nt[A], self.idx2nt[B], self.idx2nt[C]
+            return  "(" + self.idx2nt[A] + " " \
+                + self.print_parse(i, j, B) + " " \
+                + self.print_parse(j, k, C) + ")"        
 
     def forward(self, train_type, args):
         if train_type == 'supervised':
@@ -428,260 +674,74 @@ class LN(nn.Module):
             print "Unrecognized train type!"
             return
 
-    def parsing_setup(self):
-        # since for lexicon, Pr(x | P) = logsoftmax(A(Wx + b)). We
-        # precompute AW (as ut_w) and Ab (as ut_b) here to speed up the computation
-        #w2v_w = self.word_emb.weight
-        #self.ut_w = w2v_w.mm(self.ut.weight).t()
-        #self.ut_b = w2v_w.mm(self.ut.bias.view(-1, 1)).t()
-        self.precomputed = self.nt_emb.weight
-
-    def parse(self, sentence, sen, pos=None, viterbi=True):
-        # sen is a torch.LongTensor object, containing fake BOS index
-        # along with indices of the words
-
-        t0 = time.time()
-        self.pos_correct = 0
-        # get left context hidden units with a trained h0 (start hidden state)
-        output, hidden = self.LSTM(self.word_emb(sen.view(1,-1)), self.h0)
-        # get rid of the initial BOS symbol, since you need fake BOS 
-        # to make sure everyone gets their cup of left context
-        sen = sen.data[1:]
-        n = len(sen)
-        # truncate the last left context out, since we need to ensure the
-        # matrix is of length n
-        # * output (batch_size * sen_length * hidden dimension)
-        output = output.narrow(1, 0, n)
-
-        softmax = self.lsm if viterbi else self.sm
-
-        ## pre-compute all probabilities
-
-        # with context probabilities
-        # * unt_i (num_nt * sen_length * parent_emb_size)
-        cond = torch.cat((
-            self.precomputed.unsqueeze(1).repeat(1, n, 1),
-            output.repeat(self.nnt, 1, 1) # (num_nt * sen_length * hidden dimension)
-        ), 2)
-
-        sz = cond.size()
-
-        # parent to unary child
-        # * unt_pr (num_nt * sen_length * num_nt) -> (parent, position i, child)
-        unt_pr = softmax(
-            self.unt_out(
-                self.relu(
-                    self.unt(
-                        cond.view(-1, sz[2])
-                    )
-                )
-            )
-        ).view(sz[0], sz[1], -1)
-
-        p2l_pr = softmax(
-            self.p2l_out(
-                self.relu(
-                    self.p2l(
-                        cond.view(-1, sz[2])
-                    )
-                )
-            )
-        ).view(sz[0], sz[1], -1)
-
-        output = output.view(n, -1)
-        if viterbi:
-            preterminal = np.empty((n, self.nnt), dtype=np.float32)
-            preterminal.fill(-1000000)
-        else:
-            preterminal = np.zeros((n, self.nnt), dtype=np.float32)
-
-        U_TM = 0
-
-        t1= time.time()
-
-        self.pos = []
-        # append one level preterminal symbols
-
-        for i in xrange(n):
-            c = sen[i]
-            max = -1000000
-            idx = -1
-            for p in self.lexicon[c]:
-                pi = Variable(torch.LongTensor([p]))
-                h = output[i].view(1, -1)
-                if self.use_cuda:
-                    pi = pi.cuda()
-                    h = h.cuda()
-                cond = torch.cat((self.nt_emb(pi), h), 1)
-                #res = cond.mm(self.ut_w) + self.ut_b
-                res = self.ut_out(self.relu(self.ut(cond)))
-
-                x = (softmax(self.p2l(cond))[0][U_TM] + softmax(res)[0][c]).data[0]
-                if x > max:
-                    idx = p
-                    max = x
-                preterminal[i,p] = x
-            if idx == pos[i]:
-                self.pos_correct += 1
-            self.pos.append(idx)
-
-        '''
-        for i in xrange(n):
-            c = sen[i]
-            p = pos[i]
-            pi = Variable(torch.LongTensor([p]))
-            h = output[i].view(1, -1)
-            if self.use_cuda:
-                pi = pi.cuda()
-                h = h.cuda()
-            cond = torch.cat((self.nt_emb(pi), h), 1)
-            #res = cond.mm(self.ut_w) + self.ut_b
-            res = self.ut_out(self.relu(self.ut(cond)))
-
-            preterminal[i,p] = (softmax(self.p2l(cond))[0][U_TM] + softmax(res)[0][c]).data[0]
-        '''
-        t2 = time.time()
-        # preprocess
-        pl2r_p, pl2r_l, pl2r_pi, pl2r_ci = self.parser.preprocess(n, preterminal)
-
-        pl2r_p = Variable(torch.LongTensor(pl2r_p))
-        pl2r_l = Variable(torch.LongTensor(pl2r_l))
-        pl2r_pi = Variable(torch.LongTensor(pl2r_pi))
-        pl2r_ci = Variable(torch.LongTensor(pl2r_ci))
-
-        if self.use_cuda:
-            pl2r_p = pl2r_p.cuda()
-            pl2r_l = pl2r_l.cuda()
-            pl2r_pi = pl2r_pi.cuda()
-            pl2r_ci = pl2r_ci.cuda()
-
-        t3 = time.time()
-
-        parent_lc = torch.index_select(output, 0, pl2r_pi)
-        sibling_lc = torch.index_select(output, 0, pl2r_ci)
-        pl2r_cond = torch.cat((
-            self.nt_emb(pl2r_p),
-            self.nt_emb(pl2r_l),
-            parent_lc,
-            sibling_lc - parent_lc
-        ), 1)
-
-        # compute the log probability of pl2r rules
-        pl2r_pr = softmax(
-            self.pl2r_out(
-                self.relu(
-                    self.pl2r(
-                        pl2r_cond
-                    )
-                )
-            )
-        )
-
-        t4 = time.time()
-        #print " - "*10, t4-t3, t3-t2, t2-t1, t1-t0
-        if self.use_cuda:
-            if viterbi:
-                return self.parser.viterbi(
-                        sentence,
-                        preterminal,
-                        unt_pr.self.Cpu().data.numpy(),
-                        p2l_pr.self.Cpu().data.numpy(),
-                        pl2r_pr.self.Cpu().data.numpy()
-                )
-            else:
-                return self.parser.mbr(
-                        sentence,
-                        preterminal,
-                        unt_pr.self.Cpu().data.numpy(),
-                        p2l_pr.self.Cpu().data.numpy(),
-                        pl2r_pr.self.Cpu().data.numpy()
-                )
-        else:
-            if viterbi:
-                return self.parser.viterbi(
-                        sentence,
-                        preterminal,
-                        unt_pr.data.numpy(),
-                        p2l_pr.data.numpy(),
-                        pl2r_pr.data.numpy()
-                )
-            else:
-                return self.parser.mbr(
-                    sentence,
-                    preterminal,
-                    unt_pr.data.numpy(),
-                    p2l_pr.data.numpy(),
-                    pl2r_pr.data.numpy()
-                )               
-
-
     def supervised(self, sens,
-        p2l, pl2r_p, pl2r_l, unt, ut,
-        p2l_t, pl2r_t, unt_t, ut_t,
-        p2l_i, pl2r_pi, pl2r_ci, unt_i, ut_i):
+        BI, CI, AA, BB, CC, 
+        UI, U, U_A, 
+        TI, T, T_A):
 
         # run the LSTM to extract features from left context
-        output, hidden = self.LSTM(self.word_emb(sens), self.h0)
-        output = self.lstm_coef * output.contiguous().view(-1, output.size(2))
+        output, _ = self.LSTM(self.word_emb(sens), self.h0)
+        output = output.contiguous().view(-1, output.size(2))
 
-        # compute the log probability of p2l rules
+        BIv = torch.index_select(output, 0, BI)
+        CIv = torch.index_select(output, 0, CI)
+        UIv = torch.index_select(output, 0, UI)
+        TIv = torch.index_select(output, 0, TI)
 
-        p2l_cond = torch.cat((
-            self.nt_emb(p2l), 
-            torch.index_select(output, 0, p2l_i)
-        ), 1)
+        AAv = self.nt_emb(AA)
+        BBv = self.nt_emb(BB)
+        U_Av = self.nt_emb(U_A)
+        T_Av = self.nt_emb(T_A)
 
-        nll_p2l = -torch.sum(
-            self.lsm(self.p2l_out(self.relu(self.p2l(p2l_cond)))).gather(1, p2l_t.unsqueeze(1))
-        )
-
-        # compute the log probability of unary nonterminal rules
-        unt_cond = torch.cat((
-            self.nt_emb(unt), 
-            torch.index_select(output, 0, unt_i)
-        ), 1)
-
-        nll_unt = -torch.sum(
-            self.lsm(self.unt_out(self.relu(self.unt(unt_cond)))).gather(1, unt_t.unsqueeze(1))
-        )
-
-        # compute the log probability of terminal rules
-
-        ut_cond = torch.cat((
-            self.nt_emb(ut),
-            torch.index_select(output, 0, ut_i)
-        ), 1)
-
-        #m_ut = self.ut(ut_cond).mm(self.word_emb.weight.t())
-        nll_ut = -torch.sum(
+        nll_B = -torch.sum(
             self.lsm(
-                self.ut_out(self.relu(self.ut(ut_cond)))
-            ).gather(1, ut_t.unsqueeze(1))
-        )
-
-
-        # compute the log probability of pl2r rules
-        parent_lc = torch.index_select(output, 0, pl2r_pi)
-        sibling_lc = torch.index_select(output, 0, pl2r_ci)
-        pl2r_cond = torch.cat((
-            self.nt_emb(pl2r_p),
-            self.nt_emb(pl2r_l),
-            parent_lc,
-            sibling_lc - parent_lc
-        ), 1)
-
-        # pass to a single layer neural net for nonlinearity
-        nll_pl2r = -torch.sum(
-            self.lsm(
-                self.pl2r_out(
+                self.B_h2(
                     self.relu(
-                        self.pl2r(pl2r_cond)
+                        self.B_h1(
+                            torch.cat( (AAv, BIv), 1 )
+                        )
                     )
                 )
-            ).gather(1, pl2r_t.unsqueeze(1))
+            ).gather(1, BB.unsqueeze(1))
         )
 
-        return nll_p2l + nll_pl2r + nll_unt + nll_ut
+        nll_C = -torch.sum(
+            self.lsm(
+                self.C_h2(
+                    self.relu(
+                        self.C_h1(
+                            torch.cat( (AAv, BBv, BIv, CIv-BIv), 1 )
+                        )
+                    )
+                )
+            ).gather(1, CC.unsqueeze(1))
+        )
+
+        nll_U = -torch.sum(
+            self.lsm(
+                self.U_h2(
+                    self.relu(
+                        self.U_h1(
+                            torch.cat( (U_Av, UIv), 1 )
+                        )
+                    )
+                )
+            ).gather(1, U.unsqueeze(1))
+        )
+
+        nll_T = -torch.sum(
+            self.lsm(
+                self.T_h2(
+                    self.relu(
+                        self.T_h1(
+                            torch.cat( (T_Av, TIv), 1 )
+                        )
+                    )
+                )
+            ).gather(1, T.unsqueeze(1))
+        )
+
+        return nll_B + nll_C + nll_U + nll_T
 
 """
 The model with (B)ilexical information, (L)eft context LSTM features,
@@ -830,6 +890,9 @@ class BLN(nn.Module):
         self.Cp = np.zeros((n,n+1,self.nnt), dtype=int)
         self.jp = np.zeros((n,n+1,self.nnt), dtype=np.int8)
         self.H = np.zeros((n,n+1,self.nnt), dtype=int)
+
+    def parse_end(self):
+        self.init_h0()
 
     def parse(self, sentence, sen_idx):
         t0 = time.time()

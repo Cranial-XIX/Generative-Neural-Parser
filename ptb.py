@@ -159,7 +159,7 @@ def ptb(names='train', n=None, maxlength=None, minlength=None):
         for t0 in d.load_fold(getattr(d, name)):
             b = preprocess(t0)
             s = b.leaves()
-            # Note: we run `preproces` before checking length because it often
+            # Note: we run `preprocess` before checking length because it often
             # change the length of the sentence by deleting trace nodes.
             if minlength <= len(s) <= maxlength:
                 yield (' '.join(s), b)

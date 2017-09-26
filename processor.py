@@ -410,16 +410,16 @@ class Processor(object):
 
                     if idx not in self.w_U:
                         self.w_U[idx] = [tpl]
-                    else:
+                    elif tpl not in self.w_U[idx]:
                         self.w_U[idx].append(tpl)
 
                 if not headC == None:
                     tpl = (self.idx2u.index(C_unary_chain), C_unary_chain[-1], C_unary_chain[1])
-
                     idx = self.get_word_idx(headC)
+
                     if idx not in self.w_U:
                         self.w_U[idx] = [tpl]
-                    else:
+                    elif tpl not in self.w_U[idx]:
                         self.w_U[idx].append(tpl)
 
                 return None, [A]
@@ -454,6 +454,7 @@ class Processor(object):
             sen_i[i] = self.get_word_idx(word)
         return sen_i
 
+
     def make_trainset(self):
         '''
         Making the trainset. In other word, we create a more compact and
@@ -464,7 +465,7 @@ class Processor(object):
         begin_time = time.time()
 
         train_trees = list(
-            ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=2000)
+            ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=6000)
         )
 
         f = open(self.train_file, 'w')
@@ -866,7 +867,225 @@ The (P)rocessor of the model with (L)eft context LSTM features and (N)eural netw
 class PLN(Processor):
 
     def __init__(self, *args):
-        Processor.__init__(self, args)
+        super(PLN, self).__init__(*args)
+
+
+    def encode_tree(self, tree):
+        '''
+        Encode a tree to a convenient and simply representation.
+        @return dict   The dictionary of binary, unary rules and sentence terminal
+                       indices in the tree.
+        '''
+        self.binary_list = []   # list of binary rules in the tree
+        self.unary_list = []    # list of unary rules in the tree
+        self.terminal_list = [] # list of terminals (the sentence)
+
+        self.wi = -1
+
+        Ai, A, chain = self.traverse_tree(tree)
+
+        # append the ROOT -> * unary rule
+        self.unary_list.append(
+            ( Ai, A, self.idx2u.index(chain) )
+        )
+
+        '''
+        # DEBUG
+        print tree.pretty_print()
+        for Bi, Ci, A, B, C in self.binary_list:
+            print "{} -> ({}){} ({}){}".format(
+                self.idx2nt[A], Bi, self.idx2nt[B], Ci, self.idx2nt[C]
+            )
+
+        print ""
+
+        for Bi, B, u in self.unary_list:
+            print Bi, self.idx2nt[B], [self.idx2nt[x] for x in self.idx2u[u]]
+        '''
+
+        return {"b": self.binary_list, "u": self.unary_list, "s": self.terminal_list}
+
+
+    def traverse_tree(self, tree):
+        '''
+        Traverse the tree to get the desired list of binary and unary rules.
+        @return nonterminal, unary_chain
+        '''
+
+        label = tree.label() # the current nonterminal label
+
+        '''
+        Let me give an example a binarized parse tree:
+                             S
+                             |
+                        -----------
+                        |         |
+                        @S        |
+                        |         |
+                  -----------     .
+                  |         |
+                 NNP        VP
+                            |
+                          ------
+                          |    |
+                          V    NP
+
+        Notice that except for the model with bilexical info (head binarization),
+        we always do left binarization.
+        '''
+
+        A = self.nt2idx[label]
+
+        if tree.height() == 2:
+            # is leaf
+            word = tree.leaves()[0]
+            idx = self.get_word_idx(word)
+            self.wi += 1
+            self.terminal_list.append( (self.wi, A, idx) )
+
+            return self.wi, A, [0, A]
+
+        else:
+            nchild = 0
+            # a binary rule A -> B C or unary rule A -> B
+            for subtree in tree:
+
+                if nchild == 0:
+                    Bi, B, B_unary = self.traverse_tree(subtree)
+                else:
+                    Ci, C, C_unary = self.traverse_tree(subtree)
+
+                nchild += 1
+
+            if nchild == 1:
+                # unary rule
+                B_unary.append(A)
+                return Bi, A, B_unary
+
+            else:
+                # binary rule
+
+                if len(B_unary) > 1:
+                    self.unary_list.append(
+                        ( Bi, B, self.idx2u.index(B_unary) )
+                    )
+
+                if len(C_unary) > 1:
+                    self.unary_list.append(
+                        ( Ci, C, self.idx2u.index(C_unary) )
+                    )
+
+                self.binary_list.append(
+                    (Bi, Ci, A, B, C)
+                )
+
+                if B not in self.B_AC:
+                    self.B_AC[B] = []
+                tpl = (A, C)
+                if tpl not in self.B_AC[B]:
+                    self.B_AC[B].append(tpl)
+
+                return Bi, A, [A]
+
+
+    #####################################################################################
+    def next(self, idx, bsz=None):
+        '''
+        this function extract the next batch of training instances
+        and save them for later use
+        '''
+        if bsz == None:
+            ## unsupervised
+            print "Not implemented yet"
+
+        else:
+            ## supervised
+            # bsz is batch size, the number of sentences we process each time
+            # the maximum number of training instances in a batch
+            m = constants.MAX_SEN_LENGTH
+            self.sens = torch.LongTensor(bsz, m).fill_(0)
+
+            # P( A -> B C ) = P( B | A ) * P ( C | A, B )
+            self.AA = []
+            self.BB = []
+            self.CC = []
+            self.BI = []
+            self.CI = []
+
+            # P( unary | A )
+            self.U = []
+            self.U_A = []
+            self.UI = []
+
+            # P( word | A )
+            self.T = []
+            self.T_A = []
+            self.TI = []
+
+            num_sen = 0
+
+            while num_sen < bsz and idx < self.trainset_length:
+                d = ast.literal_eval(self.train_data[idx])
+                tl = d['s']
+                bl = d['b']
+                ul = d['u']
+
+                # binary
+                for Bi, Ci, A, B, C in bl:
+                    self.AA.append(A)
+                    self.BB.append(B)
+                    self.CC.append(C)
+                    self.BI.append(Bi)
+                    self.CI.append(Ci)
+
+                # unary
+                for Ai, A, index in ul:
+                    self.U.append(index)
+                    self.U_A.append(A)
+                    self.UI.append(Ai)
+
+                # lexicon
+                index = 0
+                self.sens[num_sen][0] = 0
+                for Ti, A, word in tl:
+                    self.T.append(word)
+                    self.T_A.append(A)
+                    self.TI.append(Ti)
+                    index += 1
+                    if index < m:
+                        self.sens[num_sen][index] = word
+
+                num_sen += 1
+                idx += 1
+            '''
+            # DEBUG
+
+            for i in xrange(len(self.B_A)):
+                print " RULE {} -> ({}){} ({}){}".format(
+                    self.AA[i],
+                    self.BI[i],
+                    self.BB[i],
+                    self.CI[i],
+                    self.CC[i]
+                )
+
+            print "-" * 10
+
+            for i in xrange(len(self.U)):
+                print self.idx2nt[self.U_A[i]], " -> ", self.U[i]
+            '''
+
+            next_bch = [
+                self.sens,
+                self.BI, self.CI, self.AA, self.BB, self.CC,
+                self.UI, self.U, self.U_A,
+                self.TI, self.T, self.T_A
+            ]
+
+            if idx >= self.trainset_length:
+                idx = -1
+
+            return idx, next_bch
 
 
 """
@@ -875,18 +1094,8 @@ and (N)eural network.
 """
 class PBLN(Processor):
 
-    def __init__(self, train_file, make_train, read_data, verbose):
-        '''
-        Initialize the processor, taking inputs from the main class
-        @param train_file   The filename of the train file
-        @param read_data    Whether to read WSJ and word2vec embedding
-        @param make_train   Whether to make new training set (e.g. more sentences to train)
-        @param verbose      Whether to have printout for debugging
-        '''
-        self.train_file = train_file    # the train file
-        self.read_data = read_data      # whether to read new data
-        self.verbose = verbose          # verbose mode or not
-        self.make_train = make_train    # whether to make train set
+    def __init__(self, *args):
+        super(PBLN, self).__init__(*args)
 
 
     #####################################################################################
@@ -900,7 +1109,7 @@ class PBLN(Processor):
         begin_time = time.time()
 
         train_trees = list(
-            ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=15000)
+            ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=2000)
         )
 
         f = open(self.train_file, 'w')

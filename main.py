@@ -1,7 +1,6 @@
 import argparse
 import constants
 import datetime
-import evalb
 import itertools
 import os
 import time
@@ -9,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+from evalb import evalb, evalb_unofficial
 from model import BLN, LN, BSN, BS
 from nltk import Tree
 from processor import Processor, PBLN, PLN
@@ -55,11 +55,11 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--lstm-layer', default=3, help='# LSTM layer'
+    '--lstm-layer', default=2, help='# LSTM layer'
 )
 
 argparser.add_argument(
-    '--lstm-dim', default=150, help='LSTM hidden dimension'
+    '--lstm-dim', default=128, help='LSTM hidden dimension'
 )
 
 argparser.add_argument(
@@ -220,7 +220,7 @@ def supervised():
     template = "Epch {} Bch {} [{}/{} ({:.1f}%)] NLL: {:.2f}" \
         + " Fwd: {:.2f} Bckwd: {:.2f} Opt: {:.2f}"
 
-    max_accuracy = 0
+    max_F1 = 0
 
     for epoch in range(args.epochs):
         dp.shuffle()
@@ -274,12 +274,14 @@ def supervised():
 
         print " -- E[ NLL(sentence) ]={}".format(tot_loss.data[0] / total)
 
-        if epoch < 5:
+        if epoch < 6:
             continue
 
-        avg_accuracy = test()
-        model.init_h0()
-        if avg_accuracy > max_accuracy:
+        F1 = test()
+
+        model.parse_end()
+        if F1 > max_F1:
+            max_F1 = F1
             torch.save( {'state_dict': model.state_dict()}, file_save )
 
     if args.verbose:
@@ -295,34 +297,40 @@ def parse(sentence):
     return model.parse(sentence, sen)
 
 
+def f1(GW, G, W):
+    P = GW/G
+    R = GW/W
+    F1 = 2*P*R/(P+R)
+    return P, R, F1
+
 def test():
     model.parse_setup()
-    test_data = list(ptb("dev", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100))
-    cumul_accuracy = 0
+    test_data = list(ptb("test", minlength=3, maxlength=constants.MAX_TEST_SEN_LENGTH))
+
     num_sen = 0
+    GW_sum = G_sum = W_sum = 0
 
+    N = len(test_data)
+    template = "[{}/{} ({:.1f}%)] P: {:.2f} R: {:.2f} F1: {:.2f}"
     for (sentence, gold) in test_data:
-        if len(sentence.split()) > 15:
-            continue
-
         num_sen += 1
 
         parse_string = parse(sentence)
 
         parse_tree = Tree.fromstring(parse_string)
-        tree_accruacy = evalb.evalb(
+        GW,G,W = evalb_unofficial(
             oneline(unbinarize(gold)),
-            unbinarize(parse_tree)
+            parse_tree
         )
-        cumul_accuracy += tree_accruacy
-        print " Accuracy : ", tree_accruacy
-        print " GOLD \n",unbinarize(gold).pretty_print()
-        print " PARSE \n",unbinarize(parse_tree).pretty_print()
-        print " PARSE \n",parse_tree.pretty_print()
+        GW_sum += GW
+        G_sum += G
+        W_sum += W
+        P, R, F1 = f1(GW, G, W)
+        print template.format(num_sen, N, num_sen / float(N), P, R, F1)
 
-    avg_accuracy = cumul_accuracy / float(num_sen)
-    print " # Sen: {} Accuracy: {}".format( num_sen, avg_accuracy )
-    return avg_accuracy
+    P, R, F1 = f1(GW_sum, G_sum, W_sum)
+    print " # Sen: {} P: {:.2f} R: {:.2f} F1: {:.2f}".format( num_sen, P, R, F1 )
+    return F1
 
 
 def check_spv():
