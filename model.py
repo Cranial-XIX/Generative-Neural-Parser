@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 
 from torch.autograd import Variable
-
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 """
 The (B)a(S)eline model
 """
@@ -212,7 +212,7 @@ class BS(nn.Module):
                             self.Cp[i,k,A] = U
                             self.jp[i,k,A] = -1
 
-        return self.print_parse(0, n, 1)
+        return self.betas[0,n,1,1], self.print_parse(0, n, 1)
 
 
     def print_parse(self, i, k, A):
@@ -285,6 +285,19 @@ class BSN(nn.Module):
     def __init__(self, args):
         super(BSN, self).__init__()
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 """
 The model using (L)eft context lstm features and (N)eural network
 """
@@ -307,7 +320,7 @@ class LN(nn.Module):
 
         # nonterminals
         self.nnt = dp.nnt                  # number of nonterminals
-        self.dnt = dp.dnt                  # dimension of nonterminals
+        self.dnt = dp.nnt #dp.dnt                  # dimension of nonterminals
 
         self.nunary = dp.nunary            # details please look at processor.py
         self.prefix = dp.unary_prefix
@@ -319,30 +332,21 @@ class LN(nn.Module):
         self.idx2nt = dp.idx2nt
 
         self.init_h0()
-        self.h0[0].requires_grad = False
-        self.h0[1].requires_grad = False
+        #self.h0[0].requires_grad = False
+        #self.h0[1].requires_grad = False
 
         # nonterminal embedding and w2v embedding, w2v_plus 
         # is the deviation from w2v
-        self.nt_emb = nn.Embedding(self.nnt, self.dnt)
+        self.nt_emb = nn.Embedding(self.nnt, self.nnt)
+        self.nt_emb.weight.data = torch.eye(self.nnt, self.nnt)
         self.word_emb = nn.Embedding(self.nt, self.dt)
+        self.nt_emb.weight.requires_grad = False
 
         # The LSTM and some linear transformation layers
-        self.LSTM = nn.LSTM(
+        self.LSTM = nn.GRU(
             self.dt, self.dhid, self.nlayers,
-            batch_first=True, bias=True, dropout=0.6
+            batch_first=True, bias=True, dropout=0.4
         )
-
-        init = 0.01
-
-        self.LSTM.weight_ih_l0.data.uniform_(-init, init)
-        self.LSTM.weight_hh_l0.data.uniform_(-init, init)
-
-        self.LSTM.weight_ih_l1.data.uniform_(-init, init)
-        self.LSTM.weight_hh_l1.data.uniform_(-init, init)
-
-        #self.LSTM.weight_ih_l2.data.uniform_(-init, init)  
-        #self.LSTM.weight_hh_l2.data.uniform_(-init, init)
 
         self.lsm = nn.LogSoftmax()
         self.sm = nn.Softmax()
@@ -360,7 +364,7 @@ class LN(nn.Module):
         T_in = self.dnt + self.dhid
         T_out = self.nt
 
-        zeta = 0.6
+        zeta = 0.3
         d_B = int( zeta * B_out + (1-zeta) * B_in )
         d_C = int( zeta * C_out + (1-zeta) * C_in )
         d_U = int( zeta * U_out + (1-zeta) * U_in )
@@ -368,24 +372,35 @@ class LN(nn.Module):
 
         self.B_h1 = nn.Linear(B_in, d_B)
         self.B_h2 = nn.Linear(d_B, B_out)
-        self.B_h1.weight.data.uniform_(-init, init)
-        self.B_h2.weight.data.uniform_(-init, init)
+        B_h1_init = self.initrange(B_in, d_B)
+        B_h2_init = self.initrange(d_B, B_out)
+        self.B_h1.weight.data.uniform_(-B_h1_init, B_h1_init)
+        self.B_h2.weight.data.uniform_(-B_h2_init, B_h2_init)
 
         self.C_h1 = nn.Linear(C_in, d_C)
         self.C_h2 = nn.Linear(d_C, C_out)
-        self.C_h1.weight.data.uniform_(-init, init)
-        self.C_h2.weight.data.uniform_(-init, init)
+        C_h1_init = self.initrange(C_in, d_C)
+        C_h2_init = self.initrange(d_C, C_out)        
+        self.C_h1.weight.data.uniform_(-C_h1_init, C_h1_init)
+        self.C_h2.weight.data.uniform_(-C_h2_init, C_h2_init)
 
         self.U_h1 = nn.Linear(U_in, d_U)
         self.U_h2 = nn.Linear(d_U, U_out)
-        self.U_h1.weight.data.uniform_(-init, init)
-        self.U_h2.weight.data.uniform_(-init, init)
+        U_h1_init = self.initrange(U_in, d_U)
+        U_h2_init = self.initrange(d_U, U_out) 
+        self.U_h1.weight.data.uniform_(-U_h1_init, U_h1_init)
+        self.U_h2.weight.data.uniform_(-U_h2_init, U_h2_init)
 
         self.T_h1 = nn.Linear(T_in, d_T)
         self.T_h2 = nn.Linear(d_T, T_out)
-        self.T_h1.weight.data.uniform_(-init, init)
-        self.T_h2.weight.data.uniform_(-init, init)
+        T_h1_init = self.initrange(T_in, d_T)
+        T_h2_init = self.initrange(d_T, T_out)
+        self.T_h1.weight.data.uniform_(-T_h1_init, T_h1_init)
+        self.T_h2.weight.data.uniform_(-T_h2_init, T_h2_init)
 
+
+    def initrange(self, ni, nj):
+        return math.sqrt(6) / math.sqrt(ni+nj)
 
     def init_h0(self, bsz=None):
         if bsz == None:
@@ -393,15 +408,17 @@ class LN(nn.Module):
         # the initial h for the LSTM
         if self.use_cuda:
             # the initial states for h0 and c0 of LSTM
-            self.h0 = (
-                Variable(torch.zeros(self.nlayers, bsz, self.dhid).cuda()),
-                Variable(torch.zeros(self.nlayers, bsz, self.dhid).cuda())
-            )
+            #self.h0 = (
+            #    Variable(torch.zeros(self.nlayers, bsz, self.dhid).cuda()),
+            #    Variable(torch.zeros(self.nlayers, bsz, self.dhid).cuda())
+            #)
+            self.h0 = Variable(torch.zeros(self.nlayers, bsz, self.dhid).cuda())
         else:
-            self.h0 = (
-                Variable(torch.zeros(self.nlayers, bsz, self.dhid)),
-                Variable(torch.zeros(self.nlayers, bsz, self.dhid))
-            )
+            #self.h0 = (
+            #    Variable(torch.zeros(self.nlayers, bsz, self.dhid)),
+            #    Variable(torch.zeros(self.nlayers, bsz, self.dhid))
+            #)
+            self.h0 = Variable(torch.zeros(self.nlayers, bsz, self.dhid))
 
 
     def parse_setup(self):
@@ -419,7 +436,6 @@ class LN(nn.Module):
 
 
     def pre_parse(self, sen_idx):
-        t0 = time.time()
         V = self.word_emb(sen_idx)
         alpha, _ = self.LSTM(V.unsqueeze(0), self.h0)
         alpha = alpha.squeeze(0)
@@ -571,6 +587,7 @@ class LN(nn.Module):
             )
         ).data
 
+
     def parse(self, sentence, sen_idx):
 
         self.sentence = sentence.split()
@@ -584,23 +601,14 @@ class LN(nn.Module):
         for i in xrange(self.N):
             idx = sen_idx[i]
             for U, A, PT in self.w_U[idx]:
-                score = self.TT[self.lex[(i, PT)]][idx] + self.UU[self.p2u[(i, A)]][U]
+                score = self.TT[self.lex[(i, PT)], idx] + self.UU[self.p2u[(i, A)], U]
 
                 if score > self.betas[i,i+1,A,1]:
                     self.betas[i,i+1,A,1] = score
                     self.Bp[i,i+1,A] = -1
                     self.Cp[i,i+1,A] = U
 
-        t1 = time.time()
-        #print " From start to initialization : ", t1 - t0
 
-        '''
-        For the CKY algorithm, for each layer of spans of certain width,
-        we collect all we need to compute, then we compute them all to save
-        time. Also, by doing this, we reduce the computation for next layer above
-        if we are sure certain spans are not possible (in viterbi algorithm, this saves
-        time)
-        '''
         for w in xrange(2, self.N+1):
             for i in xrange(self.N-w+1):
                 k = i + w
@@ -613,8 +621,8 @@ class LN(nn.Module):
                             Cs = self.betas[j,k,C,1]
                             if Cs == ZERO:
                                 continue
-                            score = self.BB[self.p2l[(i,A)]][B] \
-                                +self.CC[self.pl2r[(i,j,A,B)]][C] + Bs + Cs
+                            score = self.BB[self.p2l[(i,A)], B] \
+                                +self.CC[self.pl2r[(i,j,A,B)], C] + Bs + Cs
                             if score > self.betas[i,k,A,0]:
                                 # print "Binary: ({}, {}, {}) {} ({})-> {} {} ({}) = {}".format(i,j,k, self.idx2nt[A], Bh, self.idx2nt[B], self.idx2nt[C], Ch, ikAB)
                                 self.betas[i,k,A,0] = score
@@ -636,14 +644,15 @@ class LN(nn.Module):
                     if Bs == ZERO:
                         continue
                     for U, A in self.B_A[B]:
-                        score = self.UU[self.p2u[(i, A)]][U] + Bs
+                        score = self.UU[self.p2u[(i, A)], U] + Bs
                         if score > self.betas[i,k,A,1]:
                             self.betas[i,k,A,1] = score
                             self.Bp[i,k,A] = B
                             self.Cp[i,k,A] = U
                             self.jp[i,k,A] = -1
 
-        return self.print_parse(0, self.N, 1)
+
+        return -self.betas[0,self.N,1,1], self.print_parse(0, self.N, 1)
 
 
     def print_parse(self, i, k, A):
@@ -680,13 +689,14 @@ class LN(nn.Module):
         TI, T, T_A):
 
         # run the LSTM to extract features from left context
-        output, _ = self.LSTM(self.word_emb(sens), self.h0)
-        output = output.contiguous().view(-1, output.size(2))
+        alpha, _ = self.LSTM(self.word_emb(sens), self.h0)
+        alpha = alpha.contiguous().view(-1, alpha.size(2))
 
-        BIv = torch.index_select(output, 0, BI)
-        CIv = torch.index_select(output, 0, CI)
-        UIv = torch.index_select(output, 0, UI)
-        TIv = torch.index_select(output, 0, TI)
+
+        BIv = torch.index_select(alpha, 0, BI)
+        CIv = torch.index_select(alpha, 0, CI)
+        UIv = torch.index_select(alpha, 0, UI)
+        TIv = torch.index_select(alpha, 0, TI)
 
         AAv = self.nt_emb(AA)
         BBv = self.nt_emb(BB)
@@ -1282,7 +1292,7 @@ class BLN(nn.Module):
 
         #print " CKY takes : ", t7 - t0
 
-        return self.print_parse(0, n, 1)
+        return self.betas[0,n,1,1], self.print_parse(0, n, 1)
 
 
     def print_parse(self, i, k, A):

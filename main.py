@@ -59,7 +59,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--lstm-dim', default=128, help='LSTM hidden dimension'
+    '--lstm-dim', default=150, help='LSTM hidden dimension'
 )
 
 argparser.add_argument(
@@ -81,7 +81,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--learning-rate', default=0.001, help="learning rate"
+    '--learning-rate', default=0.01, help="learning rate"
 )
 
 argparser.add_argument(
@@ -114,6 +114,7 @@ if args.mode == 'spv_train' or args.mode == 'uspv_train':
 
     os.makedirs('./output/' + name + '/')
     file_save = os.path.abspath('./output/' + name + '/' + 'model')
+
 
 ## show values ##
 if args.verbose == 'yes':
@@ -212,13 +213,12 @@ def supervised():
 
     # define the optimizer to use; currently use Adam
     optimizer = optim.Adam(
-        parameters, lr=args.learning_rate, weight_decay=args.l2_coef
+        parameters, lr=args.learning_rate ,weight_decay=args.l2_coef
     )
 
     total = dp.trainset_length
 
-    template = "Epch {} Bch {} [{}/{} ({:.1f}%)] NLL: {:.2f}" \
-        + " Fwd: {:.2f} Bckwd: {:.2f} Opt: {:.2f}"
+    template = "Epoch {} [{}/{} ({:.1f}%)] Time {:.2f}"
 
     max_F1 = 0
 
@@ -227,6 +227,7 @@ def supervised():
         idx = 0
         batch = 0
         tot_loss = 0
+        model.train()
         while True:
             batch += 1
             optimizer.zero_grad()
@@ -244,48 +245,38 @@ def supervised():
             # compute loss
             loss = model('supervised', next_bch)
             tot_loss += loss
-            # back propagation
-            t0 = time.time()
             loss.backward()
-            t1 = time.time()
-            # take an optimization step
             optimizer.step()
+
             end = time.time()
             if args.verbose:
                 if idx == -1:
-                    print template.format(
-                            epoch, batch, total, total,
-                            100.,
-                            loss.data[0],
-                            round(t0 - start, 5),
-                            round(t1 - t0, 5),
-                            round(end - t1, 5)
-                        )
+                    print template.format(epoch, total, total, 100., round(end - start, 5))
                     break
                 else:
-                    print template.format(
-                            epoch, batch, idx, total,
-                            float(idx)/total * 100.,
-                            loss.data[0],
-                            round(t0 - start, 5),
-                            round(t1 - t0, 5),
-                            round(end - t1, 5)
-                        )
+                    print template.format(epoch, idx, total, float(idx)/total * 100., round(end - start, 5))
 
         print " -- E[ NLL(sentence) ]={}".format(tot_loss.data[0] / total)
 
-        if epoch < 6:
+        if epoch < 10:
             continue
+        nn = 20
+        if (epoch+1) % 3 == 0:
+            nn = 100
 
-        F1 = test()
-
+        model.eval()
+        F1_train = test("train", nn)
+        F1 = test("test", nn)
         model.parse_end()
+
         if F1 > max_F1:
             max_F1 = F1
             torch.save( {'state_dict': model.state_dict()}, file_save )
 
     if args.verbose:
         print "Finish supervised training"
+
+    f.close()
 
 
 def parse(sentence):
@@ -298,38 +289,49 @@ def parse(sentence):
 
 
 def f1(GW, G, W):
-    P = GW/G
-    R = GW/W
+    P = GW/float(G)
+    R = GW/float(W)
     F1 = 2*P*R/(P+R)
-    return P, R, F1
+    return P, R, 100*F1
 
-def test():
+def test(dataset, nn):
+
+    start = time.time()
     model.parse_setup()
-    test_data = list(ptb("test", minlength=3, maxlength=constants.MAX_TEST_SEN_LENGTH))
+    test_data = list(ptb(dataset, minlength=3, maxlength=constants.MAX_TEST_SEN_LENGTH, n=nn))
 
     num_sen = 0
-    GW_sum = G_sum = W_sum = 0
+    GW_sum = G_sum = W_sum = NLL_sum = 0
 
     N = len(test_data)
-    template = "[{}/{} ({:.1f}%)] P: {:.2f} R: {:.2f} F1: {:.2f}"
+    template = "[{}/{} ({:.1f}%)] P: {:.2f} R: {:.2f} F1: {:.2f} NLL: {:.2f}"
     for (sentence, gold) in test_data:
+        #print sentence
         num_sen += 1
 
-        parse_string = parse(sentence)
+        nll, parse_string = parse(sentence)
+        NLL_sum += nll
 
         parse_tree = Tree.fromstring(parse_string)
+        #print gold.pretty_print()
+        #print parse_tree.pretty_print()
         GW,G,W = evalb_unofficial(
             oneline(unbinarize(gold)),
             parse_tree
         )
+
         GW_sum += GW
         G_sum += G
         W_sum += W
         P, R, F1 = f1(GW, G, W)
-        print template.format(num_sen, N, num_sen / float(N), P, R, F1)
+        print template.format(num_sen, N, num_sen/float(N)*100, P, R, F1, nll)
 
     P, R, F1 = f1(GW_sum, G_sum, W_sum)
-    print " # Sen: {} P: {:.2f} R: {:.2f} F1: {:.2f}".format( num_sen, P, R, F1 )
+    print_out = " On {} # Sen: {} P: {:.2f} R: {:.2f} F1: {:.2f} NLL: {:.2f}".format( dataset, num_sen, P, R, F1, NLL_sum )
+    print print_out
+
+    end = time.time()
+    print " Testing takes: ", end - start
     return F1
 
 
@@ -344,7 +346,7 @@ elif args.mode == 'uspv_train':
     unsupervised()
 
 elif args.mode == 'test':
-    test()
+    test("test")
 
 elif args.mode == 'parse':
     model.parsing_setup()

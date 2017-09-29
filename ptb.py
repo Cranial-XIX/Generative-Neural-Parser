@@ -33,8 +33,6 @@ Notes:
 import re, sys
 from path import path
 from nltk import Tree
-#from arsenal.terminal import yellow
-#from arsenal.misc import open_diff
 from util import remove_trace, binarize, collapse_self_transition
 
 
@@ -94,45 +92,6 @@ def preprocess(t0):
     "Binarize and remove traces."
     b = binarize(Tree('ROOT', [remove_trace(t0)]))
     t = collapse_self_transition(b)
-#    for s in t.subtrees():
-#        if s.label().endswith('PRT|ADVP') or s.label() == 'PRT':
-#            #s.set_label('PRT')
-#            s.set_label('ADVP')
-
-#    if 0:
-#    #if b != t:
-#        print yellow % '-----'
-#        print yellow % '"interesting" collapse happened'
-#        print
-#        print b
-#        print
-#        print t
-#        print
-#        open_diff(b, t)
-#
-#    if 0:
-#        #t = collapse_unary_chains(b)
-#        if t != b:
-#            interesting = False
-#            for s in t.subtrees():
-#                if '-' in s.label() and not s.label().startswith('-'):
-#                    if len(s.leaves()) not in [1, len(t.leaves())]:
-#                        interesting = True
-#                        break
-#
-#            if interesting:
-#                print yellow % '-----'
-#                print yellow % '"interesting" collapse happened'
-#                #print t0
-#                #print
-#                #print b
-#                #print
-#                for s in t.subtrees():
-#                    if '-' in s.label() and not s.label().startswith('-'):
-#                        s.set_label(yellow % s.label())
-#                #print
-#                print t
-#                print yellow % '-----'
 
     return t
 

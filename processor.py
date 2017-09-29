@@ -465,7 +465,7 @@ class Processor(object):
         begin_time = time.time()
 
         train_trees = list(
-            ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=6000)
+            ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=10000)
         )
 
         f = open(self.train_file, 'w')
@@ -664,6 +664,7 @@ class Processor(object):
 
                 num_sen += 1
                 idx += 1
+
             '''
             # DEBUG
 
@@ -678,8 +679,8 @@ class Processor(object):
 
             for i in xrange(len(self.U)):
                 print self.idx2nt[self.U_A[i]], " -> ", self.U[i]
-            '''
 
+            '''
             next_bch = [
                 self.AA, self.BB, self.CC,
                 self.U, self.U_A,
@@ -861,6 +862,16 @@ class Processor(object):
             print "Reading data takes %.4f secs" % round(end - start, 5)
 
 
+
+
+
+
+
+
+
+
+
+
 """
 The (P)rocessor of the model with (L)eft context LSTM features and (N)eural network.
 """
@@ -1029,38 +1040,38 @@ class PLN(Processor):
                 tl = d['s']
                 bl = d['b']
                 ul = d['u']
-
+                previous = num_sen * m
                 # binary
                 for Bi, Ci, A, B, C in bl:
                     self.AA.append(A)
                     self.BB.append(B)
                     self.CC.append(C)
-                    self.BI.append(Bi)
-                    self.CI.append(Ci)
+                    self.BI.append(Bi+previous)
+                    self.CI.append(Ci+previous)
 
                 # unary
                 for Ai, A, index in ul:
                     self.U.append(index)
                     self.U_A.append(A)
-                    self.UI.append(Ai)
+                    self.UI.append(Ai+previous)
 
                 # lexicon
                 index = 0
-                self.sens[num_sen][0] = 0
                 for Ti, A, word in tl:
                     self.T.append(word)
                     self.T_A.append(A)
-                    self.TI.append(Ti)
+                    self.TI.append(Ti+previous)
                     index += 1
                     if index < m:
                         self.sens[num_sen][index] = word
 
                 num_sen += 1
                 idx += 1
+
             '''
             # DEBUG
 
-            for i in xrange(len(self.B_A)):
+            for i in xrange(len(self.AA)):
                 print " RULE {} -> ({}){} ({}){}".format(
                     self.AA[i],
                     self.BI[i],
@@ -1072,7 +1083,12 @@ class PLN(Processor):
             print "-" * 10
 
             for i in xrange(len(self.U)):
-                print self.idx2nt[self.U_A[i]], " -> ", self.U[i]
+                print self.idx2nt[self.U_A[i]], " -> ", self.idx2u[self.U[i]]
+
+            print "_" * 10
+
+            for i in xrange(len(self.T)):
+                print self.idx2nt[self.T_A[i]], " -> ", self.idx2w[self.T[i]]
             '''
 
             next_bch = [

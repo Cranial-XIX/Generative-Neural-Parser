@@ -1,5 +1,4 @@
-data/train_*
-data/GloVe.txt
+data/*
 output/*
 *.pyc
 corpus_info.tar

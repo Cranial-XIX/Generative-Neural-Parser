@@ -9,7 +9,7 @@ TRAIN_FILE = "data/train_small.txt"
 
 PRE_TRAINED_FILE = "output/default_cpu/model_dict"
 CORPUS_INFO_FILE = "corpus_info.tar"
-MAX_SEN_LENGTH = 50                  # maximum lenght of a sentence
+MAX_SEN_LENGTH = 30                  # maximum lenght of a sentence
 MAX_TEST_SEN_LENGTH = 30
 C_UNT = 20
 C_P2L = 50
@@ -20,8 +20,5 @@ MAX_VOCAB_SIZE = 500000
 UNCOMMON_THRESHOLD = 20
 RARE_THRESHOLD = 10
 OOV_IDX = 0
-OOV = 'OOV'
 BOS = 'BOS'
-U_TM = 'U_TM'       # unary terminal symbol
-U_NTM = 'U_NTM'     # unary nonterminal symbol
 TERMINAL = 'TERMINAL'
