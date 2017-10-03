@@ -39,7 +39,7 @@ argparser.add_argument(
 # Below are variables associated with model
 # =========================================================================
 argparser.add_argument(
-    '--model', default="BLN", help='Model: BLN, LN, BSN, BS'
+    '--model', default="LN", help='Model: BLN, LN, BSN, BS'
 )
 
 argparser.add_argument(
@@ -59,7 +59,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--lstm-dim', default=150, help='LSTM hidden dimension'
+    '--lstm-dim', default=180, help='LSTM hidden dimension'
 )
 
 argparser.add_argument(
@@ -73,11 +73,11 @@ argparser.add_argument(
 # Below are variables associated with training
 # =========================================================================
 argparser.add_argument(
-    '--epochs', default=20, help='# epochs to train'
+    '--epochs', default=100, help='# epochs to train'
 )
 
 argparser.add_argument(
-    '--batch-size', default=15, help='# instances in a batch'
+    '--batch-size', default=20, help='# instances in a batch'
 )
 
 argparser.add_argument(
