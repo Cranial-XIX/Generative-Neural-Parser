@@ -63,7 +63,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--l2-coef', default=0.02, help='l2 norm coefficient'
+    '--l2-coef', default=0.08, help='l2 norm coefficient'
 )
 
 argparser.add_argument(
@@ -229,10 +229,10 @@ def supervised():
         tot_loss = 0
         model.train()
         while True:
+            start = time.time()
             batch += 1
             optimizer.zero_grad()
 
-            start = time.time()
             # get next training instances
             idx, next_bch = dp.next(idx, args.batch_size)
 
@@ -244,11 +244,13 @@ def supervised():
 
             # compute loss
             loss = model('supervised', next_bch)
-            tot_loss += loss
-            loss.backward()
-            optimizer.step()
+            tot_loss += loss.data[0]
 
+            loss.backward()
+
+            optimizer.step()
             end = time.time()
+
             if args.verbose:
                 if idx == -1:
                     print template.format(epoch, total, total, 100., round(end - start, 5))
@@ -256,22 +258,19 @@ def supervised():
                 else:
                     print template.format(epoch, idx, total, float(idx)/total * 100., round(end - start, 5))
 
-        print " -- E[ NLL(sentence) ]={}".format(tot_loss.data[0] / total)
+        print " -- E[ NLL(sentence) ]={}".format(tot_loss / total)
 
         if epoch < 10:
             continue
-        nn = 20
-        if (epoch+1) % 3 == 0:
-            nn = 100
 
         model.eval()
-        F1_train = test("train", nn)
-        F1 = test("test", nn)
+        #F1_train = test("train", 100)
+        F1 = test("test", 100)
         model.parse_end()
 
-        if F1 > max_F1:
-            max_F1 = F1
-            torch.save( {'state_dict': model.state_dict()}, file_save )
+        #if F1 > max_F1:
+        #    max_F1 = F1
+        #    torch.save( {'state_dict': model.state_dict()}, file_save )
 
     if args.verbose:
         print "Finish supervised training"
@@ -323,12 +322,11 @@ def test(dataset, nn):
         GW_sum += GW
         G_sum += G
         W_sum += W
-        P, R, F1 = f1(GW, G, W)
-        print template.format(num_sen, N, num_sen/float(N)*100, P, R, F1, nll)
+        #P, R, F1 = f1(GW, G, W)
+        #print template.format(num_sen, N, num_sen/float(N)*100, P, R, F1, nll)
 
     P, R, F1 = f1(GW_sum, G_sum, W_sum)
-    print_out = " On {} # Sen: {} P: {:.2f} R: {:.2f} F1: {:.2f} NLL: {:.2f}".format( dataset, num_sen, P, R, F1, NLL_sum )
-    print print_out
+    print " On {} # Sen: {} P: {:.2f} R: {:.2f} F1: {:.2f} NLL: {:.2f}".format( dataset, num_sen, P, R, F1, NLL_sum ) 
 
     end = time.time()
     print " Testing takes: ", end - start

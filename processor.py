@@ -12,7 +12,6 @@ import random
 import time
 import torch
 
-from collections import defaultdict
 from nltk import Tree
 from numpy import array
 from ptb import ptb
@@ -53,100 +52,6 @@ class Processor(object):
         return True
 
     #####################################################################################
-    def init_word_embeddings(self):
-        '''
-        Read in GloVe word embeddings.
-        '''
-        if not self.check_file_exists(constants.GLOVE_FILE, "GloVe embeddings"):
-            return
-
-        begin_time = time.time()
-
-        all_trees = list(ptb("train"))
-        self.word_frequency = defaultdict(int)
-
-        for (sentence, _) in all_trees:
-            sen_split = sentence.strip().split()
-            for word in sen_split:
-                self.word_frequency[word] += 1
-
-        glove = {}
-        with open(constants.GLOVE_FILE, 'r') as f:
-            for line in f:
-                emb = line.split()
-                word = emb.pop(0)
-                glove[word] = torch.FloatTensor(map(float, emb))
-
-        self.w2idx = {}
-        self.idx2w = []
-        self.w2idx[constants.BOS] = 0
-        self.idx2w.append(constants.BOS)
-
-        self.nt = 1
-        oov_set = set()
-
-        print " # total words in WSJ : ", len(self.word_frequency)
-
-        counter = 0
-        for word, frequency in self.word_frequency.iteritems():
-            if word not in glove and frequency > constants.RARE_THRESHOLD:
-                counter += 1
-
-        self.dt = constants.DIM_TERMINAL + counter
-        self.word_emb = torch.zeros(len(glove), self.dt)
-
-        counter = -1
-        for word, frequency in self.word_frequency.iteritems():
-            has_word = word in glove
-            if frequency > constants.UNCOMMON_THRESHOLD and has_word:
-                self.w2idx[word] = self.nt
-                self.idx2w.append(word)
-                self.word_emb[self.nt][:300] = glove[word]
-                self.nt += 1
-            elif frequency > constants.RARE_THRESHOLD and has_word:
-                self.w2idx[word] = self.nt
-                self.idx2w.append(word)
-                self.word_emb[self.nt][:300] = glove[word]
-                self.word_emb[self.nt][300:314] = sig(word, frequency)[0]
-                self.nt += 1
-            elif not has_word and frequency > constants.RARE_THRESHOLD:
-                counter += 1
-                self.w2idx[word] = self.nt
-                self.idx2w.append(word)
-                self.word_emb[self.nt][300:314] = sig(word, frequency)[0]
-                self.word_emb[self.nt][314+counter] = 1
-                self.nt += 1
-            else:
-                emb, signature = sig(word, 0)
-                if signature not in oov_set:
-                    self.w2idx[signature] = self.nt
-                    self.idx2w.append(signature)
-                    self.word_emb[self.nt][300:314] = emb
-                    oov_set.add(signature)
-                    self.nt += 1
-
-        rest_trees = list(ptb(["dev", "test"]))
-        for (sentence, _) in rest_trees:
-            sen_split = sentence.strip().split()
-            for word in sen_split:
-                if word not in self.word_frequency:
-                    emb, signature = sig(word, 0)
-                    if signature not in oov_set:
-                        self.w2idx[signature] = self.nt
-                        self.idx2w.append(signature)
-                        self.word_emb[self.nt][300:] = emb
-                        oov_set.add(signature)
-                        self.nt += 1
-
-        self.word_emb = self.word_emb.narrow(0, 0, self.nt)
-        end_time = time.time()
-
-        if self.verbose:
-            print "-- Reading GloVe embeddings takes %.4f s" % round(end_time - begin_time, 5)
-            print "   # words: ", self.nt
-        return
-
-    #####################################################################################
     def init_word_indices(self):
         '''
         Temporarily we will train our own word embeddings.
@@ -182,12 +87,16 @@ class Processor(object):
         # the RARE_TRESHOLD (10). There are about 7000+ words that have appeared more than 10
         # times in the WSJ 2-21. And we create signatures for those that do not.
         # Details for creating signature are in Signature in util.py
-        self.word_frequency = defaultdict(int)
+        word_frequencies = {}
 
         for (sentence, _) in all_trees:
-            sen_split = sentence.strip().split()
+            sen_split = sentence.split()
             for word in sen_split:
-                self.word_frequency[word] += 1
+                word = word.rstrip()
+                if word in word_frequencies:
+                    word_frequencies[word] += 1
+                else:
+                    word_frequencies[word] = 1
 
         # the dimension of terminals -- self.dt
         self.dt = 80
@@ -196,44 +105,52 @@ class Processor(object):
         # there's a special symbol here called BOS, we add this symbol
         # so that we have "some left context" even at the very beginning
         # of the sentence
+        self.words_set = set()
         self.w2idx[constants.BOS] = 0
         self.idx2w.append(constants.BOS)
 
         # the number of terminals -- self.nt
         self.nt = 1
-
         oov_set = set()
 
-        for word, frequency in self.word_frequency.iteritems():
-            if frequency < constants.RARE_THRESHOLD:
-                _, signature = sig(word, 0)
-                oov_set.add(signature)
+        for word, freq in word_frequencies.iteritems():
+            if freq <= constants.RARE_THRESHOLD:
+                if word.lower() in word_frequencies:
+                    knownlc = (word_frequencies[word.lower()] > constants.RARE_THRESHOLD)
+                else:
+                    knownlc = False
+                oov_set.add(sig(word, False, knownlc))
             else:
+                self.words_set.add(word)
                 self.w2idx[word] = self.nt
                 self.idx2w.append(word)
                 self.nt += 1
 
+        print " - There are {} number of known words. ".format(self.nt)
         # we also want to include all signatures that we haven't covered in
         # training set.
         rest_trees = list(ptb("dev", "test"))
 
         for (sentence, _) in rest_trees:
-            sen_split = sentence.strip().split()
+            sen_split = sentence.split()
             for word in sen_split:
-                if word not in self.word_frequency:
-                    _, signature = sig(word, 0)
-                    oov_set.add(signature)
+                word = word.rstrip()
+                if word in self.words_set:
+                    continue
+                knownlc = word.lower() in self.words_set
+                oov_set.add(sig(word, False, knownlc))
 
         for oov in oov_set:
             self.w2idx[oov] = self.nt
             self.idx2w.append(oov)
             self.nt += 1
 
+        print " - There are {} number of OOVs. ".format(len(oov_set))
+
         end_time = time.time()
 
         if self.verbose:
             print "-- Initializing word indices takes %.4f s" % round(end_time - begin_time, 5)
-            print "   # words: ", self.nt
         return
 
     #####################################################################################
@@ -431,11 +348,8 @@ class Processor(object):
         Helper function to get index of a word, if it appears frequently, we return
         the index directly, otherwise we return the index of its signature.
         '''
-        frequency = self.word_frequency[word]
 
-        if frequency < constants.RARE_THRESHOLD:
-            _, word = sig(word, 0)
-        return self.w2idx[word]
+        return self.w2idx[sig(word, word in self.words_set, word.lower() in self.words_set)]
 
 
     def get_idx(self, sentence):
@@ -450,7 +364,7 @@ class Processor(object):
         sen_i = torch.LongTensor(length+1)
         sen_i[0] = 0
         for i in xrange(1, length+1):
-            word = sen_w[i-1]
+            word = sen_w[i-1].rstrip()
             sen_i[i] = self.get_word_idx(word)
         return sen_i
 
@@ -465,7 +379,7 @@ class Processor(object):
         begin_time = time.time()
 
         train_trees = list(
-            ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=10000)
+            ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=3000)
         )
 
         f = open(self.train_file, 'w')
@@ -746,7 +660,7 @@ class Processor(object):
                     'nt2idx': self.nt2idx,
                     'idx2nt': self.idx2nt,
 
-                    'word_frequency': self.word_frequency,
+                    'words_set': self.words_set,
 
                     'train_data': self.train_data,
                 }, constants.CORPUS_INFO_FILE)
@@ -782,7 +696,7 @@ class Processor(object):
 
             #self.word_emb = d['word_emb']
 
-            self.word_frequency = d['word_frequency']
+            self.words_set = d['words_set']
 
             self.make_trainset()
             self.read_train_data()
@@ -812,7 +726,7 @@ class Processor(object):
                     'nt2idx': self.nt2idx,
                     'idx2nt': self.idx2nt,
 
-                    'word_frequency': self.word_frequency,
+                    'words_set': self.words_set,
 
                     'train_data': self.train_data,
                 }, constants.CORPUS_INFO_FILE)
@@ -852,7 +766,7 @@ class Processor(object):
             self.nt2idx = d['nt2idx']
             self.idx2nt = d['idx2nt']
 
-            self.word_frequency = d['word_frequency']
+            self.words_set = d['words_set']
 
             self.train_data = d['train_data']
 
@@ -860,8 +774,6 @@ class Processor(object):
 
         if self.verbose:
             print "Reading data takes %.4f secs" % round(end - start, 5)
-
-
 
 
 
