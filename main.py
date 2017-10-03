@@ -43,7 +43,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--mode', default="parse", help='Mode: spv_train, uspv_train, test, parse'
+    '--mode', default="spv_train", help='Mode: spv_train, uspv_train, test, parse'
 )
 
 argparser.add_argument(
@@ -347,7 +347,7 @@ elif args.mode == 'test':
     test("test")
 
 elif args.mode == 'parse':
-    model.parsing_setup()
+    model.parse_setup()
     print "Enter sentence, one per line (press \"Enter\" to quit):"
     while True:
         sentence = raw_input()
