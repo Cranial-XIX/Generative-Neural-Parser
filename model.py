@@ -533,19 +533,35 @@ class LN(nn.Module):
                             U_i.append(i)
                         self.betas[i,k,A,1] = 1
 
-        PP = self.nt_emb(Variable(torch.LongTensor(P_P)))
-        PI = torch.index_select(alpha, 0, Variable(torch.LongTensor(P_i)))
+        if self.use_cuda:
+            PP = self.nt_emb(Variable(torch.LongTensor(P_P).cuda()))
+            PI = torch.index_select(alpha, 0, Variable(torch.LongTensor(P_i).cuda()))
 
-        UA = self.nt_emb(Variable(torch.LongTensor(U_A)))
-        UI = torch.index_select(alpha, 0, Variable(torch.LongTensor(U_i)))
+            UA = self.nt_emb(Variable(torch.LongTensor(U_A).cuda()))
+            UI = torch.index_select(alpha, 0, Variable(torch.LongTensor(U_i).cuda()))
 
-        BA = self.nt_emb(Variable(torch.LongTensor(B_A)))
-        BI = torch.index_select(alpha, 0, Variable(torch.LongTensor(B_i)))
+            BA = self.nt_emb(Variable(torch.LongTensor(B_A).cuda()))
+            BI = torch.index_select(alpha, 0, Variable(torch.LongTensor(B_i).cuda()))
 
-        CA = self.nt_emb(Variable(torch.LongTensor(C_A)))
-        CB = self.nt_emb(Variable(torch.LongTensor(C_B)))
-        CI = torch.index_select(alpha, 0, Variable(torch.LongTensor(C_i)))
-        CJ = torch.index_select(alpha, 0, Variable(torch.LongTensor(C_j)))
+            CA = self.nt_emb(Variable(torch.LongTensor(C_A).cuda()))
+            CB = self.nt_emb(Variable(torch.LongTensor(C_B).cuda()))
+            CI = torch.index_select(alpha, 0, Variable(torch.LongTensor(C_i).cuda()))
+            CJ = torch.index_select(alpha, 0, Variable(torch.LongTensor(C_j).cuda()))
+
+        else:
+            PP = self.nt_emb(Variable(torch.LongTensor(P_P)))
+            PI = torch.index_select(alpha, 0, Variable(torch.LongTensor(P_i)))
+
+            UA = self.nt_emb(Variable(torch.LongTensor(U_A)))
+            UI = torch.index_select(alpha, 0, Variable(torch.LongTensor(U_i)))
+
+            BA = self.nt_emb(Variable(torch.LongTensor(B_A)))
+            BI = torch.index_select(alpha, 0, Variable(torch.LongTensor(B_i)))
+
+            CA = self.nt_emb(Variable(torch.LongTensor(C_A)))
+            CB = self.nt_emb(Variable(torch.LongTensor(C_B)))
+            CI = torch.index_select(alpha, 0, Variable(torch.LongTensor(C_i)))
+            CJ = torch.index_select(alpha, 0, Variable(torch.LongTensor(C_j)))
 
         self.BB = self.lsm(
             self.B_h2(

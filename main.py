@@ -238,7 +238,7 @@ def supervised():
 
             # create PyTorch Variables
             if args.cuda:
-                next_bch = [(Variable(torch.LongTensor(x))).cuda() for x in next_bch]
+                next_bch = [Variable(torch.LongTensor(x).cuda()) for x in next_bch]
             else:
                 next_bch = [Variable(torch.LongTensor(x)) for x in next_bch]
 
@@ -279,12 +279,12 @@ def supervised():
 
 
 def parse(sentence):
-    sen = Variable( dp.get_idx(sentence) )
+    sen = dp.get_idx(sentence)
 
     if args.cuda:
         sen = sen.cuda()
 
-    return model.parse(sentence, sen)
+    return model.parse(sentence, Variable(sen))
 
 
 def f1(GW, G, W):

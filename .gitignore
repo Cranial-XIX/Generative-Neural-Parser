@@ -1,9 +1,8 @@
 data/*
-!data/train_small.txt
+EVALB/*
 output/*
 *.pyc
-EVALB/evalb
-baseline/output.txt
+*.txt
 */*.so
 */*.html
 */*.cpp
@@ -13,3 +12,4 @@ baseline/output.txt
 *.cpp
 *.c
 build/*
+shell.sh
