@@ -3,9 +3,9 @@ from Cython.Build import cythonize
 import numpy
 
 setup(
-  name = 'gr',
+  name = 'parser',
   ext_modules = cythonize(
-    "gr.pyx",
+    "parser.pyx",
     language="c++",
   ),
   include_dirs=[numpy.get_include()]

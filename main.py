@@ -260,12 +260,9 @@ def supervised():
 
         print " -- E[ NLL(sentence) ]={}".format(tot_loss / total)
 
-        if epoch < 10:
-            continue
-
         model.eval()
         #F1_train = test("train", 100)
-        F1 = test("test", 100)
+        F1 = test("test")
         model.parse_end()
 
         #if F1 > max_F1:
@@ -287,17 +284,28 @@ def parse(sentence):
     return model.parse(sentence, Variable(sen))
 
 
-def f1(GW, G, W):
-    P = GW/float(G)
-    R = GW/float(W)
-    F1 = 2*P*R/(P+R)
-    return P, R, 100*F1
+def fpr(GW, G, W):
+    "Compute F-measure, precition, and recall from |want & got|, |got|, |want|."
+    if want == 0 and got == 0:
+        # Wanted empty set, got empty set.
+        r = p = f = 1
+    elif want == 0 or got == 0 or want_and_got == 0:
+        # Assuming previous case failed, then we have zero f1.
+        f = 0
+        r = 1.0 if want == 0 else want_and_got * 1.0 / want
+        p = 1.0 if got == 0 else want_and_got * 1.0 / got
+    else:
+        r = want_and_got * 1.0 / want
+        p = want_and_got * 1.0 / got
+        f = 2 * p * r / (p + r)
+    return f,p,r
 
-def test(dataset, nn):
+
+def test(dataset):
 
     start = time.time()
     model.parse_setup()
-    test_data = list(ptb(dataset, minlength=3, maxlength=constants.MAX_TEST_SEN_LENGTH, n=nn))
+    test_data = list(ptb(dataset, minlength=3, maxlength=constants.MAX_TEST_SEN_LENGTH))
 
     num_sen = 0
     GW_sum = G_sum = W_sum = NLL_sum = 0
@@ -322,11 +330,11 @@ def test(dataset, nn):
         GW_sum += GW
         G_sum += G
         W_sum += W
-        #P, R, F1 = f1(GW, G, W)
-        #print template.format(num_sen, N, num_sen/float(N)*100, P, R, F1, nll)
+        F, P, R = fpr(GW, G, W)
+        print template.format(num_sen, N, num_sen/float(N)*100, P, R, F, nll)
 
-    P, R, F1 = f1(GW_sum, G_sum, W_sum)
-    print " On {} # Sen: {} P: {:.2f} R: {:.2f} F1: {:.2f} NLL: {:.2f}".format( dataset, num_sen, P, R, F1, NLL_sum ) 
+    F, P, R = fpr(GW_sum, G_sum, W_sum)
+    print " On {} # Sen: {} P: {:.2f} R: {:.2f} F1: {:.2f} NLL: {:.2f}".format( dataset, num_sen, P, R, F, NLL_sum ) 
 
     end = time.time()
     print " Testing takes: ", end - start

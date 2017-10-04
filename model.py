@@ -6,6 +6,7 @@ import time
 import torch
 import torch.nn as nn
 
+from parser import Parser
 from torch.autograd import Variable
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 """
@@ -330,6 +331,8 @@ class LN(nn.Module):
         self.w_U = dp.w_U
         self.idx2nt = dp.idx2nt
 
+        self.parser = Parser(dp)
+
         self.init_h0()
         #self.h0[0].requires_grad = False
         #self.h0[1].requires_grad = False
@@ -421,148 +424,51 @@ class LN(nn.Module):
 
 
     def parse_setup(self):
-        n = 30
         self.init_h0(1)
-        self.betas = np.empty((n, n+1, self.nnt, 2))
-        self.Bp = np.zeros((n,n+1,self.nnt), dtype=np.int8)
-        self.Cp = np.zeros((n,n+1,self.nnt), dtype=int)
-        self.jp = np.zeros((n,n+1,self.nnt), dtype=np.int8)
-        self.H = np.zeros((n,n+1,self.nnt), dtype=int)
-
 
     def parse_end(self):
         self.init_h0()
 
+    def parse(self, sentence, sen_idx):
+        start = time.time()
+        P_P, P_i, U_A, U_i, B_A, B_i, C_A, C_B, C_i, C_j = self.parser.preparse(sentence, sen_idx.data)
 
-    def pre_parse(self, sen_idx):
+        t1 = time.time()
         V = self.word_emb(sen_idx)
         alpha, _ = self.LSTM(V.unsqueeze(0), self.h0)
         alpha = alpha.squeeze(0)
-        sen_idx = sen_idx.data[1:]
-        self.N = len(sen_idx)
-
-        self.betas.fill(0)
-
-        self.lex = {}
-        self.p2l = {}
-        self.pl2r = {}
-        self.p2u = {}
-        lex_i = -1
-        p2l_i = -1
-        pl2r_i = -1
-        p2u_i = -1
-
-        P_P = []
-        P_i = []
-        U_A = []
-        U_i = []
-        B_A = []
-        B_i = []
-        C_A = []
-        C_B = []
-        C_i = []
-        C_j = []
-
-        for i in xrange(self.N):
-            idx = sen_idx[i]
-            for U, A, P in self.w_U[idx]:
-                tpl1 = (i, P)
-                if tpl1 not in self.lex:
-                    lex_i += 1
-                    self.lex[tpl1] = lex_i
-                    P_P.append(P)
-                    P_i.append(i)
-                tpl2 = (i, A)
-                if tpl2 not in self.p2u:
-                    p2u_i += 1
-                    self.p2u[tpl2] = p2u_i
-                    U_A.append(A)
-                    U_i.append(i)
-                self.betas[i,i+1,A,1] = 1
-
-        for w in xrange(2, self.N+1):
-            for i in xrange(self.N-w+1):
-                k = i + w
-                for j in xrange(i+1, k):
-                    for B in self.B_AC:
-                        Bs = self.betas[i,j,B,1]
-                        if Bs == 0:
-                            continue
-                        for A, C in self.B_AC[B]:
-                            Cs = self.betas[j,k,C,1]
-                            if Cs == 0:
-                                continue
-                            tpl1 = (i, A)
-                            tpl2 = (i, j, A, B)
-                            if tpl1 not in self.p2l:
-                                p2l_i += 1
-                                self.p2l[tpl1] = p2l_i
-                                B_A.append(A)
-                                B_i.append(i)
-                            
-                            if tpl2 not in self.pl2r:
-                                pl2r_i += 1
-                                self.pl2r[tpl2] = pl2r_i
-                                C_A.append(A)
-                                C_B.append(B)
-                                C_i.append(i)
-                                C_j.append(j)
-
-                            self.betas[i,k,A,0] = 1
-
-            for i in xrange(self.N-w+1):
-                k = i + w
-                for A in xrange(self.nnt):
-                    As = self.betas[i,k,A,0]
-                    if As > 0:
-                        self.betas[i,k,A,1] = As
-
-            for i in xrange(self.N-w+1):
-                k = i + w
-                for B in self.B_A:
-                    Bs = self.betas[i,k,B,0]
-                    if Bs == 0:
-                        continue
-                    for U, A in self.B_A[B]:
-                        tpl = (i, A)
-                        if tpl not in self.p2u:
-                            p2u_i += 1
-                            self.p2u[tpl] = p2u_i
-                            U_A.append(A)
-                            U_i.append(i)
-                        self.betas[i,k,A,1] = 1
 
         if self.use_cuda:
-            PP = self.nt_emb(Variable(torch.LongTensor(P_P).cuda()))
-            PI = torch.index_select(alpha, 0, Variable(torch.LongTensor(P_i).cuda()))
+            PP = self.nt_emb(Variable(torch.from_numpy(P_P).cuda()))
+            PI = torch.index_select(alpha, 0, Variable(torch.from_numpy(P_i).cuda()))
 
-            UA = self.nt_emb(Variable(torch.LongTensor(U_A).cuda()))
-            UI = torch.index_select(alpha, 0, Variable(torch.LongTensor(U_i).cuda()))
+            UA = self.nt_emb(Variable(torch.from_numpy(U_A).cuda()))
+            UI = torch.index_select(alpha, 0, Variable(torch.from_numpy(U_i).cuda()))
 
-            BA = self.nt_emb(Variable(torch.LongTensor(B_A).cuda()))
-            BI = torch.index_select(alpha, 0, Variable(torch.LongTensor(B_i).cuda()))
+            BA = self.nt_emb(Variable(torch.from_numpy(B_A).cuda()))
+            BI = torch.index_select(alpha, 0, Variable(torch.from_numpy(B_i).cuda()))
 
-            CA = self.nt_emb(Variable(torch.LongTensor(C_A).cuda()))
-            CB = self.nt_emb(Variable(torch.LongTensor(C_B).cuda()))
-            CI = torch.index_select(alpha, 0, Variable(torch.LongTensor(C_i).cuda()))
-            CJ = torch.index_select(alpha, 0, Variable(torch.LongTensor(C_j).cuda()))
+            CA = self.nt_emb(Variable(torch.from_numpy(C_A).cuda()))
+            CB = self.nt_emb(Variable(torch.from_numpy(C_B).cuda()))
+            CI = torch.index_select(alpha, 0, Variable(torch.from_numpy(C_i).cuda()))
+            CJ = torch.index_select(alpha, 0, Variable(torch.from_numpy(C_j).cuda()))
 
         else:
-            PP = self.nt_emb(Variable(torch.LongTensor(P_P)))
-            PI = torch.index_select(alpha, 0, Variable(torch.LongTensor(P_i)))
+            PP = self.nt_emb(Variable(torch.from_numpy(P_P)))
+            PI = torch.index_select(alpha, 0, Variable(torch.from_numpy(P_i)))
 
-            UA = self.nt_emb(Variable(torch.LongTensor(U_A)))
-            UI = torch.index_select(alpha, 0, Variable(torch.LongTensor(U_i)))
+            UA = self.nt_emb(Variable(torch.from_numpy(U_A)))
+            UI = torch.index_select(alpha, 0, Variable(torch.from_numpy(U_i)))
 
-            BA = self.nt_emb(Variable(torch.LongTensor(B_A)))
-            BI = torch.index_select(alpha, 0, Variable(torch.LongTensor(B_i)))
+            BA = self.nt_emb(Variable(torch.from_numpy(B_A)))
+            BI = torch.index_select(alpha, 0, Variable(torch.from_numpy(B_i)))
 
-            CA = self.nt_emb(Variable(torch.LongTensor(C_A)))
-            CB = self.nt_emb(Variable(torch.LongTensor(C_B)))
-            CI = torch.index_select(alpha, 0, Variable(torch.LongTensor(C_i)))
-            CJ = torch.index_select(alpha, 0, Variable(torch.LongTensor(C_j)))
+            CA = self.nt_emb(Variable(torch.from_numpy(C_A)))
+            CB = self.nt_emb(Variable(torch.from_numpy(C_B)))
+            CI = torch.index_select(alpha, 0, Variable(torch.from_numpy(C_i)))
+            CJ = torch.index_select(alpha, 0, Variable(torch.from_numpy(C_j)))
 
-        self.BB = self.lsm(
+        x2y = self.lsm(
             self.B_h2(
                 self.relu(
                     self.B_h1(
@@ -570,9 +476,9 @@ class LN(nn.Module):
                     )
                 )
             )
-        ).data
+        ).data.numpy()
 
-        self.CC = self.lsm(
+        xy2z = self.lsm(
             self.C_h2(
                 self.relu(
                     self.C_h1(
@@ -580,9 +486,9 @@ class LN(nn.Module):
                     )
                 )
             )
-        ).data
+        ).data.numpy()
 
-        self.UU = self.lsm(
+        x2u = self.lsm(
             self.U_h2(
                 self.relu(
                     self.U_h1(
@@ -590,9 +496,9 @@ class LN(nn.Module):
                     )
                 )
             )
-        ).data
+        ).data.numpy()
 
-        self.TT = self.lsm(
+        lex = self.lsm(
             self.T_h2(
                 self.relu(
                     self.T_h1(
@@ -600,94 +506,14 @@ class LN(nn.Module):
                     )
                 )
             )
-        ).data
+        ).data.numpy()
 
-
-    def parse(self, sentence, sen_idx):
-
-        self.sentence = sentence.split()
-        
-        self.pre_parse(sen_idx)
-        sen_idx = sen_idx.data[1:]
-
-        ZERO = -10000
-        self.betas.fill(ZERO)
-
-        for i in xrange(self.N):
-            idx = sen_idx[i]
-            for U, A, PT in self.w_U[idx]:
-                score = self.TT[self.lex[(i, PT)], idx] + self.UU[self.p2u[(i, A)], U]
-
-                if score > self.betas[i,i+1,A,1]:
-                    self.betas[i,i+1,A,1] = score
-                    self.Bp[i,i+1,A] = -1
-                    self.Cp[i,i+1,A] = U
-
-
-        for w in xrange(2, self.N+1):
-            for i in xrange(self.N-w+1):
-                k = i + w
-                for j in xrange(i+1, k):
-                    for B in self.B_AC:
-                        Bs = self.betas[i,j,B,1]
-                        if Bs == ZERO:
-                            continue
-                        for A, C in self.B_AC[B]:
-                            Cs = self.betas[j,k,C,1]
-                            if Cs == ZERO:
-                                continue
-                            score = self.BB[self.p2l[(i,A)], B] \
-                                +self.CC[self.pl2r[(i,j,A,B)], C] + Bs + Cs
-                            if score > self.betas[i,k,A,0]:
-                                # print "Binary: ({}, {}, {}) {} ({})-> {} {} ({}) = {}".format(i,j,k, self.idx2nt[A], Bh, self.idx2nt[B], self.idx2nt[C], Ch, ikAB)
-                                self.betas[i,k,A,0] = score
-                                self.Bp[i,k,A] = B
-                                self.Cp[i,k,A] = C
-                                self.jp[i,k,A] = j
-
-            for i in xrange(self.N-w+1):
-                k = i + w
-                for A in xrange(self.nnt):
-                    As = self.betas[i,k,A,0]
-                    if As > ZERO:
-                        self.betas[i,k,A,1] = As
-
-            for i in xrange(self.N-w+1):
-                k = i + w
-                for B in self.B_A:
-                    Bs = self.betas[i,k,B,0]
-                    if Bs == ZERO:
-                        continue
-                    for U, A in self.B_A[B]:
-                        score = self.UU[self.p2u[(i, A)], U] + Bs
-                        if score > self.betas[i,k,A,1]:
-                            self.betas[i,k,A,1] = score
-                            self.Bp[i,k,A] = B
-                            self.Cp[i,k,A] = U
-                            self.jp[i,k,A] = -1
-
-
-        return -self.betas[0,self.N,1,1], self.print_parse(0, self.N, 1)
-
-
-    def print_parse(self, i, k, A):
-
-        B = self.Bp[i,k,A]
-        C = self.Cp[i,k,A]
-        j = self.jp[i,k,A]
-
-        if B == -1:
-            # is terminal rule
-            return self.prefix[C] + " " + self.sentence[i] + self.suffix[C]
-        elif j == -1:
-            # unary rule
-            return self.prefix[C] + self.print_parse(i, k, B) + self.suffix[C]
-        else:
-            # binary rule
-            #print i, j, k, self.idx2nt[A], self.idx2nt[B], self.idx2nt[C]
-            return  "(" + self.idx2nt[A] + " " \
-                + self.print_parse(i, j, B) + " " \
-                + self.print_parse(j, k, C) + ")"        
+        t2 = time.time()
+        score, parse = self.parser.viterbi(x2y, xy2z, x2u, lex)
+        end = time.time()
+        #print " - preparse: {:.2f} compute rule prob: {:.2f} parse: {:.2f}".format(end-t2,t2-t1,t1-start)
+        return score, parse
+       
 
     def forward(self, train_type, args):
         if train_type == 'supervised':
