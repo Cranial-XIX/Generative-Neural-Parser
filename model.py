@@ -334,6 +334,7 @@ class LN(nn.Module):
         self.parser = Parser(dp)
 
         self.init_h0()
+        self.h0.requires_grad = False
         #self.h0[0].requires_grad = False
         #self.h0[1].requires_grad = False
 
@@ -347,7 +348,7 @@ class LN(nn.Module):
         # The LSTM and some linear transformation layers
         self.LSTM = nn.GRU(
             self.dt, self.dhid, self.nlayers,
-            batch_first=True, bias=True, dropout=0.4
+            batch_first=True, bias=True
         )
 
         self.lsm = nn.LogSoftmax()
@@ -366,7 +367,7 @@ class LN(nn.Module):
         T_in = self.dnt + self.dhid
         T_out = self.nt
 
-        zeta = 0.3
+        zeta = 0.4
         d_B = int( zeta * B_out + (1-zeta) * B_in )
         d_C = int( zeta * C_out + (1-zeta) * C_in )
         d_U = int( zeta * U_out + (1-zeta) * U_in )
@@ -430,10 +431,10 @@ class LN(nn.Module):
         self.init_h0()
 
     def parse(self, sentence, sen_idx):
-        start = time.time()
+        #start = time.time()
         P_P, P_i, U_A, U_i, B_A, B_i, C_A, C_B, C_i, C_j = self.parser.preparse(sentence, sen_idx.data)
 
-        t1 = time.time()
+        #t1 = time.time()
         V = self.word_emb(sen_idx)
         alpha, _ = self.LSTM(V.unsqueeze(0), self.h0)
         alpha = alpha.squeeze(0)
@@ -453,6 +454,46 @@ class LN(nn.Module):
             CI = torch.index_select(alpha, 0, Variable(torch.from_numpy(C_i).cuda()))
             CJ = torch.index_select(alpha, 0, Variable(torch.from_numpy(C_j).cuda()))
 
+            x2y = self.lsm(
+                self.B_h2(
+                    self.relu(
+                        self.B_h1(
+                            torch.cat( (BA, BI), 1 )
+                        )
+                    )
+                )
+            ).data.cpu().numpy()
+
+            xy2z = self.lsm(
+                self.C_h2(
+                    self.relu(
+                        self.C_h1(
+                            torch.cat( (CA, CB, CI, CJ-CI), 1 )
+                        )
+                    )
+                )
+            ).data.cpu().numpy()
+
+            x2u = self.lsm(
+                self.U_h2(
+                    self.relu(
+                        self.U_h1(
+                            torch.cat( (UA, UI), 1 )
+                        )
+                    )
+                )
+            ).data.cpu().numpy()
+
+            lex = self.lsm(
+                self.T_h2(
+                    self.relu(
+                        self.T_h1(
+                            torch.cat( (PP, PI), 1 )
+                        )
+                    )
+                )
+            ).data.cpu().numpy()
+
         else:
             PP = self.nt_emb(Variable(torch.from_numpy(P_P)))
             PI = torch.index_select(alpha, 0, Variable(torch.from_numpy(P_i)))
@@ -468,49 +509,49 @@ class LN(nn.Module):
             CI = torch.index_select(alpha, 0, Variable(torch.from_numpy(C_i)))
             CJ = torch.index_select(alpha, 0, Variable(torch.from_numpy(C_j)))
 
-        x2y = self.lsm(
-            self.B_h2(
-                self.relu(
-                    self.B_h1(
-                        torch.cat( (BA, BI), 1 )
+            x2y = self.lsm(
+                self.B_h2(
+                    self.relu(
+                        self.B_h1(
+                            torch.cat( (BA, BI), 1 )
+                        )
                     )
                 )
-            )
-        ).data.numpy()
+            ).data.numpy()
 
-        xy2z = self.lsm(
-            self.C_h2(
-                self.relu(
-                    self.C_h1(
-                        torch.cat( (CA, CB, CI, CJ-CI), 1 )
+            xy2z = self.lsm(
+                self.C_h2(
+                    self.relu(
+                        self.C_h1(
+                            torch.cat( (CA, CB, CI, CJ-CI), 1 )
+                        )
                     )
                 )
-            )
-        ).data.numpy()
+            ).data.numpy()
 
-        x2u = self.lsm(
-            self.U_h2(
-                self.relu(
-                    self.U_h1(
-                        torch.cat( (UA, UI), 1 )
+            x2u = self.lsm(
+                self.U_h2(
+                    self.relu(
+                        self.U_h1(
+                            torch.cat( (UA, UI), 1 )
+                        )
                     )
                 )
-            )
-        ).data.numpy()
+            ).data.numpy()
 
-        lex = self.lsm(
-            self.T_h2(
-                self.relu(
-                    self.T_h1(
-                        torch.cat( (PP, PI), 1 )
+            lex = self.lsm(
+                self.T_h2(
+                    self.relu(
+                        self.T_h1(
+                            torch.cat( (PP, PI), 1 )
+                        )
                     )
                 )
-            )
-        ).data.numpy()
+            ).data.numpy()
 
-        t2 = time.time()
+        #t2 = time.time()
         score, parse = self.parser.viterbi(x2y, xy2z, x2u, lex)
-        end = time.time()
+        #end = time.time()
         #print " - preparse: {:.2f} compute rule prob: {:.2f} parse: {:.2f}".format(end-t2,t2-t1,t1-start)
         return score, parse
        
@@ -593,6 +634,7 @@ class LN(nn.Module):
         )
 
         return nll_B + nll_C + nll_U + nll_T
+
 
 """
 The model with (B)ilexical information, (L)eft context LSTM features,

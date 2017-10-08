@@ -80,7 +80,7 @@ class Processor(object):
         begin_time = time.time()
 
         # all_trees are all the trees we can use in training -- (trainset) from the WSJ 2-21
-        all_trees = list(ptb("train"))
+        train_trees = list(ptb("train"))
 
         # here we follow the old convention from Berkeley's to record the frequency
         # of each word. But we simplify the process such that we only have one threshold, namely
@@ -89,8 +89,17 @@ class Processor(object):
         # Details for creating signature are in Signature in util.py
         word_frequencies = {}
 
-        for (sentence, _) in all_trees:
+        num_train_tokens = 0
+        num_train_sens = len(train_trees)
+        max_length_sen = 0
+        for (sentence, _) in train_trees:
+
             sen_split = sentence.split()
+            length = len(sen_split)
+            num_train_tokens += length
+            if length > max_length_sen:
+                max_length_sen = length
+
             for word in sen_split:
                 word = word.rstrip()
                 if word in word_frequencies:
@@ -99,7 +108,7 @@ class Processor(object):
                     word_frequencies[word] = 1
 
         # the dimension of terminals -- self.dt
-        self.dt = 80
+        self.dt = 128
         self.w2idx = {}
         self.idx2w = []
         # there's a special symbol here called BOS, we add this symbol
@@ -126,7 +135,11 @@ class Processor(object):
                 self.idx2w.append(word)
                 self.nt += 1
 
-        print " - There are {} number of known words. ".format(self.nt)
+        num_train_oov = len(oov_set)
+
+        print " - In train set: Sequences: {} Tokens: {} Token types: {} Unknown types: {} Max sen length: {} ".format(
+            num_train_sens, num_train_tokens, self.nt, num_train_oov, max_length_sen)
+
         # we also want to include all signatures that we haven't covered in
         # training set.
         rest_trees = list(ptb("dev", "test"))
@@ -164,13 +177,13 @@ class Processor(object):
         Read nonterminals from the nonterminal embedding file (there's no embedding,
         only a list of nonterminals --level 0 nonterminals)
         '''
-        if not self.check_file_exists(constants.NT_EMB_FILE, "nonterminal embeddings"):
+        if not self.check_file_exists(constants.NT_FILE, "nonterminal embeddings"):
             return
 
         # dimension of the nonterminals -- self.dnt
-        self.dnt = 30
+        self.dnt = 32
         begin_time = time.time()
-        with open(constants.NT_EMB_FILE, 'r') as nt_f:
+        with open(constants.NT_FILE, 'r') as nt_f:
             nt_f.next()                                 # skip the comment
 
             # There is a special symbol called TERMINAL that is used in 
@@ -192,7 +205,7 @@ class Processor(object):
             self.idx2nt.append(constants.TERMINAL)
 
             idx = 1
-            for line in nt_f: 
+            for line in nt_f:
                 nt = line.strip()
                 self.nt2idx[nt] = idx
                 self.idx2nt.append(nt)
@@ -379,7 +392,7 @@ class Processor(object):
         begin_time = time.time()
 
         train_trees = list(
-            ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=3000)
+            ptb("train", minlength=3, maxlength=constants.MAX_SEN_LENGTH, n=100)
         )
 
         f = open(self.train_file, 'w')

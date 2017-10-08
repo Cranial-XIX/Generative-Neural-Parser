@@ -2,22 +2,16 @@ W2V_FILE = "data/w2v.txt"
 GLOVE_FILE = "data/GloVe.txt"
 HEADIFIED_FILE = "data/head.txt"
 TREES_FILE = "data/trees.txt"
-NT_EMB_FILE = "data/xbar.nonterminals"
-LEX_FILE = "data/xbar.lexicon"
-GR_FILE = "data/xbar.grammar"
-TRAIN_FILE = "data/train_small.txt"
+TRAIN_FILE = "data/train.txt"
+NT_FILE = "data/nonterminals.txt"
 
 PRE_TRAINED_FILE = "output/default_cpu/model_dict"
 CORPUS_INFO_FILE = "corpus_info.tar"
+
 MAX_SEN_LENGTH = 30                  # maximum lenght of a sentence
 MAX_TEST_SEN_LENGTH = 30
-C_UNT = 20
-C_P2L = 50
-DIMENSION_OF_MODEL = 100
-DIM_TERMINAL = 314
-MAX_VOCAB_SIZE = 500000
 
-UNCOMMON_THRESHOLD = 20
-RARE_THRESHOLD = 10
+RARE_THRESHOLD = 5
+
 BOS = 'BOS'
 TERMINAL = 'TERMINAL'

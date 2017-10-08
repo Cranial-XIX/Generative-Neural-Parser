@@ -59,11 +59,11 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--lstm-dim', default=180, help='LSTM hidden dimension'
+    '--lstm-dim', default=256, help='LSTM hidden dimension'
 )
 
 argparser.add_argument(
-    '--l2-coef', default=0.08, help='l2 norm coefficient'
+    '--l2-coef', default=0, help='l2 norm coefficient'
 )
 
 argparser.add_argument(
@@ -73,7 +73,7 @@ argparser.add_argument(
 # Below are variables associated with training
 # =========================================================================
 argparser.add_argument(
-    '--epochs', default=100, help='# epochs to train'
+    '--epochs', default=200, help='# epochs to train'
 )
 
 argparser.add_argument(
@@ -213,7 +213,7 @@ def supervised():
 
     # define the optimizer to use; currently use Adam
     optimizer = optim.Adam(
-        parameters, lr=args.learning_rate ,weight_decay=args.l2_coef
+        parameters, lr=args.learning_rate#, weight_decay=args.l2_coef
     )
 
     total = dp.trainset_length
@@ -258,11 +258,14 @@ def supervised():
                 else:
                     print template.format(epoch, idx, total, float(idx)/total * 100., round(end - start, 5))
 
-        print " -- E[ NLL(sentence) ]={}".format(tot_loss / total)
+        print " -- E[ NLL(sentence) ]={}\n".format(tot_loss / total)
+
+        if epoch < 20:
+            continue
 
         model.eval()
-        #F1_train = test("train", 100)
-        F1 = test("test")
+        F1_train = test("train")
+        #F1 = test("test")
         model.parse_end()
 
         #if F1 > max_F1:
@@ -270,7 +273,7 @@ def supervised():
         #    torch.save( {'state_dict': model.state_dict()}, file_save )
 
     if args.verbose:
-        print "Finish supervised training"
+        print "\nFinish supervised training"
 
     f.close()
 
@@ -284,7 +287,7 @@ def parse(sentence):
     return model.parse(sentence, Variable(sen))
 
 
-def fpr(GW, G, W):
+def fpr(want_and_got, got, want):
     "Compute F-measure, precition, and recall from |want & got|, |got|, |want|."
     if want == 0 and got == 0:
         # Wanted empty set, got empty set.
@@ -305,7 +308,7 @@ def test(dataset):
 
     start = time.time()
     model.parse_setup()
-    test_data = list(ptb(dataset, minlength=3, maxlength=constants.MAX_TEST_SEN_LENGTH))
+    test_data = list(ptb(dataset, minlength=3, maxlength=constants.MAX_TEST_SEN_LENGTH, n=100))
 
     num_sen = 0
     GW_sum = G_sum = W_sum = NLL_sum = 0
@@ -330,15 +333,15 @@ def test(dataset):
         GW_sum += GW
         G_sum += G
         W_sum += W
-        F, P, R = fpr(GW, G, W)
-        print template.format(num_sen, N, num_sen/float(N)*100, P, R, F, nll)
+        #F, P, R = fpr(GW, G, W)
+        #print template.format(num_sen, N, num_sen/float(N)*100, P, R, F, nll)
 
     F, P, R = fpr(GW_sum, G_sum, W_sum)
     print " On {} # Sen: {} P: {:.2f} R: {:.2f} F1: {:.2f} NLL: {:.2f}".format( dataset, num_sen, P, R, F, NLL_sum ) 
 
     end = time.time()
     print " Testing takes: ", end - start
-    return F1
+    return F
 
 
 def check_spv():
