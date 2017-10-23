@@ -63,6 +63,10 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
+    '--dropout', default=0, help='LSTM dropout'
+)
+
+argparser.add_argument(
     '--l2-coef', default=0, help='l2 norm coefficient'
 )
 
@@ -77,11 +81,11 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--batch-size', default=20, help='# instances in a batch'
+    '--batch-size', default=10, help='# instances in a batch'
 )
 
 argparser.add_argument(
-    '--learning-rate', default=0.01, help="learning rate"
+    '--learning-rate', default=0.0004, help="learning rate"
 )
 
 argparser.add_argument(
@@ -130,6 +134,7 @@ if args.verbose == 'yes':
     print template.format(" LSTM coefficient :", args.lstm_coef)
     print template.format(" LSTM # of layer :", args.lstm_layer)
     print template.format(" LSTM dimension :", args.lstm_dim)
+    print template.format(" LSTM dropout :", args.dropout)
     print template.format(" l2 coefficient :", args.l2_coef)
     print "- Train:"
     print template.format(" # of epochs is :", args.epochs)
@@ -144,6 +149,7 @@ args.learning_rate = float(args.learning_rate)
 args.lstm_coef = float(args.lstm_coef)
 args.lstm_layer = int(args.lstm_layer)
 args.lstm_dim = int(args.lstm_dim)
+args.dropout = float(args.dropout)
 args.l2_coef = float(args.l2_coef)
 args.make_train = (args.make_train == 'yes')
 args.read_data = (args.read_data == 'yes')
@@ -180,6 +186,7 @@ inputs = {
     # model
     'lstm_coef': args.lstm_coef,
     'nlayers': args.lstm_layer,
+    'dropout': args.dropout,
     'bsz': args.batch_size,
     'dhid': args.lstm_dim,
 
@@ -213,7 +220,7 @@ def supervised():
 
     # define the optimizer to use; currently use Adam
     optimizer = optim.Adam(
-        parameters, lr=args.learning_rate#, weight_decay=args.l2_coef
+        parameters, lr=args.learning_rate, weight_decay=args.l2_coef
     )
 
     total = dp.trainset_length
@@ -250,23 +257,26 @@ def supervised():
 
             optimizer.step()
             end = time.time()
-
+	    
+	    if idx == -1:
+		break
+	    '''
             if args.verbose:
                 if idx == -1:
                     print template.format(epoch, total, total, 100., round(end - start, 5))
                     break
                 else:
                     print template.format(epoch, idx, total, float(idx)/total * 100., round(end - start, 5))
+	    '''
 
-        print " -- E[ NLL(sentence) ]={}\n".format(tot_loss / total)
+        print " Epoch {} -- E[ NLL(sentence) ]={}\n".format(epoch, tot_loss / total)
 
-        if epoch < 20:
-            continue
+        if epoch % 5 == 0:
 
-        model.eval()
-        F1_train = test("train")
-        #F1 = test("test")
-        model.parse_end()
+       	    model.eval()
+            F1_train = test("train")
+            F1 = test("test")
+            model.parse_end()
 
         #if F1 > max_F1:
         #    max_F1 = F1
@@ -308,7 +318,7 @@ def test(dataset):
 
     start = time.time()
     model.parse_setup()
-    test_data = list(ptb(dataset, minlength=3, maxlength=constants.MAX_TEST_SEN_LENGTH, n=100))
+    test_data = list(ptb(dataset, minlength=3, maxlength=constants.MAX_TEST_SEN_LENGTH, n=500))
 
     num_sen = 0
     GW_sum = G_sum = W_sum = NLL_sum = 0

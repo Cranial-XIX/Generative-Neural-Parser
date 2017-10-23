@@ -12,4 +12,6 @@ output/*
 *.cpp
 *.c
 build/*
-shell.sh
+*.txt
+corpus_info.tar
+shell*.sh

@@ -348,12 +348,12 @@ class LN(nn.Module):
         # The LSTM and some linear transformation layers
         self.LSTM = nn.GRU(
             self.dt, self.dhid, self.nlayers,
-            batch_first=True, bias=True
+            batch_first=True, bias=True, dropout=args['dropout']
         )
 
         self.lsm = nn.LogSoftmax()
         self.sm = nn.Softmax()
-        self.relu = nn.ReLU()
+        self.relu = nn.Sigmoid()
 
         B_in = self.dnt + self.dhid
         B_out = self.nnt
