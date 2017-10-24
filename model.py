@@ -49,7 +49,7 @@ class BS(nn.Module):
 
         self.lsm = nn.LogSoftmax()
         self.sm = nn.Softmax()
-        self.relu = nn.ReLU()
+        self.actv = nn.ReLU()
 
         self.A2B = nn.Linear(self.dnt, self.nnt)
         self.AB2C = nn.Linear(self.dnt*2, self.nnt)
@@ -346,14 +346,15 @@ class LN(nn.Module):
         self.nt_emb.weight.requires_grad = False
 
         # The LSTM and some linear transformation layers
+        self.drop = nn.Dropout(args['dropout'])
         self.LSTM = nn.GRU(
             self.dt, self.dhid, self.nlayers,
-            batch_first=True, bias=True, dropout=args['dropout']
+            batch_first=True, bias=True#, dropout=args['dropout']
         )
 
         self.lsm = nn.LogSoftmax()
         self.sm = nn.Softmax()
-        self.relu = nn.Sigmoid()
+        self.actv = nn.LeakyReLU()
 
         B_in = self.dnt + self.dhid
         B_out = self.nnt
@@ -456,7 +457,7 @@ class LN(nn.Module):
 
             x2y = self.lsm(
                 self.B_h2(
-                    self.relu(
+                    self.actv(
                         self.B_h1(
                             torch.cat( (BA, BI), 1 )
                         )
@@ -466,7 +467,7 @@ class LN(nn.Module):
 
             xy2z = self.lsm(
                 self.C_h2(
-                    self.relu(
+                    self.actv(
                         self.C_h1(
                             torch.cat( (CA, CB, CI, CJ-CI), 1 )
                         )
@@ -476,7 +477,7 @@ class LN(nn.Module):
 
             x2u = self.lsm(
                 self.U_h2(
-                    self.relu(
+                    self.actv(
                         self.U_h1(
                             torch.cat( (UA, UI), 1 )
                         )
@@ -486,7 +487,7 @@ class LN(nn.Module):
 
             lex = self.lsm(
                 self.T_h2(
-                    self.relu(
+                    self.actv(
                         self.T_h1(
                             torch.cat( (PP, PI), 1 )
                         )
@@ -511,7 +512,7 @@ class LN(nn.Module):
 
             x2y = self.lsm(
                 self.B_h2(
-                    self.relu(
+                    self.actv(
                         self.B_h1(
                             torch.cat( (BA, BI), 1 )
                         )
@@ -521,7 +522,7 @@ class LN(nn.Module):
 
             xy2z = self.lsm(
                 self.C_h2(
-                    self.relu(
+                    self.actv(
                         self.C_h1(
                             torch.cat( (CA, CB, CI, CJ-CI), 1 )
                         )
@@ -531,7 +532,7 @@ class LN(nn.Module):
 
             x2u = self.lsm(
                 self.U_h2(
-                    self.relu(
+                    self.actv(
                         self.U_h1(
                             torch.cat( (UA, UI), 1 )
                         )
@@ -541,7 +542,7 @@ class LN(nn.Module):
 
             lex = self.lsm(
                 self.T_h2(
-                    self.relu(
+                    self.actv(
                         self.T_h1(
                             torch.cat( (PP, PI), 1 )
                         )
@@ -572,7 +573,7 @@ class LN(nn.Module):
 
         # run the LSTM to extract features from left context
         alpha, _ = self.LSTM(self.word_emb(sens), self.h0)
-        alpha = alpha.contiguous().view(-1, alpha.size(2))
+        alpha = (self.drop(alpha)).contiguous().view(-1, alpha.size(2))
 
 
         BIv = torch.index_select(alpha, 0, BI)
@@ -588,7 +589,7 @@ class LN(nn.Module):
         nll_B = -torch.sum(
             self.lsm(
                 self.B_h2(
-                    self.relu(
+                    self.actv(
                         self.B_h1(
                             torch.cat( (AAv, BIv), 1 )
                         )
@@ -600,7 +601,7 @@ class LN(nn.Module):
         nll_C = -torch.sum(
             self.lsm(
                 self.C_h2(
-                    self.relu(
+                    self.actv(
                         self.C_h1(
                             torch.cat( (AAv, BBv, BIv, CIv-BIv), 1 )
                         )
@@ -612,7 +613,7 @@ class LN(nn.Module):
         nll_U = -torch.sum(
             self.lsm(
                 self.U_h2(
-                    self.relu(
+                    self.actv(
                         self.U_h1(
                             torch.cat( (U_Av, UIv), 1 )
                         )
@@ -624,7 +625,7 @@ class LN(nn.Module):
         nll_T = -torch.sum(
             self.lsm(
                 self.T_h2(
-                    self.relu(
+                    self.actv(
                         self.T_h1(
                             torch.cat( (T_Av, TIv), 1 )
                         )
@@ -699,7 +700,7 @@ class BLN(nn.Module):
 
         self.lsm = nn.LogSoftmax()
         self.sm = nn.Softmax()
-        self.relu = nn.ReLU()
+        self.actv = nn.ReLU()
 
         # below are linear layers in single layer neural net
         B_in = self.dt + self.dnt + self.dhid
@@ -812,7 +813,7 @@ class BLN(nn.Module):
 
         init = self.lsm(
             self.U_h2(
-                self.relu(
+                self.actv(
                     self.U_h1(
                         torch.cat((
                             self.nt_emb(As_var).unsqueeze(0).repeat(n, 1, 1),
@@ -862,7 +863,7 @@ class BLN(nn.Module):
 
         nll_U = self.lsm(
             self.U_h2(
-                self.relu(
+                self.actv(
                     self.U_h1(
                         torch.cat( (AAv, Aiv, AHv), 1 )
                     )
@@ -991,7 +992,7 @@ class BLN(nn.Module):
             # P( @B/B | A, v(h), alpha(A) )
             nll_B1 = self.lsm(
                 self.B_h2(
-                    self.relu(
+                    self.actv(
                         self.B_h1(
                             torch.cat( (AAv, BHv, Aiv), 1 )
                         )
@@ -1002,7 +1003,7 @@ class BLN(nn.Module):
             # P( C | A, B, v(h), alpha(A), alpha(C)-alpha(A) )
             nll_C = self.lsm(
                 self.C_h2(
-                    self.relu(
+                    self.actv(
                         self.C_h1(
                             torch.cat( (AAv, BBv, BHv, Aiv, Civ-Aiv), 1 )
                         )
@@ -1014,7 +1015,7 @@ class BLN(nn.Module):
             # P( h' | C, BH, Ci)
             nll_h = self.lsm(
                 self.h_h2(
-                    self.relu(
+                    self.actv(
                         self.h_h1(
                             torch.cat( (BH_Cv, BH_BHv, BH_Civ), 1 )
                         )
@@ -1030,7 +1031,7 @@ class BLN(nn.Module):
 
             nll_B2 = self.lsm(
                 self.B_h2(
-                    self.relu(
+                    self.actv(
                         self.B_h1(
                             torch.cat( (AAv, CHv, Aiv), 1 )
                         )
@@ -1043,7 +1044,7 @@ class BLN(nn.Module):
             # P( h' | A, B, v(h), alpha(A) )
             nll_h1 = self.lsm(
                 self.h1_h2(
-                    self.relu(
+                    self.actv(
                         self.h1_h1(
                             torch.cat( (CH_Bv, CH_CHv, CH_Biv), 1 )
                         )
@@ -1056,7 +1057,7 @@ class BLN(nn.Module):
 
             nll_C1 = self.lsm(
                 self.C1_h2(
-                    self.relu(
+                    self.actv(
                         self.C1_h1(
                             torch.cat((AAv, BBv, BHv, CHv, Aiv, Civ-Aiv), 1))
                     )
@@ -1144,7 +1145,7 @@ class BLN(nn.Module):
 
             nll_U = self.lsm(
                 self.U_h2(
-                    self.relu(
+                    self.actv(
                         self.U_h1(
                             torch.cat( (AAv, Aiv, AHv), 1 )
                         )
@@ -1241,7 +1242,7 @@ class BLN(nn.Module):
         nll_atB = -torch.sum(
             self.lsm(
                 self.B_h2(
-                    self.relu(
+                    self.actv(
                         self.B_h1(
                             torch.cat(
                                 (A, BH, Bi), 1
@@ -1257,7 +1258,7 @@ class BLN(nn.Module):
         nll_C = -torch.sum(
             self.lsm(
                 self.C_h2(
-                    self.relu(
+                    self.actv(
                         self.C_h1(
                             torch.cat( (A, B, BH, Bi, Ci-Bi), 1 )
                         )
@@ -1271,7 +1272,7 @@ class BLN(nn.Module):
         nll_h = -torch.sum(
             self.lsm(
                 self.h_h2(
-                    self.relu(
+                    self.actv(
                         self.h_h1(
                             torch.cat( (C, BH, Ci), 1 )
                         )
@@ -1297,7 +1298,7 @@ class BLN(nn.Module):
         nll_B = -torch.sum(
             self.lsm(
                 self.B_h2(
-                    self.relu(
+                    self.actv(
                         self.B_h1(
                             torch.cat(
                                 (A, CH, Bi), 1
@@ -1313,7 +1314,7 @@ class BLN(nn.Module):
         nll_h1 = -torch.sum(
             self.lsm(
                 self.h1_h2(
-                    self.relu(
+                    self.actv(
                         self.h1_h1(
                             torch.cat( (B, CH, Bi), 1 )
                         )
@@ -1327,7 +1328,7 @@ class BLN(nn.Module):
         nll_C1 = -torch.sum(
             self.lsm(
                 self.C1_h2(
-                    self.relu(
+                    self.actv(
                         self.C1_h1(
                             torch.cat( (A, B, BH, CH, Bi, Ci-Bi), 1 )
                         )
@@ -1342,7 +1343,7 @@ class BLN(nn.Module):
         nll_U = -torch.sum(
             self.lsm(
                 self.U_h2(
-                    self.relu(
+                    self.actv(
                         self.U_h1(
                             torch.cat((
                                 self.nt_emb(U_A),
@@ -1386,7 +1387,7 @@ class BLN(nn.Module):
 
         smatB = self.sm(
             self.B_h2(
-                self.relu(
+                self.actv(
                     self.B_h1(
                         torch.cat(
                             (A, BH, Bi), 1
@@ -1400,7 +1401,7 @@ class BLN(nn.Module):
 
         smC = self.sm(
             self.C_h2(
-                self.relu(
+                self.actv(
                     self.C_h1(
                         torch.cat( (A, B, BH, Bi, Ci-Bi), 1 )
                     )
@@ -1412,7 +1413,7 @@ class BLN(nn.Module):
 
         smH = self.sm(
             self.h_h2(
-                self.relu(
+                self.actv(
                     self.h_h1(
                         torch.cat( (C, BH, Ci), 1 )
                     )
@@ -1436,7 +1437,7 @@ class BLN(nn.Module):
 
         smB = self.sm(
             self.B_h2(
-                self.relu(
+                self.actv(
                     self.B_h1(
                         torch.cat(
                             (A, CH, Bi), 1
@@ -1450,7 +1451,7 @@ class BLN(nn.Module):
 
         smH1 = self.sm(
             self.h1_h2(
-                self.relu(
+                self.actv(
                     self.h1_h1(
                         torch.cat( (B, CH, Bi), 1 )
                     )
@@ -1462,7 +1463,7 @@ class BLN(nn.Module):
 
         smC1 = self.sm(
             self.C1_h2(
-                self.relu(
+                self.actv(
                     self.C1_h1(
                         torch.cat( (A, B, BH, CH, Bi, Ci-Bi), 1 )
                     )
@@ -1475,7 +1476,7 @@ class BLN(nn.Module):
         # P( unary | A, alpha(A), v(h))
         smU = self.sm(
             self.U_h2(
-                self.relu(
+                self.actv(
                     self.U_h1(
                         torch.cat((
                             self.nt_emb(U_A),

@@ -228,13 +228,13 @@ def supervised():
     template = "Epoch {} [{}/{} ({:.1f}%)] Time {:.2f}"
 
     max_F1 = 0
+    model.train()
 
     for epoch in range(args.epochs):
         dp.shuffle()
         idx = 0
         batch = 0
         tot_loss = 0
-        model.train()
         while True:
             start = time.time()
             batch += 1
@@ -258,25 +258,23 @@ def supervised():
             optimizer.step()
             end = time.time()
 	    
-	    if idx == -1:
-		break
-	    '''
-            if args.verbose:
-                if idx == -1:
+            if idx == -1:
+                if args.verbose:
                     print template.format(epoch, total, total, 100., round(end - start, 5))
-                    break
-                else:
+                break
+            else:
+                if args.verbose:
                     print template.format(epoch, idx, total, float(idx)/total * 100., round(end - start, 5))
-	    '''
+
 
         print " Epoch {} -- E[ NLL(sentence) ]={}\n".format(epoch, tot_loss / total)
 
         if epoch % 5 == 0:
-
        	    model.eval()
             F1_train = test("train")
             F1 = test("test")
             model.parse_end()
+            model.train()
 
         #if F1 > max_F1:
         #    max_F1 = F1
@@ -284,8 +282,6 @@ def supervised():
 
     if args.verbose:
         print "\nFinish supervised training"
-
-    f.close()
 
 
 def parse(sentence):
@@ -324,18 +320,19 @@ def test(dataset):
     GW_sum = G_sum = W_sum = NLL_sum = 0
 
     N = len(test_data)
+
     template = "[{}/{} ({:.1f}%)] P: {:.2f} R: {:.2f} F1: {:.2f} NLL: {:.2f}"
     for (sentence, gold) in test_data:
-        #print sentence
+
         num_sen += 1
 
         nll, parse_string = parse(sentence)
         NLL_sum += nll
-
         parse_tree = Tree.fromstring(parse_string)
         #print gold.pretty_print()
         #print parse_tree.pretty_print()
-        GW,G,W = evalb_unofficial(
+
+        GW, G, W = evalb_unofficial(
             oneline(unbinarize(gold)),
             parse_tree
         )
@@ -343,14 +340,17 @@ def test(dataset):
         GW_sum += GW
         G_sum += G
         W_sum += W
-        #F, P, R = fpr(GW, G, W)
-        #print template.format(num_sen, N, num_sen/float(N)*100, P, R, F, nll)
+
+        if args.verbose:
+            F, P, R = fpr(GW, G, W)
+            print template.format(num_sen, N, num_sen/float(N)*100, P, R, F, nll)
 
     F, P, R = fpr(GW_sum, G_sum, W_sum)
-    print " On {} # Sen: {} P: {:.2f} R: {:.2f} F1: {:.2f} NLL: {:.2f}".format( dataset, num_sen, P, R, F, NLL_sum ) 
-
     end = time.time()
-    print " Testing takes: ", end - start
+
+    print " On {} # Sen: {} P: {:.2f} R: {:.2f} F1: {:.2f} NLL: {:.2f} TIME: {:.2f}".format(
+        dataset, N, P, R, F, NLL_sum, end-start ) 
+
     return F
 
 
