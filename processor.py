@@ -137,7 +137,8 @@ class Processor(object):
 
         num_train_oov = len(oov_set)
 
-        print " - In train set: Sequences: {} Tokens: {} Token types: {} Unknown types: {} Max sen length: {} ".format(
+        print " - In train set: Sequences: {} Tokens: {} Token types: {} " \
+            "Unknown types: {} Max sen length: {} ".format(
             num_train_sens, num_train_tokens, self.nt, num_train_oov, max_length_sen)
 
         # we also want to include all signatures that we haven't covered in
@@ -236,7 +237,7 @@ class Processor(object):
 
 
     #####################################################################################
-    def init_unary_chains(self):
+    def init_rules(self):
         '''
         Remember all unary chains appeared in the treebank and index them.
         In the model, a whole unary chain is expanded at the same time.
@@ -261,10 +262,15 @@ class Processor(object):
         #   the parse staring at A becomes: prefix + parse_C + suffix
         self.unary_prefix = []
         self.unary_suffix = []
+
+        # the word -> preterminal unary chain dictionary
         self.w_U = {}
 
+        self.B_AC = {}
+        self.A2B_bias_mask = torch.FloatTensor(self.nnt, self.nnt).fill_(-10000)
+
         for (_, gold_tree) in all_trees:
-            head, unary_chain = self.find_unary(gold_tree)
+            head, unary_chain = self.find_rules(gold_tree)
             if len(unary_chain) > 1:
                 if unary_chain not in self.idx2u:
                     self.add_unary_chain(unary_chain)
@@ -282,7 +288,7 @@ class Processor(object):
 
     def add_unary_chain(self, unary_chain):
         '''
-        helper function to add a new unary_chain, used in find_unary. 
+        helper function to add a new unary_chain, used in find_rules. 
         '''
         self.idx2u.append(unary_chain)
         bottom = unary_chain[0]
@@ -293,9 +299,9 @@ class Processor(object):
         self.nunary += 1
 
 
-    def find_unary(self, tree):
+    def find_rules(self, tree):
         '''
-        find all unary chains in a tree.
+        find all unary chains in a tree, as well as binary rules
         @return head   The head of the tree
         @return chain  The unary chain on the top of the tree
         '''
@@ -312,9 +318,9 @@ class Processor(object):
             nchild = 0 # number of child
             for subtree in tree:
                 if nchild == 0:
-                    headB, B_unary_chain = self.find_unary(subtree)
+                    headB, B_unary_chain = self.find_rules(subtree)
                 else:
-                    headC, C_unary_chain = self.find_unary(subtree)
+                    headC, C_unary_chain = self.find_rules(subtree)
                 nchild += 1
 
             if nchild == 1:
@@ -330,27 +336,36 @@ class Processor(object):
                 if len(C_unary_chain) > 1 and C_unary_chain not in self.idx2u:
                     self.add_unary_chain(C_unary_chain)
 
+                B = B_unary_chain[-1]
+                C = C_unary_chain[-1]
+
                 # to speed up the parsing step, temporarily we only allow
                 # a terminal unary expansion if the it is compatible with
                 # the terminal word. Therefore we need a dictionary from
                 # word to its possible unary chain above
                 if not headB == None:
-                    tpl = (self.idx2u.index(B_unary_chain), B_unary_chain[-1], B_unary_chain[1])
+                    tpl = (self.idx2u.index(B_unary_chain), B, B_unary_chain[1])
                     idx = self.get_word_idx(headB)
-
                     if idx not in self.w_U:
                         self.w_U[idx] = [tpl]
                     elif tpl not in self.w_U[idx]:
                         self.w_U[idx].append(tpl)
 
                 if not headC == None:
-                    tpl = (self.idx2u.index(C_unary_chain), C_unary_chain[-1], C_unary_chain[1])
+                    tpl = (self.idx2u.index(C_unary_chain), C, C_unary_chain[1])
                     idx = self.get_word_idx(headC)
-
                     if idx not in self.w_U:
                         self.w_U[idx] = [tpl]
                     elif tpl not in self.w_U[idx]:
                         self.w_U[idx].append(tpl)
+
+                if B not in self.B_AC:
+                    self.B_AC[B] = []
+
+                tpl = (A, C)
+                if tpl not in self.B_AC[B]:
+                    self.A2B_bias_mask[A, B] = 0
+                    self.B_AC[B].append(tpl)
 
                 return None, [A]
 
@@ -528,12 +543,6 @@ class Processor(object):
                     (A, B, C)
                 )
 
-                if B not in self.B_AC:
-                    self.B_AC[B] = []
-                tpl = (A, C)
-                if tpl not in self.B_AC[B]:
-                    self.B_AC[B].append(tpl)
-
                 return A, [A]
 
 
@@ -640,7 +649,7 @@ class Processor(object):
 
             self.init_word_indices()
             self.init_nonterminal_indices()
-            self.init_unary_chains()
+            self.init_rules()
 
             self.make_trainset()
             self.read_train_data()
@@ -667,6 +676,7 @@ class Processor(object):
 
                     'B_AC': self.B_AC,
                     'w_U': self.w_U,
+                    'A2B_bias_mask': self.A2B_bias_mask,
 
                     'w2idx': self.w2idx,
                     'idx2w': self.idx2w,
@@ -701,6 +711,8 @@ class Processor(object):
             self.idx2u = d['idx2u']
 
             self.w_U = d['w_U']
+            self.B_AC = d['B_AC']
+            self.A2B_bias_mask = d['A2B_bias_mask']
 
             self.w2idx = d['w2idx']
             self.idx2w = d['idx2w']
@@ -733,6 +745,7 @@ class Processor(object):
 
                     'B_AC': self.B_AC,
                     'w_U': self.w_U,
+                    'A2B_bias_mask': self.A2B_bias_mask,
 
                     'w2idx': self.w2idx,
                     'idx2w': self.idx2w,
@@ -773,6 +786,7 @@ class Processor(object):
 
             self.B_AC = d['B_AC']
             self.w_U = d['w_U']
+            self.A2B_bias_mask = d['A2B_bias_mask']
 
             self.w2idx = d['w2idx']
             self.idx2w = d['idx2w']

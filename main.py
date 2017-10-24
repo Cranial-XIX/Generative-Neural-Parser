@@ -264,7 +264,8 @@ def supervised():
                 break
             else:
                 if args.verbose:
-                    print template.format(epoch, idx, total, float(idx)/total * 100., round(end - start, 5))
+                    print template.format(epoch, idx, total,
+                        float(idx)/total * 100., round(end - start, 5))
 
 
         print " Epoch {} -- E[ NLL(sentence) ]={}\n".format(epoch, tot_loss / total)

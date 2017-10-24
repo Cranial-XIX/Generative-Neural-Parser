@@ -329,6 +329,10 @@ class LN(nn.Module):
         self.B_AC = dp.B_AC
         self.B_A = dp.unary
         self.w_U = dp.w_U
+        self.A2B_bias_mask = nn.Embedding(self.nnt, self.nnt)
+        self.A2B_bias_mask.weight.data = dp.A2B_bias_mask
+        self.A2B_bias_mask.weight.requires_grad = False
+
         self.idx2nt = dp.idx2nt
 
         self.parser = Parser(dp)
@@ -447,7 +451,8 @@ class LN(nn.Module):
             UA = self.nt_emb(Variable(torch.from_numpy(U_A).cuda()))
             UI = torch.index_select(alpha, 0, Variable(torch.from_numpy(U_i).cuda()))
 
-            BA = self.nt_emb(Variable(torch.from_numpy(B_A).cuda()))
+            AA = Variable(torch.from_numpy(B_A).cuda())
+            BA = self.nt_emb(AA)
             BI = torch.index_select(alpha, 0, Variable(torch.from_numpy(B_i).cuda()))
 
             CA = self.nt_emb(Variable(torch.from_numpy(C_A).cuda()))
@@ -462,7 +467,7 @@ class LN(nn.Module):
                             torch.cat( (BA, BI), 1 )
                         )
                     )
-                )
+                ) + self.A2B_bias_mask(AA)
             ).data.cpu().numpy()
 
             xy2z = self.lsm(
@@ -502,7 +507,8 @@ class LN(nn.Module):
             UA = self.nt_emb(Variable(torch.from_numpy(U_A)))
             UI = torch.index_select(alpha, 0, Variable(torch.from_numpy(U_i)))
 
-            BA = self.nt_emb(Variable(torch.from_numpy(B_A)))
+            AA = Variable(torch.from_numpy(B_A))
+            BA = self.nt_emb(AA)
             BI = torch.index_select(alpha, 0, Variable(torch.from_numpy(B_i)))
 
             CA = self.nt_emb(Variable(torch.from_numpy(C_A)))
@@ -517,7 +523,7 @@ class LN(nn.Module):
                             torch.cat( (BA, BI), 1 )
                         )
                     )
-                )
+                ) + self.A2B_bias_mask(AA)
             ).data.numpy()
 
             xy2z = self.lsm(
@@ -594,7 +600,7 @@ class LN(nn.Module):
                             torch.cat( (AAv, BIv), 1 )
                         )
                     )
-                )
+                ) + self.A2B_bias_mask(AA)
             ).gather(1, BB.unsqueeze(1))
         )
 
