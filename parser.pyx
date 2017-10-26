@@ -75,7 +75,7 @@ cdef inline int x2y_h(int i, int x) nogil:
     return x*31+i
 
 cdef inline int xy2z_h(int i, int j, int x, int y) nogil:
-    return x*96960+y*960+i*31+j
+    return x*96100+y*961+i*31+j
 
 cdef inline int x2u_h(int i, int x) nogil:
     return x*31+i
