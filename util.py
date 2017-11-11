@@ -88,7 +88,7 @@ def head_binarize(t):
         return curr
 
 
-def binarize(t, right=False):
+def binarize(t, right=True):
     """
     Left-binarization by default
 

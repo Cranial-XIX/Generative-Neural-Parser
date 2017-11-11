@@ -353,17 +353,17 @@ class LN(nn.Module):
         self.drop = nn.Dropout(args['dropout'])
         self.LSTM = nn.GRU(
             self.dt, self.dhid, self.nlayers,
-            batch_first=True, bias=True#, dropout=args['dropout']
+            batch_first=True, bias=True, dropout=args['dropout']
         )
 
         self.lsm = nn.LogSoftmax()
         self.sm = nn.Softmax()
-        self.actv = nn.LeakyReLU()
+        self.actv = nn.Sigmoid()
 
         B_in = self.dnt + self.dhid
         B_out = self.nnt
 
-        C_in = self.dnt * 2 + self.dhid * 2
+        C_in = self.dnt * 2 + self.dhid * 3
         C_out = self.nnt
 
         U_in = self.dnt + self.dhid
@@ -380,35 +380,29 @@ class LN(nn.Module):
 
         self.B_h1 = nn.Linear(B_in, d_B)
         self.B_h2 = nn.Linear(d_B, B_out)
-        B_h1_init = self.initrange(B_in, d_B)
-        B_h2_init = self.initrange(d_B, B_out)
-        self.B_h1.weight.data.uniform_(-B_h1_init, B_h1_init)
-        self.B_h2.weight.data.uniform_(-B_h2_init, B_h2_init)
 
         self.C_h1 = nn.Linear(C_in, d_C)
         self.C_h2 = nn.Linear(d_C, C_out)
-        C_h1_init = self.initrange(C_in, d_C)
-        C_h2_init = self.initrange(d_C, C_out)        
-        self.C_h1.weight.data.uniform_(-C_h1_init, C_h1_init)
-        self.C_h2.weight.data.uniform_(-C_h2_init, C_h2_init)
 
         self.U_h1 = nn.Linear(U_in, d_U)
         self.U_h2 = nn.Linear(d_U, U_out)
-        U_h1_init = self.initrange(U_in, d_U)
-        U_h2_init = self.initrange(d_U, U_out) 
-        self.U_h1.weight.data.uniform_(-U_h1_init, U_h1_init)
-        self.U_h2.weight.data.uniform_(-U_h2_init, U_h2_init)
 
         self.T_h1 = nn.Linear(T_in, d_T)
         self.T_h2 = nn.Linear(d_T, T_out)
-        T_h1_init = self.initrange(T_in, d_T)
-        T_h2_init = self.initrange(d_T, T_out)
-        self.T_h1.weight.data.uniform_(-T_h1_init, T_h1_init)
-        self.T_h2.weight.data.uniform_(-T_h2_init, T_h2_init)
 
+        self.xavier_reset([
+            self.B_h1, self.B_h2,
+            self.C_h1, self.C_h2,
+            self.U_h1, self.U_h2,
+            self.T_h1, self.T_h2
+        ])
+ 
+    def xavier_reset(self, W_list):
+        for W in W_list:
+            stdv = math.sqrt(2.) / math.sqrt(W.weight.size(0) + W.weight.size(1))
+            W.weight.data.uniform_(-stdv, stdv)
+            W.bias.data.uniform_(-stdv, stdv)
 
-    def initrange(self, ni, nj):
-        return math.sqrt(6) / math.sqrt(ni+nj)
 
     def init_h0(self, bsz=None):
         if bsz == None:
@@ -474,7 +468,7 @@ class LN(nn.Module):
                 self.C_h2(
                     self.actv(
                         self.C_h1(
-                            torch.cat( (CA, CB, CI, CJ-CI), 1 )
+                           torch.cat( (CA, CB, CI, CJ, CJ-CI), 1 )
                         )
                     )
                 )
@@ -530,7 +524,7 @@ class LN(nn.Module):
                 self.C_h2(
                     self.actv(
                         self.C_h1(
-                            torch.cat( (CA, CB, CI, CJ-CI), 1 )
+                            torch.cat( (CA, CB, CI, CJ, CJ-CI), 1 )
                         )
                     )
                 )
@@ -609,7 +603,7 @@ class LN(nn.Module):
                 self.C_h2(
                     self.actv(
                         self.C_h1(
-                            torch.cat( (AAv, BBv, BIv, CIv-BIv), 1 )
+                            torch.cat( (AAv, BBv, BIv, CIv, CIv-BIv), 1 )
                         )
                     )
                 )

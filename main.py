@@ -71,7 +71,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--verbose', default="yes", help='use verbose mode'
+    '--verbose', default="no", help='use verbose mode'
 )
 
 # Below are variables associated with training
