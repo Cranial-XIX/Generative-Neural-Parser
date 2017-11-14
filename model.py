@@ -358,7 +358,7 @@ class LN(nn.Module):
 
         self.lsm = nn.LogSoftmax()
         self.sm = nn.Softmax()
-        self.actv = nn.Sigmoid()
+        self.actv = nn.LeakyReLU()
 
         B_in = self.dnt + self.dhid
         B_out = self.nnt

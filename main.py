@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from evalb import evalb, evalb_unofficial
+from evalb import evalb, evalb_unofficial, evalb_many
 from model import BLN, LN, BSN, BS
 from nltk import Tree
 from processor import Processor, PBLN, PLN
@@ -55,11 +55,11 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--lstm-layer', default=2, help='# LSTM layer'
+    '--lstm-layer', default=3, help='# LSTM layer'
 )
 
 argparser.add_argument(
-    '--lstm-dim', default=256, help='LSTM hidden dimension'
+    '--lstm-dim', default=300, help='LSTM hidden dimension'
 )
 
 argparser.add_argument(
@@ -77,15 +77,15 @@ argparser.add_argument(
 # Below are variables associated with training
 # =========================================================================
 argparser.add_argument(
-    '--epochs', default=200, help='# epochs to train'
+    '--epochs', default=100, help='# epochs to train'
 )
 
 argparser.add_argument(
-    '--batch-size', default=10, help='# instances in a batch'
+    '--batch-size', default=15, help='# instances in a batch'
 )
 
 argparser.add_argument(
-    '--learning-rate', default=0.0004, help="learning rate"
+    '--learning-rate', default=0.01, help="learning rate"
 )
 
 argparser.add_argument(
@@ -218,9 +218,10 @@ def supervised():
         lambda x: x.requires_grad, model.parameters()
     )
 
+    learning_rate = args.learning_rate
     # define the optimizer to use; currently use Adam
     optimizer = optim.Adam(
-        parameters, lr=args.learning_rate, weight_decay=args.l2_coef
+        parameters, lr=learning_rate, weight_decay=args.l2_coef
     )
 
     total = dp.trainset_length
@@ -230,11 +231,20 @@ def supervised():
     max_F1 = 0
     model.train()
 
-    for epoch in range(args.epochs):
+    for epoch in range(1, args.epochs+1):
         dp.shuffle()
         idx = 0
         batch = 0
         tot_loss = 0
+        if epoch > 1 and learning_rate > 0.0001:
+            parameters = itertools.ifilter(
+                lambda x: x.requires_grad, model.parameters()
+            )
+            learning_rate *= 0.8
+            optimizer = optim.Adam(
+                parameters, lr=learning_rate, weight_decay=args.l2_coef
+            )
+
         while True:
             start = time.time()
             batch += 1
@@ -319,6 +329,8 @@ def test(dataset):
 
     num_sen = 0
     GW_sum = G_sum = W_sum = NLL_sum = 0
+    expect = []
+    got = []
 
     N = len(test_data)
 
@@ -332,7 +344,9 @@ def test(dataset):
         parse_tree = Tree.fromstring(parse_string)
         #print gold.pretty_print()
         #print parse_tree.pretty_print()
-
+        expect.append(unbinarize(gold))
+        got.append(unbinarize(parse_tree))
+        '''
         GW, G, W = evalb_unofficial(
             oneline(unbinarize(gold)),
             parse_tree
@@ -345,12 +359,15 @@ def test(dataset):
         if args.verbose:
             F, P, R = fpr(GW, G, W)
             print template.format(num_sen, N, num_sen/float(N)*100, P, R, F, nll)
-
-    F, P, R = fpr(GW_sum, G_sum, W_sum)
+       '''
+    F = evalb_many(expect, got)
+    #F, P, R = fpr(GW_sum, G_sum, W_sum)
     end = time.time()
-
-    print " On {} # Sen: {} P: {:.2f} R: {:.2f} F1: {:.2f} NLL: {:.2f} TIME: {:.2f}".format(
-        dataset, N, P, R, F, NLL_sum, end-start ) 
+    
+    print " On {} # Sen: {} F1: {:.2f} NLL: {:.2f} TIME: {:.2f}".format(
+        dataset, N, F, NLL_sum, end-start ) 
+    #print " On {} # Sen: {} P: {:.2f} R: {:.2f} F1: {:.2f} NLL: {:.2f} TIME: {:.2f}".format(
+    #    dataset, N, P, R, F, NLL_sum, end-start ) 
 
     return F
 
