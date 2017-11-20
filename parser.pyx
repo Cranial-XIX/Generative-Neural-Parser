@@ -2,7 +2,7 @@
 #distutils: language=c++
 #cython: boundscheck=False
 #cython: initializedcheck=False
-###cython: wraparound=False     # TODO make sure there is no negative indexing first.
+#cython: wraparound=False
 #cython: infertypes=True
 #cython: cdivision=True
 
@@ -410,6 +410,9 @@ cdef class Parser(object):
                     chart[i,k,A].y = -1
                     chart[i,k,A].z = U
 
+        #for i in xrange(self.nnt):
+        #    if not chart[0,1,i].score == LOG_ZERO:
+        #        print "V", i, chart[0,1,i].score, chart[0,1,i].z
 
         for w in xrange(2, n+1):  # wider constituents
             for i in xrange(n-w+1):
@@ -469,6 +472,122 @@ cdef class Parser(object):
             return score, self.print_parse(0, n, ROOT)
 
 
+    cpdef viterbi_gld(self,
+        np.ndarray[np.float32_t, ndim=2] x2y,
+        np.ndarray[np.float32_t, ndim=2] xy2z,
+        np.ndarray[np.float32_t, ndim=2] x2u,
+        np.ndarray[np.float32_t, ndim=2] lex,
+        np.ndarray[np.int64_t, ndim=1] pret,
+        np.ndarray[np.int64_t, ndim=2] p2l):
+
+        cdef:
+            int ik, i, j, k, w, n
+            int t, A, B, C, PT, U
+            double parent, left, right, child, score
+            UR ur
+            BR br
+            PR pr
+            intvec tmp
+            intvec* cell
+            Cell[:,:,:] chart
+
+        start = time.time()
+        n = self.N
+
+        chart = np.empty((n,n+1,self.nnt), dtype=Cell_dt)
+
+        for i in xrange(n):
+            for k in xrange(i+1,n+1):
+                for A in xrange(self.nnt):
+                    chart[i,k,A].score = LOG_ZERO
+
+        for ik in xrange(n*(n+1)//2):
+            self.spandex.push_back(new intvec())
+
+        # initialize the chart
+        for i in xrange(n):
+            k = i + 1
+            t = self.sen[i]
+            cell = self.spandex[tri(i, k)]
+            for pr in deref(self.lexicon[t]):
+
+                PT = pr.preterminal
+                A = pr.parent
+                U = pr.idx
+                if not pret[i] == U:
+                    continue
+                score = x2u[self.x2u_m[x2u_h(i,A)],U] + lex[self.lex_m[lex_h(i,PT)],t]
+
+                if score > chart[i,k,A].score:
+                    cell.push_back(A)
+                    chart[i,k,A].score = score
+                    chart[i,k,A].y = -1
+                    chart[i,k,A].z = U
+
+        #for i in xrange(self.nnt):
+        #    if not chart[0,1,i].score == LOG_ZERO:
+        #        print "V_gld", i, chart[0,1,i].score, chart[0,1,i].z
+
+        for w in xrange(2, n+1):  # wider constituents
+            for i in xrange(n-w+1):
+                k = i + w
+                cell = self.spandex[tri(i, k)]
+                for j in xrange(i+1, k):
+                    for B in deref(self.spandex[tri(i, j)]):
+                        left = chart[i,j,B].score
+                        for br in deref(self.rule_y_xz[B]):
+                            C = br.right
+                            right = chart[j,k,C].score
+
+                            if right <= LOG_ZERO:
+                                continue
+
+                            A = br.parent
+                            #if not p2l[i, A] == 1:
+                            #    continue
+
+                            score = left + right + x2y[self.x2y_m[x2y_h(i,A)],B] \
+                                + xy2z[self.xy2z_m[xy2z_h(i,j,A,B)],C]
+
+                            if score > chart[i,k,A].score:
+                                cell.push_back(A)
+                                chart[i,k,A].score = score
+                                chart[i,k,A].y = B
+                                chart[i,k,A].z = C
+                                chart[i,k,A].j = j
+
+
+                for B in deref(cell):
+                    child = chart[i,k,B].score
+                    for ur in deref(self.rule_u_x[B]):
+                        A = ur.parent
+                        U = ur.idx
+
+                        score = child + x2u[self.x2u_m[x2u_h(i,A)],U]
+
+                        if score > chart[i,k,A].score:
+                            tmp.push_back(A)
+                            chart[i,k,A].score = score
+                            chart[i,k,A].y = B
+                            chart[i,k,A].z = U
+                            chart[i,k,A].j = -1
+
+                for p in tmp:
+                    cell.push_back(p)
+
+                tmp.clear()
+
+        self.spandex.clear()
+        self.chart = chart
+
+        score = self.chart[0,n,ROOT].score
+
+        if score == LOG_ZERO:
+            return score, "( ROOT )"
+        else:
+            return score, self.print_parse(0, n, ROOT)
+
+
     cpdef print_parse(self, int i, int k, int A):
         cdef:
             int B, C, j
@@ -476,15 +595,19 @@ cdef class Parser(object):
         B = self.chart[i,k,A].y
         C = self.chart[i,k,A].z
         j = self.chart[i,k,A].j
+        score = self.chart[i,k,A].score
 
         if B == -1:
             # is terminal rule
+            #print " t: ", i, score
             return self.prefix[C] + " " + self.sentence[i] + self.suffix[C]
         elif j == -1:
             # unary rule
+            #print " u: ", i, k, score
             return self.prefix[C] + self.print_parse(i, k, B) + self.suffix[C]
         else:
             # binary rule
+            #print " b: ", i, j, k, self.idx2nt[A], "=>", self.idx2nt[B], self.idx2nt[C], score
             return  "(" + self.idx2nt[A] + " " \
                 + self.print_parse(i, j, B) + " " \
                 + self.print_parse(j, k, C) + ")" 

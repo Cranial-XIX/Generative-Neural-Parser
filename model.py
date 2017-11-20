@@ -351,14 +351,24 @@ class LN(nn.Module):
 
         # The LSTM and some linear transformation layers
         self.drop = nn.Dropout(args['dropout'])
+
         self.LSTM = nn.GRU(
             self.dt, self.dhid, self.nlayers,
             batch_first=True, bias=True, dropout=args['dropout']
         )
 
+        self.rnn_x2u = nn.GRU(
+            self.dt, self.dhid, 2,
+            batch_first=True, bias=True, dropout=args['dropout']
+        )
+        self.rnn_lex = nn.GRU(
+            self.dt, self.dhid, 2,
+            batch_first=True, bias=True, dropout=args['dropout']
+        )
+
         self.lsm = nn.LogSoftmax()
         self.sm = nn.Softmax()
-        self.actv = nn.LeakyReLU()
+        self.actv = nn.ReLU()
 
         B_in = self.dnt + self.dhid
         B_out = self.nnt
@@ -372,10 +382,9 @@ class LN(nn.Module):
         T_in = self.dnt + self.dhid
         T_out = self.nt
 
-        zeta = 0.4
-        d_B = int( zeta * B_out + (1-zeta) * B_in )
-        d_C = int( zeta * C_out + (1-zeta) * C_in )
-        d_U = int( zeta * U_out + (1-zeta) * U_in )
+        d_B = int( math.sqrt(B_in * B_out) )
+        d_C = int( math.sqrt(C_in * C_out) )
+        d_U = int( math.sqrt(U_in * U_out) )
         d_T = int( T_in )
 
         self.B_h1 = nn.Linear(B_in, d_B)
@@ -390,13 +399,15 @@ class LN(nn.Module):
         self.T_h1 = nn.Linear(T_in, d_T)
         self.T_h2 = nn.Linear(d_T, T_out)
 
+        '''
         self.xavier_reset([
             self.B_h1, self.B_h2,
             self.C_h1, self.C_h2,
             self.U_h1, self.U_h2,
             self.T_h1, self.T_h2
         ])
- 
+        '''
+
     def xavier_reset(self, W_list):
         for W in W_list:
             stdv = math.sqrt(2.) / math.sqrt(W.weight.size(0) + W.weight.size(1))
@@ -429,7 +440,7 @@ class LN(nn.Module):
     def parse_end(self):
         self.init_h0()
 
-    def parse(self, sentence, sen_idx):
+    def parse(self, sentence, sen_idx, pret=None, p2l=None):
         #start = time.time()
         P_P, P_i, U_A, U_i, B_A, B_i, C_A, C_B, C_i, C_j = self.parser.preparse(sentence, sen_idx.data)
 
@@ -438,12 +449,18 @@ class LN(nn.Module):
         alpha, _ = self.LSTM(V.unsqueeze(0), self.h0)
         alpha = alpha.squeeze(0)
 
+        alpha_x2u, _ = self.rnn_x2u(V.unsqueeze(0), self.h0)
+        alpha_x2u = alpha_x2u.squeeze(0)
+
+        alpha_lex, _ = self.rnn_lex(V.unsqueeze(0), self.h0)
+        alpha_lex = alpha_lex.squeeze(0)
+
         if self.use_cuda:
             PP = self.nt_emb(Variable(torch.from_numpy(P_P).cuda()))
-            PI = torch.index_select(alpha, 0, Variable(torch.from_numpy(P_i).cuda()))
+            PI = torch.index_select(alpha_lex, 0, Variable(torch.from_numpy(P_i).cuda()))
 
             UA = self.nt_emb(Variable(torch.from_numpy(U_A).cuda()))
-            UI = torch.index_select(alpha, 0, Variable(torch.from_numpy(U_i).cuda()))
+            UI = torch.index_select(alpha_x2u, 0, Variable(torch.from_numpy(U_i).cuda()))
 
             AA = Variable(torch.from_numpy(B_A).cuda())
             BA = self.nt_emb(AA)
@@ -496,10 +513,10 @@ class LN(nn.Module):
 
         else:
             PP = self.nt_emb(Variable(torch.from_numpy(P_P)))
-            PI = torch.index_select(alpha, 0, Variable(torch.from_numpy(P_i)))
+            PI = torch.index_select(alpha_lex, 0, Variable(torch.from_numpy(P_i)))
 
             UA = self.nt_emb(Variable(torch.from_numpy(U_A)))
-            UI = torch.index_select(alpha, 0, Variable(torch.from_numpy(U_i)))
+            UI = torch.index_select(alpha_x2u, 0, Variable(torch.from_numpy(U_i)))
 
             AA = Variable(torch.from_numpy(B_A))
             BA = self.nt_emb(AA)
@@ -552,9 +569,14 @@ class LN(nn.Module):
 
         #t2 = time.time()
         score, parse = self.parser.viterbi(x2y, xy2z, x2u, lex)
+        
+        score_gld = None
+        parse_gld = None
+        if pret.any():
+            score_gld, parse_gld = self.parser.viterbi_gld(x2y, xy2z, x2u, lex, pret, p2l)
         #end = time.time()
         #print " - preparse: {:.2f} compute rule prob: {:.2f} parse: {:.2f}".format(end-t2,t2-t1,t1-start)
-        return score, parse
+        return score, parse, score_gld, parse_gld
        
 
     def forward(self, train_type, args):
@@ -573,13 +595,19 @@ class LN(nn.Module):
 
         # run the LSTM to extract features from left context
         alpha, _ = self.LSTM(self.word_emb(sens), self.h0)
-        alpha = (self.drop(alpha)).contiguous().view(-1, alpha.size(2))
+        alpha = alpha.contiguous().view(-1, alpha.size(2))
+
+        alpha_x2u, _ = self.rnn_x2u(self.word_emb(sens), self.h0)
+        alpha_x2u = alpha_x2u.contiguous().view(-1, alpha_x2u.size(2))
+
+        alpha_lex, _ = self.rnn_lex(self.word_emb(sens), self.h0)
+        alpha_lex = alpha_lex.contiguous().view(-1, alpha_lex.size(2))
 
 
         BIv = torch.index_select(alpha, 0, BI)
         CIv = torch.index_select(alpha, 0, CI)
-        UIv = torch.index_select(alpha, 0, UI)
-        TIv = torch.index_select(alpha, 0, TI)
+        UIv = torch.index_select(alpha_x2u, 0, UI)
+        TIv = torch.index_select(alpha_lex, 0, TI)
 
         AAv = self.nt_emb(AA)
         BBv = self.nt_emb(BB)

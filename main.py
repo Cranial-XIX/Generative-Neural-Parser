@@ -2,6 +2,7 @@ import argparse
 import constants
 import datetime
 import itertools
+import numpy as np
 import os
 import time
 import torch
@@ -77,15 +78,15 @@ argparser.add_argument(
 # Below are variables associated with training
 # =========================================================================
 argparser.add_argument(
-    '--epochs', default=100, help='# epochs to train'
+    '--epochs', default=80, help='# epochs to train'
 )
 
 argparser.add_argument(
-    '--batch-size', default=15, help='# instances in a batch'
+    '--batch-size', default=1, help='# instances in a batch'
 )
 
 argparser.add_argument(
-    '--learning-rate', default=0.01, help="learning rate"
+    '--learning-rate', default=0.001, help="learning rate"
 )
 
 argparser.add_argument(
@@ -93,14 +94,6 @@ argparser.add_argument(
 )
 
 args = argparser.parse_args()
-torch.manual_seed(args.seed)
-
-if torch.cuda.is_available():
-    if not args.cuda:
-        print("WARNING: You have a CUDA device, so you should probably run with --cuda")
-    else:
-        torch.cuda.manual_seed(args.seed)
-
 # Create folder to save model and log files
 file_save = ""
 save_template = "TIME={}_MDL={}_EPCH={}_BSIZE={}_HD={}_LY={}"
@@ -156,17 +149,24 @@ args.read_data = (args.read_data == 'yes')
 args.seed = int(args.seed)
 args.verbose = (args.verbose == 'yes')
 
+torch.manual_seed(args.seed)
+
+if torch.cuda.is_available():
+    if not args.cuda:
+        print("WARNING: You have a CUDA device, so you should probably run with --cuda")
+    else:
+        torch.cuda.manual_seed_all(args.seed)
 
 # let the processor read in data
 # Model: BLN, LN, BSN, BS
 if args.model == 'BLN':
-    dp = PBLN(args.train, args.make_train, args.read_data, args.verbose)
+    dp = PBLN(args.train, args.make_train, args.read_data, args.verbose, args.seed)
 
 elif args.model == 'LN':
-    dp = PLN(args.train, args.make_train, args.read_data, args.verbose)
+    dp = PLN(args.train, args.make_train, args.read_data, args.verbose, args.seed)
 
 elif args.model == 'BSN' or args.model == 'BS':
-    dp = Processor(args.train, args.make_train, args.read_data, args.verbose)
+    dp = Processor(args.train, args.make_train, args.read_data, args.verbose, args.seed)
 
 else:
     print "Cannot recognize the model!"
@@ -236,6 +236,7 @@ def supervised():
         idx = 0
         batch = 0
         tot_loss = 0
+        '''
         if epoch > 1 and learning_rate > 0.0001:
             parameters = itertools.ifilter(
                 lambda x: x.requires_grad, model.parameters()
@@ -244,7 +245,7 @@ def supervised():
             optimizer = optim.Adam(
                 parameters, lr=learning_rate, weight_decay=args.l2_coef
             )
-
+        '''
         while True:
             start = time.time()
             batch += 1
@@ -280,7 +281,7 @@ def supervised():
 
         print " Epoch {} -- E[ NLL(sentence) ]={}\n".format(epoch, tot_loss / total)
 
-        if epoch % 5 == 0:
+        if epoch % 3 == 0:
        	    model.eval()
             F1_train = test("train")
             F1 = test("test")
@@ -295,13 +296,13 @@ def supervised():
         print "\nFinish supervised training"
 
 
-def parse(sentence):
+def parse(sentence, pret=None, p2l=None):
     sen = dp.get_idx(sentence)
 
     if args.cuda:
         sen = sen.cuda()
 
-    return model.parse(sentence, Variable(sen))
+    return model.parse(sentence, Variable(sen), pret, p2l)
 
 
 def fpr(want_and_got, got, want):
@@ -321,55 +322,155 @@ def fpr(want_and_got, got, want):
     return f,p,r
 
 
-def test(dataset):
+def get_gold_partials(sentence, gold):
+    n = len(sentence)
+    preterminal_allowed = np.zeros(n).astype(int)
+    p2l_allowed = np.zeros((n, dp.nnt)).astype(int)
+    traverse_gold(gold, 0,  preterminal_allowed, p2l_allowed)
+    return preterminal_allowed, p2l_allowed
 
+
+def traverse_gold(tree, idx, pret, p2l):
+    label = tree.label() # the current nonterminal label
+    A = dp.nt2idx[label]
+
+    if tree.height() == 2:
+        # is leaf
+        return idx, idx+1, A, [0, A]
+
+    else:
+        nchild = 0
+        # a binary rule A -> B C or unary rule A -> B
+        for subtree in tree:
+
+            if nchild == 0:
+                ii, jj, B, B_unary = traverse_gold(subtree, idx, pret, p2l)
+            else:
+                jj, kk, C, C_unary = traverse_gold(subtree, jj, pret, p2l)
+
+            nchild += 1
+
+        if nchild == 1:
+            # unary rule
+            if not B_unary == None:
+                B_unary.append(A)
+
+            return ii, jj, A, B_unary
+
+        else:
+            # binary rule
+            if not B_unary == None:
+                pret[ii] = dp.idx2u.index(B_unary)
+
+            if not C_unary == None:
+                pret[jj] = dp.idx2u.index(C_unary)
+
+            p2l[ii, A] = 1
+
+            return ii, kk, A, None
+
+
+def eval_official(dataset, test_data):
     start = time.time()
-    model.parse_setup()
-    test_data = list(ptb(dataset, minlength=3, maxlength=constants.MAX_TEST_SEN_LENGTH, n=500))
-
-    num_sen = 0
-    GW_sum = G_sum = W_sum = NLL_sum = 0
+    NLL_sum = 0
     expect = []
     got = []
 
-    N = len(test_data)
+    '''
+    got2 = []
+    NLL_sum2 = 0
+    '''
 
+    num_sen = 0
     template = "[{}/{} ({:.1f}%)] P: {:.2f} R: {:.2f} F1: {:.2f} NLL: {:.2f}"
+
     for (sentence, gold) in test_data:
 
         num_sen += 1
-
-        nll, parse_string = parse(sentence)
+        #pret, p2l = get_gold_partials(sentence, gold)
+        nll, parse_string, nll2, parse_string2 = parse(sentence)
         NLL_sum += nll
         parse_tree = Tree.fromstring(parse_string)
-        #print gold.pretty_print()
-        #print parse_tree.pretty_print()
+        #parse_tree2 = Tree.fromstring(parse_string2)
         expect.append(unbinarize(gold))
         got.append(unbinarize(parse_tree))
-        '''
-        GW, G, W = evalb_unofficial(
-            oneline(unbinarize(gold)),
-            parse_tree
-        )
+#        got2.append(unbinarize(parse_tree2))
 
+
+    F = evalb_many(expect, got)
+
+    end = time.time()
+    
+    print " On {} # Sen: {} F1: {:.5f} NLL: {:.2f} TIME: {:.2f}".format(
+        dataset, N, F, NLL_sum, end-start ) 
+
+    return F
+
+
+def evalb_unofficial_helper(gold, parse):
+    tree = Tree.fromstring(parse)
+    print tree.pretty_print()
+    GW, G, W = evalb_unofficial(
+        oneline(unbinarize(gold)),
+        tree
+    )
+    return GW, G, W
+
+def eval_unofficial(dataset, test_data):
+    start = time.time()
+    N = len(test_data)
+    GW_sum = G_sum = W_sum = NLL_sum = 0
+    #GW_sum2 = G_sum2 = W_sum2 = NLL_sum2 = 0
+
+    num_sen = 0
+    template = "[{}/{} ({:.1f}%)] F1: {:.4f} NLL: {:.4f}"
+
+    for (sentence, gold) in test_data:
+        print " gold ", gold.pretty_print()
+        num_sen += 1
+        #pret, p2l = get_gold_partials(sentence, gold)
+        
+        nll, parse_string, nll2, parse_string2 = parse(sentence, pret, p2l)
+
+        NLL_sum += nll
+        #NLL_sum2 += nll2
+
+        GW, G, W = evalb_unofficial_helper(gold, parse_string)
         GW_sum += GW
         G_sum += G
         W_sum += W
 
+        #GW2, G2, W2 = evalb_unofficial_helper(gold, parse_string2)
+        #GW_sum2 += GW2
+        #G_sum2 += G2
+        #W_sum2 += W2
+
         if args.verbose:
             F, P, R = fpr(GW, G, W)
-            print template.format(num_sen, N, num_sen/float(N)*100, P, R, F, nll)
-       '''
-    F = evalb_many(expect, got)
-    #F, P, R = fpr(GW_sum, G_sum, W_sum)
+            #F2, P2, R2 = fpr(GW2, G2, W2)
+            print template.format(num_sen, N, num_sen/float(N)*100, F, nll)
+
+
+    F, _, _ = fpr(GW_sum, G_sum, W_sum)
+    #F2, _, _ = fpr(GW_sum2, G_sum2, W_sum2)
+
     end = time.time()
-    
-    print " On {} # Sen: {} F1: {:.2f} NLL: {:.2f} TIME: {:.2f}".format(
+
+    print " On {} # Sen: {} F1: {:.4f} NLL: {:.4f} TIME: {:.2f}".format(
         dataset, N, F, NLL_sum, end-start ) 
-    #print " On {} # Sen: {} P: {:.2f} R: {:.2f} F1: {:.2f} NLL: {:.2f} TIME: {:.2f}".format(
-    #    dataset, N, P, R, F, NLL_sum, end-start ) 
+    #print " On {} # Sen: {} F1: {:.5f} NLL: {:.2f} TIME: {:.2f}".format(
+    #    dataset, N, F2, NLL_sum, end-start ) 
+    #print ""
 
     return F
+
+
+def test(dataset):
+
+    model.parse_setup()
+    test_data = list(ptb(dataset, minlength=3, maxlength=constants.MAX_TEST_SEN_LENGTH, n=500))
+
+    return eval_unofficial(dataset, test_data)
 
 
 def check_spv():

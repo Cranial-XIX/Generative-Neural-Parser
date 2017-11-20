@@ -23,7 +23,7 @@ from util import oneline, head_binarize, binarize, unbinarize
 Base Class Processor
 """
 class Processor(object):
-    def __init__(self, train_file, make_train, read_data, verbose):
+    def __init__(self, train_file, make_train, read_data, verbose, seed):
         '''
         Initialize the processor, taking inputs from the main class
         @param train_file   The filename of the train file
@@ -35,6 +35,7 @@ class Processor(object):
         self.read_data = read_data      # whether to read new data
         self.verbose = verbose          # verbose mode or not
         self.make_train = make_train    # whether to make train set
+        np.random.seed(seed)
 
     #####################################################################################
     def check_file_exists(self, filename, file_type):
@@ -414,8 +415,6 @@ class Processor(object):
         num_sen = 0
         counter = 0
 
-        self.B_AC = {}
-
         for (sentence, gold_tree) in train_trees:
             counter += 1
 
@@ -439,7 +438,7 @@ class Processor(object):
 
     def encode_tree(self, tree):
         '''
-        Encode a tree to a convenient and simply representation.
+        Encode a tree to a convenient and simple representation.
         @return dict   The dictionary of binary, unary rules and sentence terminal
                        indices in the tree.
         '''
@@ -929,12 +928,6 @@ class PLN(Processor):
                     (Bi, Ci, A, B, C)
                 )
 
-                if B not in self.B_AC:
-                    self.B_AC[B] = []
-                tpl = (A, C)
-                if tpl not in self.B_AC[B]:
-                    self.B_AC[B].append(tpl)
-
                 return Bi, A, [A]
 
 
@@ -1072,7 +1065,6 @@ class PBLN(Processor):
         counter = 0
 
         self.headify_trees(train_trees)
-        self.B_AC = {}
 
         with open(constants.HEADIFIED_FILE, 'r') as f_head:
             for line in f_head:
