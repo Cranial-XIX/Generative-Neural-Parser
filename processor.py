@@ -408,7 +408,7 @@ class Processor(object):
         begin_time = time.time()
 
         train_trees = list(
-            ptb("train", maxlength=constants.MAX_SEN_LENGTH)
+            ptb(["train", "test"], maxlength=constants.MAX_SEN_LENGTH)
         )
 
         f = open(self.train_file, 'w')

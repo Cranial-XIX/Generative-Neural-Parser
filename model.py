@@ -339,8 +339,6 @@ class LN(nn.Module):
 
         self.init_h0()
         self.h0.requires_grad = False
-        #self.h0[0].requires_grad = False
-        #self.h0[1].requires_grad = False
 
         # nonterminal embedding and w2v embedding, w2v_plus 
         # is the deviation from w2v
@@ -352,23 +350,14 @@ class LN(nn.Module):
         # The LSTM and some linear transformation layers
         self.drop = nn.Dropout(args['dropout'])
 
-        self.LSTM = nn.GRU(
+        self.rnn = nn.GRU(
             self.dt, self.dhid, self.nlayers,
-            batch_first=True, bias=True, dropout=args['dropout']
-        )
-
-        self.rnn_x2u = nn.GRU(
-            self.dt, self.dhid, 2,
-            batch_first=True, bias=True, dropout=args['dropout']
-        )
-        self.rnn_lex = nn.GRU(
-            self.dt, self.dhid, 2,
             batch_first=True, bias=True, dropout=args['dropout']
         )
 
         self.lsm = nn.LogSoftmax()
         self.sm = nn.Softmax()
-        self.actv = nn.ReLU()
+        self.actv = nn.LeakyReLU()
 
         B_in = self.dnt + self.dhid
         B_out = self.nnt
@@ -446,21 +435,15 @@ class LN(nn.Module):
 
         #t1 = time.time()
         V = self.word_emb(sen_idx)
-        alpha, _ = self.LSTM(V.unsqueeze(0), self.h0)
+        alpha, _ = self.rnn(V.unsqueeze(0), self.h0)
         alpha = alpha.squeeze(0)
-
-        alpha_x2u, _ = self.rnn_x2u(V.unsqueeze(0), self.h0)
-        alpha_x2u = alpha_x2u.squeeze(0)
-
-        alpha_lex, _ = self.rnn_lex(V.unsqueeze(0), self.h0)
-        alpha_lex = alpha_lex.squeeze(0)
 
         if self.use_cuda:
             PP = self.nt_emb(Variable(torch.from_numpy(P_P).cuda()))
-            PI = torch.index_select(alpha_lex, 0, Variable(torch.from_numpy(P_i).cuda()))
+            PI = torch.index_select(alpha, 0, Variable(torch.from_numpy(P_i).cuda()))
 
             UA = self.nt_emb(Variable(torch.from_numpy(U_A).cuda()))
-            UI = torch.index_select(alpha_x2u, 0, Variable(torch.from_numpy(U_i).cuda()))
+            UI = torch.index_select(alpha, 0, Variable(torch.from_numpy(U_i).cuda()))
 
             AA = Variable(torch.from_numpy(B_A).cuda())
             BA = self.nt_emb(AA)
@@ -513,10 +496,10 @@ class LN(nn.Module):
 
         else:
             PP = self.nt_emb(Variable(torch.from_numpy(P_P)))
-            PI = torch.index_select(alpha_lex, 0, Variable(torch.from_numpy(P_i)))
+            PI = torch.index_select(alpha, 0, Variable(torch.from_numpy(P_i)))
 
             UA = self.nt_emb(Variable(torch.from_numpy(U_A)))
-            UI = torch.index_select(alpha_x2u, 0, Variable(torch.from_numpy(U_i)))
+            UI = torch.index_select(alpha, 0, Variable(torch.from_numpy(U_i)))
 
             AA = Variable(torch.from_numpy(B_A))
             BA = self.nt_emb(AA)
@@ -572,8 +555,8 @@ class LN(nn.Module):
         
         score_gld = None
         parse_gld = None
-        if pret.any():
-            score_gld, parse_gld = self.parser.viterbi_gld(x2y, xy2z, x2u, lex, pret, p2l)
+        #if pret.any():
+        #    score_gld, parse_gld = self.parser.viterbi_gld(x2y, xy2z, x2u, lex, pret, p2l)
         #end = time.time()
         #print " - preparse: {:.2f} compute rule prob: {:.2f} parse: {:.2f}".format(end-t2,t2-t1,t1-start)
         return score, parse, score_gld, parse_gld
@@ -594,20 +577,14 @@ class LN(nn.Module):
         TI, T, T_A):
 
         # run the LSTM to extract features from left context
-        alpha, _ = self.LSTM(self.word_emb(sens), self.h0)
+        dropped = self.drop(self.word_emb(sens))
+        alpha, _ = self.rnn(dropped, self.h0)
         alpha = alpha.contiguous().view(-1, alpha.size(2))
-
-        alpha_x2u, _ = self.rnn_x2u(self.word_emb(sens), self.h0)
-        alpha_x2u = alpha_x2u.contiguous().view(-1, alpha_x2u.size(2))
-
-        alpha_lex, _ = self.rnn_lex(self.word_emb(sens), self.h0)
-        alpha_lex = alpha_lex.contiguous().view(-1, alpha_lex.size(2))
-
 
         BIv = torch.index_select(alpha, 0, BI)
         CIv = torch.index_select(alpha, 0, CI)
-        UIv = torch.index_select(alpha_x2u, 0, UI)
-        TIv = torch.index_select(alpha_lex, 0, TI)
+        UIv = torch.index_select(alpha, 0, UI)
+        TIv = torch.index_select(alpha, 0, TI)
 
         AAv = self.nt_emb(AA)
         BBv = self.nt_emb(BB)

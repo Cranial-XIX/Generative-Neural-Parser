@@ -48,7 +48,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--seed', default=419, help='Random seed'
+    '--seed', default=0, help='Random seed'
 )
 
 argparser.add_argument(
@@ -78,15 +78,15 @@ argparser.add_argument(
 # Below are variables associated with training
 # =========================================================================
 argparser.add_argument(
-    '--epochs', default=80, help='# epochs to train'
+    '--epochs', default=200, help='# epochs to train'
 )
 
 argparser.add_argument(
-    '--batch-size', default=1, help='# instances in a batch'
+    '--batch-size', default=100, help='# instances in a batch'
 )
 
 argparser.add_argument(
-    '--learning-rate', default=0.001, help="learning rate"
+    '--learning-rate', default=0.01, help="learning rate"
 )
 
 argparser.add_argument(
@@ -236,16 +236,16 @@ def supervised():
         idx = 0
         batch = 0
         tot_loss = 0
-        '''
-        if epoch > 1 and learning_rate > 0.0001:
+        
+        if epoch > 1 and learning_rate > 1e-4:
             parameters = itertools.ifilter(
                 lambda x: x.requires_grad, model.parameters()
             )
-            learning_rate *= 0.8
+            learning_rate *= 0.5
             optimizer = optim.Adam(
                 parameters, lr=learning_rate, weight_decay=args.l2_coef
             )
-        '''
+      
         while True:
             start = time.time()
             batch += 1
@@ -279,9 +279,9 @@ def supervised():
                         float(idx)/total * 100., round(end - start, 5))
 
 
-        print " Epoch {} -- E[ NLL(sentence) ]={}\n".format(epoch, tot_loss / total)
+        print " Epoch {} -- likelihood of trainset is: {:.4f}\n".format(epoch, tot_loss)
 
-        if epoch % 3 == 0:
+        if epoch % 5 == 0:
        	    model.eval()
             F1_train = test("train")
             F1 = test("test")
@@ -409,7 +409,6 @@ def eval_official(dataset, test_data):
 
 def evalb_unofficial_helper(gold, parse):
     tree = Tree.fromstring(parse)
-    print tree.pretty_print()
     GW, G, W = evalb_unofficial(
         oneline(unbinarize(gold)),
         tree
@@ -426,11 +425,10 @@ def eval_unofficial(dataset, test_data):
     template = "[{}/{} ({:.1f}%)] F1: {:.4f} NLL: {:.4f}"
 
     for (sentence, gold) in test_data:
-        print " gold ", gold.pretty_print()
         num_sen += 1
         #pret, p2l = get_gold_partials(sentence, gold)
         
-        nll, parse_string, nll2, parse_string2 = parse(sentence, pret, p2l)
+        nll, parse_string, nll2, parse_string2 = parse(sentence)
 
         NLL_sum += nll
         #NLL_sum2 += nll2
