@@ -2,7 +2,7 @@ W2V_FILE = "data/w2v.txt"
 GLOVE_FILE = "data/GloVe.txt"
 HEADIFIED_FILE = "data/head.txt"
 TREES_FILE = "data/trees.txt"
-TRAIN_FILE = "data/train.txt"
+DATA_FILE = "data/"
 NT_FILE = "data/nonterminals.txt"
 
 PRE_TRAINED_FILE = "output/default_cpu/model_dict"

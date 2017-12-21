@@ -22,7 +22,7 @@ argparser = argparse.ArgumentParser(description='Generative Neural Parser')
 # Below are variables associated with files
 # =========================================================================
 argparser.add_argument(
-    '--train', default=constants.TRAIN_FILE, help='Train file path'
+    '--data', default=constants.DATA_FILE, help='Data foler path'
 )
 
 argparser.add_argument(
@@ -48,7 +48,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--seed', default=0, help='Random seed'
+    '--seed', default=200, help='Random seed'
 )
 
 argparser.add_argument(
@@ -118,7 +118,7 @@ if args.verbose == 'yes':
     template = "{0:30}{1:35}"
     print "="*80
     print "- Files:"
-    print template.format(" train file :", args.train)
+    print template.format(" train file :", args.data)
     print template.format(" pretrained file :", args.pretrain)
     print template.format(" whether to read new data :", args.read_data)
     print "- Model:"
@@ -160,13 +160,13 @@ if torch.cuda.is_available():
 # let the processor read in data
 # Model: BLN, LN, BSN, BS
 if args.model == 'BLN':
-    dp = PBLN(args.train, args.make_train, args.read_data, args.verbose, args.seed)
+    dp = PBLN(args.data, args.make_train, args.read_data, args.verbose, args.seed)
 
 elif args.model == 'LN':
-    dp = PLN(args.train, args.make_train, args.read_data, args.verbose, args.seed)
+    dp = PLN(args.data, args.make_train, args.read_data, args.verbose, args.seed)
 
 elif args.model == 'BSN' or args.model == 'BS':
-    dp = Processor(args.train, args.make_train, args.read_data, args.verbose, args.seed)
+    dp = Processor(args.data, args.make_train, args.read_data, args.verbose, args.seed)
 
 else:
     print "Cannot recognize the model!"
@@ -283,9 +283,10 @@ def supervised():
 
         if epoch % 5 == 0:
        	    model.eval()
-            F1_train = test("train")
-            F1 = test("test")
-            model.parse_end()
+            #F1_train = test("train")
+            #F1 = test("test")
+            #model.parse_end()
+            print "NLL on test : ", eval_test_likelihood()
             model.train()
 
         #if F1 > max_F1:
@@ -470,6 +471,29 @@ def test(dataset):
 
     return eval_unofficial(dataset, test_data)
 
+def eval_test_likelihood():
+    idx = 0
+    batch = 0
+    tot_loss = 0
+    while True:
+        batch += 1
+
+        # get next training instances
+        idx, next_bch = dp.next(idx, args.batch_size, dataset='test')
+
+        # create PyTorch Variables
+        if args.cuda:
+            next_bch = [Variable(torch.LongTensor(x).cuda()) for x in next_bch]
+        else:
+            next_bch = [Variable(torch.LongTensor(x)) for x in next_bch]
+
+        # compute loss
+        loss = model('supervised', next_bch)
+        tot_loss += loss.data[0]
+        if idx == -1:
+            break
+
+    return tot_loss
 
 def check_spv():
     pass

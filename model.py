@@ -388,20 +388,20 @@ class LN(nn.Module):
         self.T_h1 = nn.Linear(T_in, d_T)
         self.T_h2 = nn.Linear(d_T, T_out)
 
-        '''
+
         self.xavier_reset([
             self.B_h1, self.B_h2,
             self.C_h1, self.C_h2,
             self.U_h1, self.U_h2,
             self.T_h1, self.T_h2
         ])
-        '''
+
 
     def xavier_reset(self, W_list):
         for W in W_list:
             stdv = math.sqrt(2.) / math.sqrt(W.weight.size(0) + W.weight.size(1))
-            W.weight.data.uniform_(-stdv, stdv)
-            W.bias.data.uniform_(-stdv, stdv)
+            W.weight.data.normal_(-stdv, stdv)
+            W.bias.data.fill_(0)
 
 
     def init_h0(self, bsz=None):

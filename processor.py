@@ -23,19 +23,23 @@ from util import oneline, head_binarize, binarize, unbinarize
 Base Class Processor
 """
 class Processor(object):
-    def __init__(self, train_file, make_train, read_data, verbose, seed):
+    def __init__(self, data_folder, make_train, read_data, verbose, seed):
         '''
         Initialize the processor, taking inputs from the main class
-        @param train_file   The filename of the train file
+        @param data_folder  The directory path of data to be stored
         @param read_data    Whether to read WSJ and word2vec embedding
         @param make_train   Whether to make new training set (e.g. more sentences to train)
         @param verbose      Whether to have printout for debugging
         '''
-        self.train_file = train_file    # the train file
+        self.data_file = data_folder
+        self.train_file = data_folder + "train.txt"
+        self.dev_file = data_folder + "dev.txt"
+        self.test_file = data_folder + "test.txt"
+
         self.read_data = read_data      # whether to read new data
         self.verbose = verbose          # verbose mode or not
         self.make_train = make_train    # whether to make train set
-        np.random.seed(seed)
+        np.random.seed(seed)            # set random seed
 
     #####################################################################################
     def check_file_exists(self, filename, file_type):
@@ -222,12 +226,25 @@ class Processor(object):
 
 
     #####################################################################################
-    def read_train_data(self):
+    def read_input(self):
         if not self.check_file_exists(self.train_file, "training data"):
+            return
+        if not self.check_file_exists(self.dev_file, "training data"):
+            return
+        if not self.check_file_exists(self.test_file, "training data"):
             return
 
         with open(self.train_file, 'r') as data:
             self.train_data = data.readlines()
+            self.trainset_length = len(self.train_data)
+
+        with open(self.dev_file, 'r') as data:
+            self.dev_data = data.readlines()
+            self.devset_length = len(self.dev_data)
+
+        with open(self.test_file, 'r') as data:
+            self.test_data = data.readlines()
+            self.testset_length = len(self.test_data)
 
 
     def shuffle(self):
@@ -398,7 +415,7 @@ class Processor(object):
         return sen_i
 
 
-    def make_trainset(self):
+    def make_data(self, dataset, num=None):
         '''
         Making the trainset. In other word, we create a more compact and
         convenient representation for each tree in our trainset: we store
@@ -407,15 +424,17 @@ class Processor(object):
         '''
         begin_time = time.time()
 
-        train_trees = list(
-            ptb(["train", "test"], maxlength=constants.MAX_SEN_LENGTH)
+        trees = list(
+            ptb(dataset, maxlength=constants.MAX_SEN_LENGTH, n=num)
         )
 
-        f = open(self.train_file, 'w')
+        filename = self.data_file + dataset + ".txt"
+
+        f = open(filename, 'w')
         num_sen = 0
         counter = 0
 
-        for (sentence, gold_tree) in train_trees:
+        for (sentence, gold_tree) in trees:
             counter += 1
 
             d = self.encode_tree(gold_tree)
@@ -431,8 +450,7 @@ class Processor(object):
 
         end_time = time.time()
 
-        print "-- Making trainset takes %.4f s" \
-            % round(end_time - begin_time, 5)
+        print "-- Making %sset takes %.4f s".format(dataset, round(end_time - begin_time, 5))
         print " # sentences ", num_sen
 
 
@@ -650,9 +668,11 @@ class Processor(object):
             self.init_nonterminal_indices()
             self.init_rules()
 
-            self.make_trainset()
-            self.read_train_data()
-            self.trainset_length = len(self.train_data)
+            self.make_data('train')
+            self.make_data('dev')
+            self.make_data('test')
+
+            self.read_input()
 
             end = time.time()
 
@@ -661,6 +681,12 @@ class Processor(object):
             # save those for future use
             torch.save({
                     'trainset_length': self.trainset_length,
+                    'devset_length': self.devset_length,
+                    'testset_length': self.testset_length,
+
+                    'train_data': self.train_data,
+                    'dev_data': self.dev_data,
+                    'test_data': self.test_data,
 
                     'nt': self.nt,
                     'dt': self.dt,
@@ -682,9 +708,7 @@ class Processor(object):
                     'nt2idx': self.nt2idx,
                     'idx2nt': self.idx2nt,
 
-                    'words_set': self.words_set,
-
-                    'train_data': self.train_data,
+                    'words_set': self.words_set
                 }, constants.CORPUS_INFO_FILE)
 
         elif self.make_train:
@@ -722,14 +746,21 @@ class Processor(object):
 
             self.words_set = d['words_set']
 
-            self.make_trainset()
-            self.read_train_data()
-            self.trainset_length = len(self.train_data)
+            self.make_data('train', 500)
+            self.make_data('dev', 500)
+            self.make_data('test', 500)
+            self.read_input()
 
             os.remove(constants.CORPUS_INFO_FILE)
 
             torch.save({
                     'trainset_length': self.trainset_length,
+                    'devset_length': self.devset_length,
+                    'testset_length': self.testset_length,
+
+                    'train_data': self.train_data,
+                    'dev_data': self.dev_data,
+                    'test_data': self.test_data,
 
                     'nt': self.nt,
                     'dt': self.dt,
@@ -751,9 +782,7 @@ class Processor(object):
                     'nt2idx': self.nt2idx,
                     'idx2nt': self.idx2nt,
 
-                    'words_set': self.words_set,
-
-                    'train_data': self.train_data,
+                    'words_set': self.words_set
                 }, constants.CORPUS_INFO_FILE)
 
             end = time.time()
@@ -771,6 +800,11 @@ class Processor(object):
             d = torch.load(constants.CORPUS_INFO_FILE)
 
             self.trainset_length = d['trainset_length']
+            self.devset_length = d['devset_length']
+            self.testset_length = d['testset_length']
+            self.train_data = d['train_data']
+            self.dev_data = d['dev_data']
+            self.test_data = d['test_data']
 
             self.nt = d['nt']
             self.dt = d['dt']
@@ -793,8 +827,6 @@ class Processor(object):
             self.idx2nt = d['idx2nt']
 
             self.words_set = d['words_set']
-
-            self.train_data = d['train_data']
 
             end = time.time()
 
@@ -932,108 +964,113 @@ class PLN(Processor):
 
 
     #####################################################################################
-    def next(self, idx, bsz=None):
+    def next(self, idx, bsz=None, dataset='train'):
         '''
         this function extract the next batch of training instances
         and save them for later use
         '''
-        if bsz == None:
-            ## unsupervised
-            print "Not implemented yet"
-
+        if dataset == 'train':
+            ds = self.train_data
+            length = self.trainset_length
+        elif dataset == 'dev':
+            ds = self.dev_data
+            length = self.devset_length
         else:
-            ## supervised
-            # bsz is batch size, the number of sentences we process each time
-            # the maximum number of training instances in a batch
-            m = constants.MAX_SEN_LENGTH
-            self.sens = torch.LongTensor(bsz, m).fill_(0)
+            ds = self.test_data
+            length = self.testset_length
 
-            # P( A -> B C ) = P( B | A ) * P ( C | A, B )
-            self.AA = []
-            self.BB = []
-            self.CC = []
-            self.BI = []
-            self.CI = []
+        ## supervised
+        # bsz is batch size, the number of sentences we process each time
+        # the maximum number of training instances in a batch
+        m = constants.MAX_SEN_LENGTH
+        self.sens = torch.LongTensor(bsz, m).fill_(0)
 
-            # P( unary | A )
-            self.U = []
-            self.U_A = []
-            self.UI = []
+        # P( A -> B C ) = P( B | A ) * P ( C | A, B )
+        self.AA = []
+        self.BB = []
+        self.CC = []
+        self.BI = []
+        self.CI = []
 
-            # P( word | A )
-            self.T = []
-            self.T_A = []
-            self.TI = []
+        # P( unary | A )
+        self.U = []
+        self.U_A = []
+        self.UI = []
 
-            num_sen = 0
+        # P( word | A )
+        self.T = []
+        self.T_A = []
+        self.TI = []
 
-            while num_sen < bsz and idx < self.trainset_length:
-                d = ast.literal_eval(self.train_data[idx])
-                tl = d['s']
-                bl = d['b']
-                ul = d['u']
-                previous = num_sen * m
-                # binary
-                for Bi, Ci, A, B, C in bl:
-                    self.AA.append(A)
-                    self.BB.append(B)
-                    self.CC.append(C)
-                    self.BI.append(Bi+previous)
-                    self.CI.append(Ci+previous)
+        num_sen = 0
 
-                # unary
-                for Ai, A, index in ul:
-                    self.U.append(index)
-                    self.U_A.append(A)
-                    self.UI.append(Ai+previous)
+        while num_sen < bsz and idx < length:
+            d = ast.literal_eval(ds[idx])
+            tl = d['s']
+            bl = d['b']
+            ul = d['u']
+            previous = num_sen * m
+            # binary
+            for Bi, Ci, A, B, C in bl:
+                self.AA.append(A)
+                self.BB.append(B)
+                self.CC.append(C)
+                self.BI.append(Bi+previous)
+                self.CI.append(Ci+previous)
 
-                # lexicon
-                index = 0
-                for Ti, A, word in tl:
-                    self.T.append(word)
-                    self.T_A.append(A)
-                    self.TI.append(Ti+previous)
-                    index += 1
-                    if index < m:
-                        self.sens[num_sen][index] = word
+            # unary
+            for Ai, A, index in ul:
+                self.U.append(index)
+                self.U_A.append(A)
+                self.UI.append(Ai+previous)
 
-                num_sen += 1
-                idx += 1
+            # lexicon
+            index = 0
+            for Ti, A, word in tl:
+                self.T.append(word)
+                self.T_A.append(A)
+                self.TI.append(Ti+previous)
+                index += 1
+                if index < m:
+                    self.sens[num_sen][index] = word
 
-            '''
-            # DEBUG
+            num_sen += 1
+            idx += 1
 
-            for i in xrange(len(self.AA)):
-                print " RULE {} -> ({}){} ({}){}".format(
-                    self.AA[i],
-                    self.BI[i],
-                    self.BB[i],
-                    self.CI[i],
-                    self.CC[i]
-                )
+        '''
+        # DEBUG
 
-            print "-" * 10
+        for i in xrange(len(self.AA)):
+            print " RULE {} -> ({}){} ({}){}".format(
+                self.AA[i],
+                self.BI[i],
+                self.BB[i],
+                self.CI[i],
+                self.CC[i]
+            )
 
-            for i in xrange(len(self.U)):
-                print self.idx2nt[self.U_A[i]], " -> ", self.idx2u[self.U[i]]
+        print "-" * 10
 
-            print "_" * 10
+        for i in xrange(len(self.U)):
+            print self.idx2nt[self.U_A[i]], " -> ", self.idx2u[self.U[i]]
 
-            for i in xrange(len(self.T)):
-                print self.idx2nt[self.T_A[i]], " -> ", self.idx2w[self.T[i]]
-            '''
+        print "_" * 10
 
-            next_bch = [
-                self.sens,
-                self.BI, self.CI, self.AA, self.BB, self.CC,
-                self.UI, self.U, self.U_A,
-                self.TI, self.T, self.T_A
-            ]
+        for i in xrange(len(self.T)):
+            print self.idx2nt[self.T_A[i]], " -> ", self.idx2w[self.T[i]]
+        '''
 
-            if idx >= self.trainset_length:
-                idx = -1
+        next_bch = [
+            self.sens,
+            self.BI, self.CI, self.AA, self.BB, self.CC,
+            self.UI, self.U, self.U_A,
+            self.TI, self.T, self.T_A
+        ]
 
-            return idx, next_bch
+        if idx >= length:
+            idx = -1
+
+        return idx, next_bch
 
 
 """
