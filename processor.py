@@ -397,6 +397,8 @@ class Processor(object):
 
         return self.w2idx[sig(word, word in self.words_set, word.lower() in self.words_set)]
 
+    def is_oov(self, word):
+        return not sig(word, word in self.words_set, word.lower() in self.words_set) == word
 
     def get_idx(self, sentence):
         '''
@@ -668,7 +670,7 @@ class Processor(object):
             self.init_nonterminal_indices()
             self.init_rules()
 
-            self.make_data('train')
+            self.make_data('train', 500)
             self.make_data('dev', 500)
             self.make_data('test', 500)
 
@@ -746,7 +748,7 @@ class Processor(object):
 
             self.words_set = d['words_set']
 
-            self.make_data('train')
+            self.make_data('train', 500)
             self.make_data('dev', 500)
             self.make_data('test', 500)
             self.read_input()

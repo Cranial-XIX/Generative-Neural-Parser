@@ -86,7 +86,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--learning-rate', default=2e-3, help="learning rate"
+    '--learning-rate', default=1e-2, help="learning rate"
 )
 
 argparser.add_argument(
@@ -281,7 +281,7 @@ def supervised():
 
         print " Epoch {} -- likelihood of trainset is: {:.4f}\n".format(epoch, tot_loss)
 
-        if epoch % 1 == 0:
+        if epoch % 5 == 0:
        	    model.eval()
             #F1_train = test("train")
             #F1 = test("test")
@@ -416,6 +416,15 @@ def evalb_unofficial_helper(gold, parse):
     )
     return GW, G, W
 
+def has_oov(sentence):
+    sentence = sentence.split()
+    for i in xrange(len(sentence)):
+        isoov = dp.is_oov(sentence[i])
+        if isoov:
+            print "the oov is : ", sentence[i]
+            return True
+    return False
+
 def eval_unofficial(dataset, test_data):
     start = time.time()
     N = len(test_data)
@@ -423,7 +432,7 @@ def eval_unofficial(dataset, test_data):
     #GW_sum2 = G_sum2 = W_sum2 = NLL_sum2 = 0
 
     num_sen = 0
-    template = "[{}/{} ({:.1f}%)] F1: {:.4f} NLL: {:.4f}"
+    template = "[{}/{} ({:.1f}%)] F1: {:.4f} NLL: {:.4f} has OOV: {}"
 
     for (sentence, gold) in test_data:
         num_sen += 1
@@ -447,7 +456,7 @@ def eval_unofficial(dataset, test_data):
         if args.verbose:
             F, P, R = fpr(GW, G, W)
             #F2, P2, R2 = fpr(GW2, G2, W2)
-            print template.format(num_sen, N, num_sen/float(N)*100, F, nll)
+            print template.format(num_sen, N, num_sen/float(N)*100, F, nll, has_oov(sentence))
 
 
     F, _, _ = fpr(GW_sum, G_sum, W_sum)
@@ -467,7 +476,7 @@ def eval_unofficial(dataset, test_data):
 def test(dataset):
 
     model.parse_setup()
-    test_data = list(ptb(dataset, minlength=3, maxlength=constants.MAX_TEST_SEN_LENGTH, n=500))
+    test_data = list(ptb(dataset, minlength=3, maxlength=constants.MAX_TEST_SEN_LENGTH, n=200))
 
     return eval_unofficial(dataset, test_data)
 
