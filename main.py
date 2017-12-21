@@ -86,7 +86,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--learning-rate', default=0.01, help="learning rate"
+    '--learning-rate', default=2e-3, help="learning rate"
 )
 
 argparser.add_argument(
@@ -221,7 +221,7 @@ def supervised():
     learning_rate = args.learning_rate
     # define the optimizer to use; currently use Adam
     optimizer = optim.Adam(
-        parameters, lr=learning_rate, weight_decay=args.l2_coef
+        parameters, lr=learning_rate, weight_decay=0.05
     )
 
     total = dp.trainset_length
@@ -237,15 +237,15 @@ def supervised():
         batch = 0
         tot_loss = 0
         
-        if epoch > 1 and learning_rate > 1e-4:
+        if epoch == 5:
             parameters = itertools.ifilter(
                 lambda x: x.requires_grad, model.parameters()
             )
-            learning_rate *= 0.5
+            learning_rate = 1e-4
             optimizer = optim.Adam(
-                parameters, lr=learning_rate, weight_decay=args.l2_coef
+                parameters, lr=learning_rate, weight_decay=0.01
             )
-      
+
         while True:
             start = time.time()
             batch += 1
@@ -263,7 +263,7 @@ def supervised():
             # compute loss
             loss = model('supervised', next_bch)
             tot_loss += loss.data[0]
-
+            nn.utils.clip_grad_norm(parameters, 0.2)
             loss.backward()
 
             optimizer.step()
@@ -281,7 +281,7 @@ def supervised():
 
         print " Epoch {} -- likelihood of trainset is: {:.4f}\n".format(epoch, tot_loss)
 
-        if epoch % 5 == 0:
+        if epoch % 1 == 0:
        	    model.eval()
             #F1_train = test("train")
             #F1 = test("test")
