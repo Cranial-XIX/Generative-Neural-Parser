@@ -345,6 +345,10 @@ class LN(nn.Module):
         self.nt_emb = nn.Embedding(self.nnt, self.nnt)
         self.nt_emb.weight.data = torch.eye(self.nnt, self.nnt)
         self.word_emb = nn.Embedding(self.nt, self.dt)
+        self.word_emb_plus = nn.Embedding(self.nt, self.dt)
+        self.word_emb.weight.data = dp.word_emb
+        self.word_emb.weight.requires_grad = False
+
         self.nt_emb.weight.requires_grad = False
 
         # The LSTM and some linear transformation layers
@@ -434,7 +438,7 @@ class LN(nn.Module):
         P_P, P_i, U_A, U_i, B_A, B_i, C_A, C_B, C_i, C_j = self.parser.preparse(sentence, sen_idx.data)
 
         #t1 = time.time()
-        V = self.word_emb(sen_idx)
+        V = self.word_emb(sen_idx) + self.word_emb_plus(sen_idx)
         alpha, _ = self.rnn(V.unsqueeze(0), self.h0)
         alpha = alpha.squeeze(0)
 
@@ -577,7 +581,7 @@ class LN(nn.Module):
         TI, T, T_A):
 
         # run the LSTM to extract features from left context
-        dropped = self.drop(self.word_emb(sens))
+        dropped = self.drop(self.word_emb(sens) + self.word_emb_plus(sens))
         alpha, _ = self.rnn(dropped, self.h0)
         alpha = alpha.contiguous().view(-1, alpha.size(2))
 

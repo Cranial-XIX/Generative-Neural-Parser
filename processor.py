@@ -82,6 +82,9 @@ class Processor(object):
 
         '''
 
+        if not self.check_file_exists(constants.GLOVE_FILE, "GloVe embeddings"):
+            return
+
         begin_time = time.time()
 
         # all_trees are all the trees we can use in training -- (trainset) from the WSJ 2-21
@@ -163,6 +166,17 @@ class Processor(object):
             self.w2idx[oov] = self.nt
             self.idx2w.append(oov)
             self.nt += 1
+
+        self.dt = 300
+        self.word_emb = torch.zeros(self.nt, self.dt)
+
+        with open(constants.GLOVE_FILE, 'r') as f:
+            for line in f:
+                emb = line.split()
+                word = emb.pop(0)
+                if word in self.w2idx:
+                    idx = self.w2idx[word]
+                    self.word_emb[idx] = torch.FloatTensor([float(i) for i in emb])
 
         print " - There are {} number of OOVs. ".format(len(oov_set))
 
@@ -690,6 +704,8 @@ class Processor(object):
                     'dev_data': self.dev_data,
                     'test_data': self.test_data,
 
+                    'word_emb': self.word_emb,
+
                     'nt': self.nt,
                     'dt': self.dt,
                     'nnt': self.nnt,
@@ -744,7 +760,7 @@ class Processor(object):
             self.nt2idx = d['nt2idx']
             self.idx2nt = d['idx2nt']
 
-            #self.word_emb = d['word_emb']
+            self.word_emb = d['word_emb']
 
             self.words_set = d['words_set']
 
@@ -763,6 +779,8 @@ class Processor(object):
                     'train_data': self.train_data,
                     'dev_data': self.dev_data,
                     'test_data': self.test_data,
+
+                    'word_emb': self.word_emb,
 
                     'nt': self.nt,
                     'dt': self.dt,
@@ -827,6 +845,8 @@ class Processor(object):
             self.idx2w = d['idx2w']
             self.nt2idx = d['nt2idx']
             self.idx2nt = d['idx2nt']
+
+            self.word_emb = d['word_emb']
 
             self.words_set = d['words_set']
 
