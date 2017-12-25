@@ -1,6 +1,10 @@
-data/*
-!data/GloVe.txt
-EVALB/*
+!data/
+data/head.txt
+data/trees.txt
+data/w2v.txt
+data/dev.txt
+data/train.txt
+data/test.txt
 output/*
 corpus_info.tar
 *.pyc
