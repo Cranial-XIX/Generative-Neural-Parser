@@ -986,6 +986,56 @@ class PLN(Processor):
 
 
     #####################################################################################
+    def next_lm(self, idx, bsz=None, dataset='train'):
+        '''
+        this function extract the next batch of training instances
+        and save them for later use
+        '''
+        if dataset == 'train':
+            ds = self.train_data
+            length = self.trainset_length
+        elif dataset == 'dev':
+            ds = self.dev_data
+            length = self.devset_length
+        else:
+            ds = self.test_data
+            length = self.testset_length
+
+        ## supervised
+        # bsz is batch size, the number of sentences we process each time
+        # the maximum number of training instances in a batch
+        m = constants.MAX_SEN_LENGTH
+        sens = torch.LongTensor(bsz, m-1).fill_(0)
+        targets = []
+        targets_I = []
+        num_sen = 0
+
+        while num_sen < bsz and idx < length:
+            d = ast.literal_eval(ds[idx])
+            tl = d['s']
+            previous = num_sen * m
+            # lexicon
+            index = 0
+            for Ti, A, word in tl:
+                index += 1
+                assert Ti == index-1
+                targets.append(word)
+                targets_I.append(previous + Ti)
+                if index < m:
+                    sens[num_sen][index] = word
+
+            num_sen += 1
+            idx += 1
+
+        next_bch = [
+            sens, targets, targets_I
+        ]
+
+        if idx >= length:
+            idx = -1
+
+        return idx, next_bch
+                  
     def next(self, idx, bsz=None, dataset='train'):
         '''
         this function extract the next batch of training instances

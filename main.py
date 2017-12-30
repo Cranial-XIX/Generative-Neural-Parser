@@ -212,6 +212,105 @@ if not args.pretrain == "":
     model.load_state_dict(pretrain['state_dict'])
 
 
+def train_language_model():
+    # get model paramters
+    parameters = itertools.ifilter(
+        lambda x: x.requires_grad, model.parameters()
+    )
+
+    learning_rate = args.learning_rate
+    # define the optimizer to use; currently use Adam
+    optimizer = optim.SGD(
+        parameters, lr=5, weight_decay=0.05
+    )
+
+    total = dp.trainset_length
+
+    template = "Epoch {} [{}/{} ({:.1f}%)] Time {:.2f}"
+
+    max_F1 = 0
+    model.train()    
+
+    for epoch in range(1, args.epochs+1):
+        dp.shuffle()
+        idx = 0
+        batch = 0
+        tot_loss = 0
+
+        while True:
+            start = time.time()
+            batch += 1
+            optimizer.zero_grad()
+
+            # get next training instances
+            idx, next_bch = dp.next_lm(idx, args.batch_size)
+
+            # create PyTorch Variables
+            if args.cuda:
+                next_bch = [Variable(torch.LongTensor(x).cuda()) for x in next_bch]
+            else:
+                next_bch = [Variable(torch.LongTensor(x)) for x in next_bch]
+
+            # compute loss
+            loss = model('language_model', next_bch)
+            tot_loss += loss.data[0]
+            loss.backward()
+
+            nn.utils.clip_grad_norm(parameters, 0.2)
+
+            optimizer.step()
+
+            end = time.time()
+        
+            if idx == -1:
+                if args.verbose:
+                    print template.format(epoch, total, total, 100., round(end - start, 5))
+                break
+            else:
+                if args.verbose:
+                    print template.format(epoch, idx, total,
+                        float(idx)/total * 100., round(end - start, 5))
+
+
+        print " Epoch {} -- cross entropy loss is: {:.4f}\n".format(epoch, tot_loss)
+
+        if epoch % 1 == 0:
+            model.eval()
+            #F1_train = test("train")
+            #F1 = test("test")
+            #model.parse_end()
+            print "cross entropy on test : ", eval_language_model()
+            model.train()
+
+    if args.verbose:
+        print "\nFinish supervised training"
+
+
+def eval_language_model():
+    idx = 0
+    batch = 0
+    tot_loss = 0
+    while True:
+        batch += 1
+
+        # get next training instances
+        idx, next_bch = dp.next_lm(idx, args.batch_size, dataset='test')
+
+        # create PyTorch Variables
+        if args.cuda:
+            next_bch = [Variable(torch.LongTensor(x).cuda()) for x in next_bch]
+        else:
+            next_bch = [Variable(torch.LongTensor(x)) for x in next_bch]
+
+        # compute loss
+        loss = model('language_model', next_bch)
+        tot_loss += loss.data[0]
+        if idx == -1:
+            break
+
+    return tot_loss
+
+
 def supervised():
     # get model paramters
     parameters = itertools.ifilter(
@@ -263,8 +362,9 @@ def supervised():
             # compute loss
             loss = model('supervised', next_bch)
             tot_loss += loss.data[0]
-            nn.utils.clip_grad_norm(parameters, 0.2)
+
             loss.backward()
+            nn.utils.clip_grad_norm(parameters, 0.2)
 
             optimizer.step()
             end = time.time()
@@ -510,6 +610,9 @@ def check_spv():
 ## run the model
 if args.mode == 'spv_train':
     supervised()
+
+elif args.mode == 'language_model':
+    train_language_model()
 
 elif args.mode == 'uspv_train':
     unsupervised()
