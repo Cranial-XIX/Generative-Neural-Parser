@@ -392,7 +392,7 @@ class LN(nn.Module):
         self.T_h1 = nn.Linear(T_in, d_T)
         self.T_h2 = nn.Linear(d_T, T_out)
 
-        self.LM = nn.Linear(self.dhid, self.nt)
+        self.language_model_decoder = nn.Linear(self.dhid, self.nt)
         self.criterion = nn.CrossEntropyLoss()
 
         self.xavier_reset([
@@ -566,7 +566,7 @@ class LN(nn.Module):
         #end = time.time()
         #print " - preparse: {:.2f} compute rule prob: {:.2f} parse: {:.2f}".format(end-t2,t2-t1,t1-start)
         return score, parse, score_gld, parse_gld
-       
+
 
     def forward(self, train_type, args):
         if train_type == 'supervised':
@@ -583,10 +583,11 @@ class LN(nn.Module):
     def language_model(self, sens, targets, targets_I):
         dropped = self.drop(self.word_emb(sens) + self.word_emb_plus(sens))
         alpha, _ = self.rnn(dropped, self.h0)
+        alpha = self.drop(alpha)
         alpha = alpha.contiguous().view(-1, alpha.size(2))
 
-        context = torch.index_select(alpha, 0, targets_I)
-        return self.criterion(self.LM(context), targets)
+        decoded = self.language_model_decoder(torch.index_select(alpha, 0, targets_I))
+        return self.criterion(decoded, targets)
 
 
     def supervised(self, sens,
@@ -597,6 +598,7 @@ class LN(nn.Module):
         # run the LSTM to extract features from left context
         dropped = self.drop(self.word_emb(sens) + self.word_emb_plus(sens))
         alpha, _ = self.rnn(dropped, self.h0)
+        alpha = self.drop(alpha)
         alpha = alpha.contiguous().view(-1, alpha.size(2))
 
         BIv = torch.index_select(alpha, 0, BI)

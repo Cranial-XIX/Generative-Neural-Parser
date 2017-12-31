@@ -2,6 +2,7 @@ import argparse
 import constants
 import datetime
 import itertools
+import math
 import numpy as np
 import os
 import time
@@ -64,7 +65,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--dropout', default=0, help='LSTM dropout'
+    '--dropout', default=0.2, help='LSTM dropout'
 )
 
 argparser.add_argument(
@@ -82,7 +83,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--batch-size', default=100, help='# instances in a batch'
+    '--batch-size', default=20, help='# instances in a batch'
 )
 
 argparser.add_argument(
@@ -93,7 +94,9 @@ argparser.add_argument(
     '--cuda', action='store_true', help='enable CUDA training'
 )
 
+
 args = argparser.parse_args()
+
 # Create folder to save model and log files
 file_save = ""
 save_template = "TIME={}_MDL={}_EPCH={}_BSIZE={}_HD={}_LY={}"
@@ -146,10 +149,12 @@ args.dropout = float(args.dropout)
 args.l2_coef = float(args.l2_coef)
 args.make_train = (args.make_train == 'yes')
 args.read_data = (args.read_data == 'yes')
-args.seed = int(args.seed)
 args.verbose = (args.verbose == 'yes')
+args.seed = int(args.seed)
 
+# set random seed for reproducing
 torch.manual_seed(args.seed)
+np.random.seed(args.seed)
 
 if torch.cuda.is_available():
     if not args.cuda:
@@ -175,7 +180,7 @@ else:
 dp.process_data()
 
 # set batch size for unsupervised learning and parsing
-if not (args.mode == 'spv_train'):
+if not (args.mode == 'spv_train' or args.mode == 'language_model'):
     args.batch_size = 1
 
 # input arguments for model
@@ -190,7 +195,7 @@ inputs = {
     'bsz': args.batch_size,
     'dhid': args.lstm_dim,
 
-    'dp': dp,
+    'dp': dp
 }
 
 if args.model == 'BLN':
@@ -212,6 +217,7 @@ if not args.pretrain == "":
     model.load_state_dict(pretrain['state_dict'])
 
 
+#####################################################################################
 def train_language_model():
     # get model paramters
     parameters = itertools.ifilter(
@@ -219,19 +225,17 @@ def train_language_model():
     )
 
     learning_rate = args.learning_rate
-    # define the optimizer to use; currently use Adam
+
     optimizer = optim.SGD(
-        parameters, lr=5, weight_decay=0.05
+        parameters, lr=0.01, weight_decay=0.01
     )
 
     total = dp.trainset_length
+    template = "Epoch {} [{}/{} ({:.1f}%)] Time {:.2f} Loss {:.2f}"
 
-    template = "Epoch {} [{}/{} ({:.1f}%)] Time {:.2f}"
+    model.train()
 
-    max_F1 = 0
-    model.train()    
-
-    for epoch in range(1, args.epochs+1):
+    for epoch in range(1, 1+10):
         dp.shuffle()
         idx = 0
         batch = 0
@@ -264,26 +268,23 @@ def train_language_model():
         
             if idx == -1:
                 if args.verbose:
-                    print template.format(epoch, total, total, 100., round(end - start, 5))
+                    print template.format(epoch, total, total, 100., round(end - start, 5), loss.data[0])
                 break
             else:
                 if args.verbose:
                     print template.format(epoch, idx, total,
-                        float(idx)/total * 100., round(end - start, 5))
+                        float(idx)/total * 100., round(end - start, 5), loss.data[0])
 
-
-        print " Epoch {} -- cross entropy loss is: {:.4f}\n".format(epoch, tot_loss)
+        perplexity = math.exp(tot_loss/float(batch))
+        print " Epoch {} -- perplexity is: {:.4f}\n".format(epoch, perplexity)
 
         if epoch % 1 == 0:
             model.eval()
-            #F1_train = test("train")
-            #F1 = test("test")
-            #model.parse_end()
-            print "cross entropy on test : ", eval_language_model()
+            print "perplexity on test : ", eval_language_model()
             model.train()
 
     if args.verbose:
-        print "\nFinish supervised training"
+        print "\nFinish training language model"
 
 
 def eval_language_model():
@@ -308,19 +309,21 @@ def eval_language_model():
         if idx == -1:
             break
 
-    return tot_loss
+    perplexity = math.exp(tot_loss/float(batch))
+
+    return perplexity
 
 
+#####################################################################################
 def supervised():
     # get model paramters
     parameters = itertools.ifilter(
         lambda x: x.requires_grad, model.parameters()
     )
 
-    learning_rate = args.learning_rate
     # define the optimizer to use; currently use Adam
     optimizer = optim.Adam(
-        parameters, lr=learning_rate, weight_decay=0.05
+        parameters, lr=args.learning_rate, weight_decay=args.l2_coef
     )
 
     total = dp.trainset_length
@@ -335,15 +338,6 @@ def supervised():
         idx = 0
         batch = 0
         tot_loss = 0
-        
-        if epoch == 5:
-            parameters = itertools.ifilter(
-                lambda x: x.requires_grad, model.parameters()
-            )
-            learning_rate = 1e-4
-            optimizer = optim.Adam(
-                parameters, lr=learning_rate, weight_decay=0.01
-            )
 
         while True:
             start = time.time()
@@ -381,7 +375,7 @@ def supervised():
 
         print " Epoch {} -- likelihood of trainset is: {:.4f}\n".format(epoch, tot_loss)
 
-        if epoch % 5 == 0:
+        if epoch % 1 == 0:
        	    model.eval()
             #F1_train = test("train")
             #F1 = test("test")
@@ -529,46 +523,33 @@ def eval_unofficial(dataset, test_data):
     start = time.time()
     N = len(test_data)
     GW_sum = G_sum = W_sum = NLL_sum = 0
-    #GW_sum2 = G_sum2 = W_sum2 = NLL_sum2 = 0
 
     num_sen = 0
     template = "[{}/{} ({:.1f}%)] F1: {:.4f} NLL: {:.4f} has OOV: {}"
 
     for (sentence, gold) in test_data:
         num_sen += 1
-        #pret, p2l = get_gold_partials(sentence, gold)
         
         nll, parse_string, nll2, parse_string2 = parse(sentence)
 
         NLL_sum += nll
-        #NLL_sum2 += nll2
 
         GW, G, W = evalb_unofficial_helper(gold, parse_string)
         GW_sum += GW
         G_sum += G
         W_sum += W
 
-        #GW2, G2, W2 = evalb_unofficial_helper(gold, parse_string2)
-        #GW_sum2 += GW2
-        #G_sum2 += G2
-        #W_sum2 += W2
-
         if args.verbose:
             F, P, R = fpr(GW, G, W)
-            #F2, P2, R2 = fpr(GW2, G2, W2)
             print template.format(num_sen, N, num_sen/float(N)*100, F, nll, has_oov(sentence))
 
 
     F, _, _ = fpr(GW_sum, G_sum, W_sum)
-    #F2, _, _ = fpr(GW_sum2, G_sum2, W_sum2)
 
     end = time.time()
 
     print " On {} # Sen: {} F1: {:.4f} NLL: {:.4f} TIME: {:.2f}".format(
         dataset, N, F, NLL_sum, end-start ) 
-    #print " On {} # Sen: {} F1: {:.5f} NLL: {:.2f} TIME: {:.2f}".format(
-    #    dataset, N, F2, NLL_sum, end-start ) 
-    #print ""
 
     return F
 
@@ -604,11 +585,10 @@ def eval_test_likelihood():
 
     return tot_loss
 
-def check_spv():
-    pass
 
 ## run the model
 if args.mode == 'spv_train':
+    train_language_model()
     supervised()
 
 elif args.mode == 'language_model':
@@ -628,9 +608,6 @@ elif args.mode == 'parse':
         if sentence == "":
             break
         parse(sentence)
-
-elif args.mode == 'check_spv':
-    check_spv()
 
 else:
     print "Unknown mode!"
