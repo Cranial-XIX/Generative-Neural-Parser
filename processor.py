@@ -684,7 +684,7 @@ class Processor(object):
             self.init_nonterminal_indices()
             self.init_rules()
 
-            self.make_data('train', 500)
+            self.make_data('train')
             self.make_data('dev', 500)
             self.make_data('test', 500)
 
@@ -764,7 +764,7 @@ class Processor(object):
 
             self.words_set = d['words_set']
 
-            self.make_data('train', 500)
+            self.make_data('train')
             self.make_data('dev', 500)
             self.make_data('test', 500)
             self.read_input()
@@ -1005,7 +1005,7 @@ class PLN(Processor):
         # bsz is batch size, the number of sentences we process each time
         # the maximum number of training instances in a batch
         m = constants.MAX_SEN_LENGTH
-        sens = torch.LongTensor(bsz, m-1).fill_(0)
+        sens = torch.LongTensor(bsz, m).fill_(0)
         targets = []
         targets_I = []
         num_sen = 0

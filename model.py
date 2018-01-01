@@ -277,22 +277,6 @@ class BS(nn.Module):
 
         return nll_B + nll_C + nll_U + nll_T
 
-"""
-The (B)a(S)eline model with (N)eural network
-"""
-class BSN(nn.Module):
-
-    def __init__(self, args):
-        super(BSN, self).__init__()
-
-
-
-
-
-
-
-
-
 
 
 
@@ -393,6 +377,8 @@ class LN(nn.Module):
         self.T_h2 = nn.Linear(d_T, T_out)
 
         self.language_model_decoder = nn.Linear(self.dhid, self.nt)
+        self.language_model_decoder.weight.data.uniform_(-0.1, 0.1)
+        self.language_model_decoder.bias.data.fill_(0)
         self.criterion = nn.CrossEntropyLoss()
 
         self.xavier_reset([

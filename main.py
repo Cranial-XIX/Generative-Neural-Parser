@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from evalb import evalb, evalb_unofficial, evalb_many
-from model import BLN, LN, BSN, BS
+from model import BLN, LN, BS
 from nltk import Tree
 from processor import Processor, PBLN, PLN
 from ptb import ptb
@@ -41,7 +41,7 @@ argparser.add_argument(
 # Below are variables associated with model
 # =========================================================================
 argparser.add_argument(
-    '--model', default="LN", help='Model: BLN, LN, BSN, BS'
+    '--model', default="LN", help='Model: BLN, LN, BS'
 )
 
 argparser.add_argument(
@@ -57,11 +57,11 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--lstm-layer', default=3, help='# LSTM layer'
+    '--lstm-layer', default=2, help='# LSTM layer'
 )
 
 argparser.add_argument(
-    '--lstm-dim', default=300, help='LSTM hidden dimension'
+    '--lstm-dim', default=600, help='LSTM hidden dimension'
 )
 
 argparser.add_argument(
@@ -87,7 +87,7 @@ argparser.add_argument(
 )
 
 argparser.add_argument(
-    '--learning-rate', default=1e-2, help="learning rate"
+    '--learning-rate', default=2e-4, help="learning rate"
 )
 
 argparser.add_argument(
@@ -170,7 +170,7 @@ if args.model == 'BLN':
 elif args.model == 'LN':
     dp = PLN(args.data, args.make_train, args.read_data, args.verbose, args.seed)
 
-elif args.model == 'BSN' or args.model == 'BS':
+elif args.model == 'BS':
     dp = Processor(args.data, args.make_train, args.read_data, args.verbose, args.seed)
 
 else:
@@ -202,8 +202,6 @@ if args.model == 'BLN':
     model = BLN(inputs)
 elif args.model == 'LN':
     model = LN(inputs)
-elif args.model == 'BSN':
-    model = BSN(inputs)
 elif args.model == 'BS':
     model = BS(inputs)
 
@@ -220,22 +218,23 @@ if not args.pretrain == "":
 #####################################################################################
 def train_language_model():
     # get model paramters
-    parameters = itertools.ifilter(
-        lambda x: x.requires_grad, model.parameters()
+    
+    #parameters = itertools.ifilter(
+    #    lambda x: x.requires_grad, model.parameters()
+    #)
+
+    learning_rate = 10 #args.learning_rate
+    '''
+    optimizer = optim.Adam(
+        parameters, lr=1e-4, weight_decay=1e-3
     )
-
-    learning_rate = args.learning_rate
-
-    optimizer = optim.SGD(
-        parameters, lr=0.01, weight_decay=0.01
-    )
-
+    '''
     total = dp.trainset_length
     template = "Epoch {} [{}/{} ({:.1f}%)] Time {:.2f} Loss {:.2f}"
 
     model.train()
 
-    for epoch in range(1, 1+10):
+    for epoch in range(1, 1+20):
         dp.shuffle()
         idx = 0
         batch = 0
@@ -244,10 +243,11 @@ def train_language_model():
         while True:
             start = time.time()
             batch += 1
-            optimizer.zero_grad()
+            #optimizer.zero_grad()
 
             # get next training instances
             idx, next_bch = dp.next_lm(idx, args.batch_size)
+            model.zero_grad()
 
             # create PyTorch Variables
             if args.cuda:
@@ -260,9 +260,15 @@ def train_language_model():
             tot_loss += loss.data[0]
             loss.backward()
 
-            nn.utils.clip_grad_norm(parameters, 0.2)
+            nn.utils.clip_grad_norm(model.parameters(), 0.2)
 
-            optimizer.step()
+            #optimizer.step()
+            for p in model.language_model_decoder.parameters():
+                p.data.add_(-learning_rate, p.grad.data)
+            for p in model.rnn.parameters():
+                p.data.add_(-learning_rate, p.grad.data)
+            for p in model.word_emb_plus.parameters():
+                p.data.add_(-learning_rate, p.grad.data)
 
             end = time.time()
         
@@ -316,6 +322,9 @@ def eval_language_model():
 
 #####################################################################################
 def supervised():
+    #for param in model.rnn.parameters():
+    #    param.requires_grad = False
+
     # get model paramters
     parameters = itertools.ifilter(
         lambda x: x.requires_grad, model.parameters()
@@ -373,14 +382,14 @@ def supervised():
                         float(idx)/total * 100., round(end - start, 5))
 
 
-        print " Epoch {} -- likelihood of trainset is: {:.4f}\n".format(epoch, tot_loss)
+        print " Epoch {} -- avg nll: {:.4f}\n".format(epoch, tot_loss/float(total))
 
         if epoch % 1 == 0:
        	    model.eval()
             #F1_train = test("train")
             #F1 = test("test")
             #model.parse_end()
-            print "NLL on test : ", eval_test_likelihood()
+            print "    test  -- avg nll: {:.4f}".format(eval_test_likelihood()/float(total))
             model.train()
 
         #if F1 > max_F1:
